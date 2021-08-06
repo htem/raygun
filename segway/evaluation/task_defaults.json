@@ -1,0 +1,33 @@
+{
+    "Input":
+        {
+            "segment_dataset":[
+                "segmentation_0.500",
+                "segmentation_0.600",
+                "segmentation_0.700",
+                "segmentation_0.800"
+            ],
+            "voxel_size":[40, 4, 4]
+        },   
+    "Output":
+        {
+            "output_path":"./",
+            "write_TXT": true,
+            "write_CSV": true,
+            "colors":["blue", "yellow","black","coral","purple","navy","lime","red","fuchsia","gold", "maroon", "darkgreen", "darkslategrey", "fuchsia"],
+            "markers":["o", "", "^", "", "s", "", "p", "", "D"],
+            "font_size":10,
+            "line_width": 2.5
+        },
+    "AdditionalFeatures":
+        {
+            "z_weight_multiplier": 1,
+            "step":40,
+            "ignore_glia": true,
+            "leaf_node_removal_depth": 2,
+            "with_interpolation": true,
+            "assume_minimal_merges": true,
+            "max_break_size": 1,
+            "load_segment_array_to_memory": true
+        }   
+}

@@ -1,0 +1,189 @@
+{
+    "Input":
+        {
+            "log_dir": ".logs/{script_folder}/{experiment}_{network}_{iteration}",
+            "output_file" : "./{experiment}.zarr"
+        },
+
+    "GlobalConfig":
+        {
+            "dry_run": 0
+        },
+
+    "SynfulNetwork":
+        {
+            "name": "dummy_synful_network",
+            "iteration": 100000,
+            "name1": "dummy_synful_network",
+            "iteration1": 100000
+        },
+
+    "Network":
+        {
+            "name": "setup45",
+            "train_dir" : "/n/groups/htem/Segmentation/networks/cb2_setups/setup45",
+            "iteration" : 285000,
+            "net_voxel_size": [40, 4, 4],
+            "myelin_prediction": 1,
+            "mem_per_core": 4.5
+         },
+
+    "PredictTask":
+        {
+            "out_dataset" : "volumes/affs",
+            "num_workers": 1
+        },
+
+    "PredictCapillaryTask":
+        {
+            "out_dataset" : "volumes/capillary_pred",
+            "num_workers": 4,
+            "lazyflow_num_threads": 4,
+            "lazyflow_mem": 2048,
+            "block_size": [1000, 65536, 65536],
+            "context": [0, 8192, 8192]
+        },
+
+    "PredictSynapseTask":
+        {
+            "num_workers": 1
+        },
+
+    "PredictSynapseDirTask":
+        {
+            "num_workers": 1
+        },
+        
+    "ExtractFragmentTask":
+        {
+            "affs_dataset": "/volumes/affs",
+            "fragments_dataset": "/volumes/fragments",
+            "block_size": [1000, 2048, 2048],
+            "context": [120, 256, 256],
+            "num_workers": 16,
+            "fragments_in_xy": 1,
+            "mask_fragments": 0,
+            "use_mahotas": 0
+        },
+    "ExtractSynapsesTask":
+        {
+            "syn_indicator_dataset": "/volumes/pred_syn_indicator",
+            "syn_dir_dataset": "/volumes/pred_partner_vectors",
+            "block_size": [2000, 2048, 2048],
+            "context": [256, 256, 256],
+            "num_workers": 1
+        },
+
+    "AgglomerateTask":
+        {
+            "affs_dataset": "/volumes/affs",
+            "fragments_dataset": "/volumes/fragments",
+            "merge_function": "hist_quant_50",
+            "block_size": [8960, 8192, 8192],
+            "context": [1280, 1024, 1024],
+            "filedb_nodes_chunk_size": [1000, 2048, 2048],
+            "filedb_edges_chunk_size": [8960, 8192, 8192],
+            "num_workers": 2,
+            "sbatch_mem": 32,
+            "sbatch_time": "1:00:00",
+            "max_retries": 1
+        },
+
+    "SegmentationTask":
+        {
+            "fragments_dataset": "/volumes/fragments",
+            "out_dataset": "volumes/segmentation",
+            "thresholds": [0.6, 0.7, 0.8, 0.9],
+            "sbatch_mem": 32,
+            "sbatch_time": "1:00:00",
+            "num_workers": 1
+        },
+
+    "FindSegmentsBlockwiseTask":
+        {
+            "lut_dir": "luts/fragment_segment",
+            "fragments_dataset": "/volumes/fragments",
+            "num_workers": 4,
+            "block_size": [4000, 4096, 4096],
+            "filedb_nodes_chunk_size": [1000, 2048, 2048],
+            "filedb_edges_chunk_size": [8960, 8192, 8192]
+        },
+
+    "MakeInterThresholdMappingTask":
+        {
+            "lut_dir": "luts/fragment_segment",
+            "fragments_dataset": "/volumes/fragments",
+            "num_workers": 4,
+            "block_size": [4000, 4096, 4096]
+        },
+
+    "FindSegmentsBlockwiseTask2":
+        {
+            "lut_dir": "luts/fragment_segment",
+            "fragments_dataset": "/volumes/fragments",
+            "num_workers": 4,
+            "block_size": [4000, 4096, 4096]
+        },
+
+    "FindSegmentsBlockwiseTask2a":
+        {
+            "lut_dir": "luts/fragment_segment",
+            "fragments_dataset": "/volumes/fragments",
+            "num_workers": 4,
+            "block_size": [4000, 4096, 4096]
+        },
+
+    "FindSegmentsBlockwiseTask2b":
+        {
+            "lut_dir": "luts/fragment_segment",
+            "fragments_dataset": "/volumes/fragments",
+            "num_workers": 4,
+            "block_size": [4000, 4096, 4096]
+        },
+
+    "FindSegmentsBlockwiseTask3":
+        {
+            "lut_dir": "luts/fragment_segment",
+            "fragments_dataset": "/volumes/fragments",
+            "num_workers": 1,
+            "block_size": [4000, 4096, 4096]
+        },
+
+    "FindSegmentsBlockwiseTask4":
+        {
+            "lut_dir": "luts/fragment_segment",
+            "fragments_dataset": "/volumes/fragments",
+            "thresholds": [
+                           0.10, 0.15,
+                           0.20, 0.25,
+                           0.30, 0.35,
+                           0.40, 0.45,
+                           0.50, 0.55,
+                           0.60, 0.65,
+                           0.70, 0.75,
+                           0.80, 0.85,
+                           0.90],
+            "num_workers": 4,
+            "block_size": [4000, 4096, 4096],
+            "chunk_size": [4, 4, 4]
+        },
+
+    "ExtractSegmentationFromLUTBlockwiseTask":
+        {
+            "fragments_dataset": "/volumes/fragments",
+            "out_dataset": "volumes/segmentation",
+            "thresholds": [0.5, 0.6, 0.7, 0.8, 0.9],
+            "num_workers": 4,
+            "lut_dir": "luts/fragment_segment",
+            "block_size": [4000, 4096, 4096]
+        },
+
+    "BlockwiseSegmentationTask":
+        {
+            "fragments_dataset": "/volumes/fragments",
+            "out_dataset": "volumes/sparse_segmentation",
+            "block_size": [2240, 2048, 2048],
+            "threshold": 0.5,
+            "num_workers": 4
+        }
+}

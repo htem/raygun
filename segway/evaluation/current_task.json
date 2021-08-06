@@ -1,0 +1,33 @@
+{
+    "Input":
+        {
+            "segment_dataset":[
+                "segmentation_0.100",
+                "segmentation_0.200",
+                "segmentation_0.300",
+                "segmentation_0.400",
+                "segmentation_0.500",
+                "segmentation_0.600",
+                "segmentation_0.700",
+                "segmentation_0.800",
+                "segmentation_0.900"
+            ],
+            "segment_volumes":[
+                "/n/groups/htem/temcagt/datasets/cb2/segmentation/tri/cb2_segmentation/outputs/2019_03/cb2_synapse_cutout4/cb2/130000/output.zarr",
+                "/n/groups/htem/temcagt/datasets/cb2/segmentation/tri/cb2_segmentation/outputs/2019_03/cb2_synapse_cutout4/setup00/40000/output.zarr"
+            ]
+        },
+    "Output":
+        {
+            "output_path":"./"
+        },
+    "GraphMatricesTask" :
+        {   
+            "chosen_matrices":["rand"]
+        },
+    "PrintSplitMergeErrorTask":
+        {
+            "chosen_error_type":["merge"]
+        }
+        
+}
