@@ -8,7 +8,7 @@ from torch.nn import functional as F
 from torch.nn import _reduction as _Reduction
 from torch.nn.modules.loss import _Loss
 
-from torch import Tensor
+from torch import Tensor, BoolTensor
 from typing import Callable, Optional
 import random
 
@@ -73,7 +73,17 @@ class MaskedMSELoss(_Loss):
     def __init__(self, reduction: str = 'mean') -> None:
         super(MaskedMSELoss, self).__init__(reduction)
 
-    def forward(self, input: Tensor, mask: Tensor, target: Tensor) -> Tensor:
-        masked_input = input[mask > 0]
-        masked_target = target[mask > 0]
-        return F.mse_loss(masked_input, masked_target, reduction=self.reduction)
+    def forward(self, input: Tensor, mask: Tensor or BoolTensor, target: Tensor) -> Tensor:
+        if not isinstance(mask, BoolTensor):
+            mask = mask > 0
+
+        if mask.numel() > input.numel():
+            pad_width = (np.array(mask.shape) - np.array(input.shape)) // 2
+            if pad_width.shape[0] == 2:
+                input_mask = mask[pad_width[0]:-pad_width[0], pad_width[1]:-pad_width[1]]
+            else: # assumes 3 dimensions...
+                input_mask = mask[pad_width[0]:-pad_width[0], pad_width[1]:-pad_width[1], pad_width[2]:-pad_width[2]] 
+        else:
+            input_mask = mask
+        
+        return F.mse_loss(input[input_mask], target[mask], reduction=self.reduction)
