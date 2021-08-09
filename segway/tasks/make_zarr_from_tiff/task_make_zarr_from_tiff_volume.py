@@ -228,7 +228,7 @@ def make_zarr_from_tiff(src, args):
     else:
         ap = argparse.ArgumentParser()
         # ap.add_argument("input_file", type=str, help='Input hdf/zarr volume')
-        ap.add_argument("src_file", type=str, help='E.g.: /n/groups/htem/ESRF_id16a/tomo_ML/ReducedAnglesXray/CARE/mCTX/450p_stacks/mCTX_17keV_30nm_512c_first256.tif')
+        ap.add_argument("src_file", type=str, help='E.g.: /n/groups/htem/ESRF_id16a/tomo_ML/ReducedAnglesXray/CARE/mCTX/450p_stacks/mCTX_17keV_30nm_512c_first256.tif', default=src)
         ap.add_argument("y_tile_size", type=int, help='In pixel', default=img.size[0])                       # TODO: GET FROM TIFF FILE
         ap.add_argument("x_tile_size", type=int, help='In pixel', default=img.size[1])
         ap.add_argument("voxel_size", type=int, help='In ZYX', nargs='+')

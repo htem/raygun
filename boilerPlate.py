@@ -25,14 +25,17 @@ class BoilerPlate(gp.BatchFilter):
 
     def setup(self):
         # tell downstream nodes about the new arrays
+        mask_spec = self.spec[self.raw_array].copy()
+        mask_spec.dtype = bool
         self.provides(
             self.mask_array,
-            self.spec[self.raw_array].copy())
+            mask_spec)
         self.provides(
             self.hot_array,
             self.spec[self.raw_array].copy())
 
     def prepare(self, request):
+        self.ndims = request[self.raw_array].roi.dims()
         deps = gp.BatchRequest()
         deps[self.raw_array] = request[self.hot_array].copy() # make sure we're getting the needed data (should already be requested, but just in case)
         return deps
@@ -44,6 +47,7 @@ class BoilerPlate(gp.BatchFilter):
         # create the array spec for the new arrays
         mask_spec = batch[self.raw_array].spec.copy() #TODO: DETERMINE IF THIS IS NECESSARY
         mask_spec.roi = request[self.mask_array].roi.copy() #TODO: DETERMINE IF THIS IS NECESSARY
+        mask_spec.dtype = bool
         hot_spec = batch[self.raw_array].spec.copy() #TODO: DETERMINE IF THIS IS NECESSARY
         hot_spec.roi = request[self.hot_array].roi.copy() #TODO: DETERMINE IF THIS IS NECESSARY
 
@@ -62,41 +66,40 @@ class BoilerPlate(gp.BatchFilter):
         return batch
 
     def get_heat(self, batch):
-        ndims = batch[self.raw_array].roi.dims()
         raw_data = batch[self.raw_array].data
         if not isinstance(self.plate_size, type(None)):
-            if len(self.plate_size) > 1:
+            if len(np.array(self.plate_size).flatten()) > 1:
                 plate_shape = self.plate_size
             else:
-                plate_shape = [self.plate_size,]*ndims           
+                plate_shape = [self.plate_size,]*self.ndims           
+            # TODO: MAKE STACKS WORK --> STACKING BRINGS IN RAW DATA of [n_stack, z, y, x] size
             pad_width = (np.array(raw_data.shape) - np.array(plate_shape)) // 2
-            plate_volume = np.prod(plate_shape)
         else:
-            pad_width = (0,)*ndims
-            plate_volume = np.prod(raw_data.shape)
+            pad_width = (0,)*self.ndims
             plate_shape = raw_data.shape
         
-        numPix = int(plate_volume *  self.perc_hotPixels)
+        numPix = int(np.prod(plate_shape) * self.perc_hotPixels)
         coords = self.getStratifiedCoords(numPix, plate_shape)
 
-        mask = torch.zeros_like(raw_data) > 0
+        mask = np.zeros_like(raw_data) > 0
         hot = raw_data.copy()
-        hot_pixels = torch.utils.data.RandomSampler(raw_data, replacement=True, num_samples=numPix)
+        #hot_pixels = torch.utils.data.RandomSampler(raw_data, replacement=True, num_samples=numPix)
+        hot_pixels = np.random.choice(raw_data.flatten(), size=numPix)
         for i, coord in enumerate(coords):
-            this_coord = tuple(np.add(coord, pad_width))
+            this_coord = tuple(np.add(coord, pad_width).astype(int))
             mask[this_coord] = True
             hot[this_coord] = hot_pixels[i]
 
         return mask, hot
 
-    def getStratifiedCoords(numPix, shape):
+    def getStratifiedCoords(self, numPix, shape):
         '''
         Produce a list of approx. 'numPix' random coordinate, sampled from 'shape' using startified sampling.
         '''
         ndims = len(shape)
         box_size = np.round((np.prod(shape) / numPix)**(1/ndims)).astype(np.int)
         coords = []
-        box_counts = int(np.ceil(shape / box_size))
+        box_counts = np.ceil(shape / box_size).astype(int)
         
         rands = torch.tensor(np.random.randint(0, box_size, (np.prod(box_counts), ndims)))
         
