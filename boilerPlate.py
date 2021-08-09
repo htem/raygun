@@ -42,7 +42,7 @@ class BoilerPlate(gp.BatchFilter):
 
     def process(self, batch, request):
         # make heat mask
-        mask_data, hot_data = self.get_heat(batch)
+        mask_data, hot_data = self.boil(batch)
 
         # create the array spec for the new arrays
         mask_spec = batch[self.raw_array].spec.copy() #TODO: DETERMINE IF THIS IS NECESSARY
@@ -52,43 +52,50 @@ class BoilerPlate(gp.BatchFilter):
         hot_spec.roi = request[self.hot_array].roi.copy() #TODO: DETERMINE IF THIS IS NECESSARY
 
         # create a new batch to hold the new array
-        batch = gp.Batch()
+        new_batch = gp.Batch()
 
         # create a new array
         mask = gp.Array(mask_data, mask_spec)
         hot = gp.Array(hot_data, hot_spec)
 
         # store it in the batch
-        batch[self.mask_array] = mask
-        batch[self.hot_array] = hot
+        new_batch[self.mask_array] = mask
+        new_batch[self.hot_array] = hot
 
         # return the new batch
-        return batch
+        print(f"Batch coming from upstream: {batch}")
+        print(f"New batch going downstream: {new_batch}")
+        return new_batch
 
-    def get_heat(self, batch):
+    def boil(self, batch):
         raw_data = batch[self.raw_array].data
+
         if not isinstance(self.plate_size, type(None)):
             if len(np.array(self.plate_size).flatten()) > 1:
-                plate_shape = self.plate_size
+                self.plate_shape = self.plate_size
             else:
-                plate_shape = [self.plate_size,]*self.ndims           
-            # TODO: MAKE STACKS WORK --> STACKING BRINGS IN RAW DATA of [n_stack, z, y, x] size
-            pad_width = (np.array(raw_data.shape) - np.array(plate_shape)) // 2
+                self.plate_shape = [self.plate_size,]*self.ndims           
+            self.pad_width = (np.array(raw_data.shape[-self.ndims:]) - np.array(self.plate_shape)) // 2
         else:
-            pad_width = (0,)*self.ndims
-            plate_shape = raw_data.shape
+            self.plate_shape = raw_data.shape[-self.ndims:]
+            self.pad_width = (0,)*self.ndims
         
-        numPix = int(np.prod(plate_shape) * self.perc_hotPixels)
-        coords = self.getStratifiedCoords(numPix, plate_shape)
-
+        self.numPix = int(np.prod(self.plate_shape) * self.perc_hotPixels)
         mask = np.zeros_like(raw_data) > 0
         hot = raw_data.copy()
-        #hot_pixels = torch.utils.data.RandomSampler(raw_data, replacement=True, num_samples=numPix)
-        hot_pixels = np.random.choice(raw_data.flatten(), size=numPix)
+        for i, data in enumerate(raw_data):
+            mask, hot = self.get_heat(data, mask, hot, i)
+
+        return mask, hot
+    
+    def get_heat(self, raw_data, mask, hot, ind):
+        ind = tuple([ind]) # yes, i know this is cudegy (jRho, August 2021)
+        coords = self.getStratifiedCoords(self.numPix, self.plate_shape)        
+        hot_pixels = np.random.choice(raw_data.flatten(), size=self.numPix)
         for i, coord in enumerate(coords):
-            this_coord = tuple(np.add(coord, pad_width).astype(int))
-            mask[this_coord] = True
-            hot[this_coord] = hot_pixels[i]
+            this_coord = tuple(np.add(coord, self.pad_width).astype(int))
+            mask[ind + this_coord] = True
+            hot[ind + this_coord] = hot_pixels[i]
 
         return mask, hot
 
