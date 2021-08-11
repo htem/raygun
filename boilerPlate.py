@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import random
 import logging
+from skimage import filters
+from skimage.util import *
 
 import gunpowder as gp
 from gunpowder.array import ArrayKey, Array
@@ -12,6 +14,7 @@ from gunpowder.nodes.generic_train import GenericTrain
 from typing import Dict, Union, Optional
 
 logger = logging.getLogger(__name__)
+logger.setLevel('DEBUG')
 
 from skimage import filters
 
@@ -63,8 +66,8 @@ class BoilerPlate(gp.BatchFilter):
         new_batch[self.hot_array] = hot
 
         # return the new batch
-        print(f"Batch coming from upstream: {batch}")
-        print(f"New batch going downstream: {new_batch}")
+        # print(f"Batch coming from upstream: {batch}")
+        # print(f"New batch going downstream: {new_batch}")
         return new_batch
 
     def boil(self, batch):
@@ -129,3 +132,54 @@ class BoilerPlate(gp.BatchFilter):
             if include:
                 coords.append(tuple(temp_coords[i, :]))
         return coords
+
+class GaussBlur(gp.BatchFilter):
+
+  def __init__(self, array, sigma):
+    self.array = array
+    self.sigma = sigma
+    self.truncate = 4
+
+  def prepare(self, request):
+
+    # the requested ROI for array
+    roi = request[self.array].roi
+
+    # 1. compute the context
+    context = gp.Coordinate((self.truncate,)*roi.dims()) * self.sigma
+
+    # 2. enlarge the requested ROI by the context
+    context_roi = roi.grow(context, context)
+    context_roi = request[self.array].roi.intersect(context_roi) # make sure it doesn't go out of bounds
+
+    # create a new request with our dependencies
+    deps = gp.BatchRequest()
+    deps[self.array] = context_roi
+
+    # return the request
+    return deps
+
+  def process(self, batch, request):
+
+    # 3. smooth the whole array (including the context)
+    data = batch[self.array].data
+    data = filters.gaussian(
+      data,
+      sigma=self.sigma,
+      truncate=self.truncate)
+
+    # 4. make sure to match original datatype
+    # if data.dtype != batch[self.array].spec.dtype:
+    #     if batch[self.array].spec.dtype == 'uint8':
+    #         data = img_as_ubyte(data)
+    #     elif batch[self.array].spec.dtype == 'uint16':
+    #         data = img_as_uint(data)
+    #     elif batch[self.array].spec.dtype == 'int16':
+    #         data = img_as_int(data)
+    #     elif batch[self.array].spec.dtype == 'float64':
+    #         data = img_as_float(data)
+    batch[self.array].spec.dtype = data.dtype
+    batch[self.array].data = data
+
+    # 5. crop the array back to the request
+    batch[self.array] = batch[self.array].crop(request[self.array].roi)
