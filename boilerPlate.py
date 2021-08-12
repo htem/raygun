@@ -19,26 +19,29 @@ logger.setLevel('DEBUG')
 from skimage import filters
 
 class BoilerPlate(gp.BatchFilter):
-    def __init__(self, raw_array, mask_array, hot_array, plate_size=None, perc_hotPixels = 0.198):
+    def __init__(self, raw_array, mask_array, hot_array, plate_size=None, perc_hotPixels = 0.198, ndims=3):
         self.raw_array = raw_array
         self.mask_array = mask_array
         self.hot_array = hot_array
         self.plate_size = plate_size
         self.perc_hotPixels = perc_hotPixels
+        self.ndims = ndims
 
     def setup(self):
         # tell downstream nodes about the new arrays
         mask_spec = self.spec[self.raw_array].copy()
         mask_spec.dtype = bool
+        hot_spec = self.spec[self.raw_array].copy()
+        hot_spec.dtype = np.float64
         self.provides(
             self.mask_array,
             mask_spec)
         self.provides(
             self.hot_array,
-            self.spec[self.raw_array].copy())
+            hot_spec)
 
     def prepare(self, request):
-        self.ndims = request[self.raw_array].roi.dims()
+        #self.ndims = request[self.raw_array].roi.dims()
         deps = gp.BatchRequest()
         deps[self.raw_array] = request[self.hot_array].copy() # make sure we're getting the needed data (should already be requested, but just in case)
         return deps
@@ -53,6 +56,7 @@ class BoilerPlate(gp.BatchFilter):
         mask_spec.dtype = bool
         hot_spec = batch[self.raw_array].spec.copy() #TODO: DETERMINE IF THIS IS NECESSARY
         hot_spec.roi = request[self.hot_array].roi.copy() #TODO: DETERMINE IF THIS IS NECESSARY
+        hot_spec.dtype = hot_data.dtype
 
         # create a new batch to hold the new array
         new_batch = gp.Batch()
@@ -71,7 +75,7 @@ class BoilerPlate(gp.BatchFilter):
         return new_batch
 
     def boil(self, batch):
-        raw_data = batch[self.raw_array].data
+        raw_data = batch[self.raw_array].data.astype(np.float64)
 
         if not isinstance(self.plate_size, type(None)):
             if len(np.array(self.plate_size).flatten()) > 1:
@@ -86,21 +90,38 @@ class BoilerPlate(gp.BatchFilter):
         self.numPix = int(np.prod(self.plate_shape) * self.perc_hotPixels)
         mask = np.zeros_like(raw_data) > 0
         hot = raw_data.copy()
-        for i, data in enumerate(raw_data):
-            mask, hot = self.get_heat(data, mask, hot, i)
+        mask, hot = self.rec_heater(raw_data, mask, hot)
+        # for i, data in enumerate(raw_data):
+        #     mask, hot = self.get_heat(data, mask, hot, i)
 
         return mask, hot
     
-    def get_heat(self, raw_data, mask, hot, ind):
-        ind = tuple([ind]) # yes, i know this is cudegy (jRho, August 2021)
+    # def get_heat(self, raw_data, mask, hot, ind):
+    #     ind = tuple([ind]) # yes, i know this is cudegy (jRho, August 2021)
+    #     coords = self.getStratifiedCoords(self.numPix, self.plate_shape)        
+    #     hot_pixels = np.random.choice(raw_data.flatten(), size=self.numPix)
+    #     for i, coord in enumerate(coords):
+    #         this_coord = tuple(np.add(coord, self.pad_width).astype(int))
+    #         mask[ind + this_coord] = True
+    #         hot[ind + this_coord] = hot_pixels[i]
+    #     return mask, hot
+    
+    def get_heat(self, raw_data, mask, hot):
         coords = self.getStratifiedCoords(self.numPix, self.plate_shape)        
         hot_pixels = np.random.choice(raw_data.flatten(), size=self.numPix)
         for i, coord in enumerate(coords):
             this_coord = tuple(np.add(coord, self.pad_width).astype(int))
-            mask[ind + this_coord] = True
-            hot[ind + this_coord] = hot_pixels[i]
-
+            mask[this_coord] = True
+            hot[this_coord] = hot_pixels[i]
         return mask, hot
+
+    def rec_heater(self, raw_data, mask, hot):
+        if len(raw_data.shape) > self.ndims:
+            for i, data, this_mask, this_hot in enumerate(zip(raw_data, mask, hot)):
+                mask[i], hot[i] = self.rec_heater(data, this_mask, this_hot)
+            return mask, hot
+        else:
+            return self.get_heat(raw_data, mask, hot)
 
     def getStratifiedCoords(self, numPix, shape):
         '''
@@ -135,51 +156,59 @@ class BoilerPlate(gp.BatchFilter):
 
 class GaussBlur(gp.BatchFilter):
 
-  def __init__(self, array, sigma):
-    self.array = array
-    self.sigma = sigma
-    self.truncate = 4
+    def __init__(self, array, sigma):
+        self.array = array
+        self.sigma = sigma
+        self.truncate = 4
+    
+    def setup(self):
+        # tell downstream nodes about the new arrays
+        spec = self.spec[self.array].copy()
+        spec.dtype = np.float64
+        self.updates(
+            self.array,
+            spec)
 
-  def prepare(self, request):
+    def prepare(self, request):
 
-    # the requested ROI for array
-    roi = request[self.array].roi
+        # the requested ROI for array
+        roi = request[self.array].roi
 
-    # 1. compute the context
-    context = gp.Coordinate((self.truncate,)*roi.dims()) * self.sigma
+        # 1. compute the context
+        context = gp.Coordinate((self.truncate,)*roi.dims()) * self.sigma
 
-    # 2. enlarge the requested ROI by the context
-    context_roi = roi.grow(context, context)
-    context_roi = request[self.array].roi.intersect(context_roi) # make sure it doesn't go out of bounds
+        # 2. enlarge the requested ROI by the context
+        context_roi = roi.grow(context, context)
+        context_roi = request[self.array].roi.intersect(context_roi) # make sure it doesn't go out of bounds
 
-    # create a new request with our dependencies
-    deps = gp.BatchRequest()
-    deps[self.array] = context_roi
+        # create a new request with our dependencies
+        deps = gp.BatchRequest()
+        deps[self.array] = context_roi
 
-    # return the request
-    return deps
+        # return the request
+        return deps
 
-  def process(self, batch, request):
+    def process(self, batch, request):
 
-    # 3. smooth the whole array (including the context)
-    data = batch[self.array].data
-    data = filters.gaussian(
-      data,
-      sigma=self.sigma,
-      truncate=self.truncate)
+        # 3. smooth the whole array (including the context)
+        data = batch[self.array].data
+        data = filters.gaussian(
+        data,
+        sigma=self.sigma,
+        truncate=self.truncate)
 
-    # 4. make sure to match original datatype
-    # if data.dtype != batch[self.array].spec.dtype:
-    #     if batch[self.array].spec.dtype == 'uint8':
-    #         data = img_as_ubyte(data)
-    #     elif batch[self.array].spec.dtype == 'uint16':
-    #         data = img_as_uint(data)
-    #     elif batch[self.array].spec.dtype == 'int16':
-    #         data = img_as_int(data)
-    #     elif batch[self.array].spec.dtype == 'float64':
-    #         data = img_as_float(data)
-    batch[self.array].spec.dtype = data.dtype
-    batch[self.array].data = data
+        # 4. make sure to match original datatype
+        # if data.dtype != batch[self.array].spec.dtype:
+        #     if batch[self.array].spec.dtype == 'uint8':
+        #         data = img_as_ubyte(data)
+        #     elif batch[self.array].spec.dtype == 'uint16':
+        #         data = img_as_uint(data)
+        #     elif batch[self.array].spec.dtype == 'int16':
+        #         data = img_as_int(data)
+        #     elif batch[self.array].spec.dtype == 'float64':
+        #         data = img_as_float(data)
+        batch[self.array].spec.dtype = data.dtype
+        batch[self.array].data = data
 
-    # 5. crop the array back to the request
-    batch[self.array] = batch[self.array].crop(request[self.array].roi)
+        # 5. crop the array back to the request
+        batch[self.array] = batch[self.array].crop(request[self.array].roi)
