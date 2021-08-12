@@ -32,7 +32,7 @@ class BoilerPlate(gp.BatchFilter):
         mask_spec = self.spec[self.raw_array].copy()
         mask_spec.dtype = bool
         hot_spec = self.spec[self.raw_array].copy()
-        hot_spec.dtype = np.float64
+        hot_spec.dtype = np.float32
         self.provides(
             self.mask_array,
             mask_spec)
@@ -75,7 +75,7 @@ class BoilerPlate(gp.BatchFilter):
         return new_batch
 
     def boil(self, batch):
-        raw_data = batch[self.raw_array].data.astype(np.float64)
+        raw_data = batch[self.raw_array].data.astype(np.float32)
 
         if not isinstance(self.plate_size, type(None)):
             if len(np.array(self.plate_size).flatten()) > 1:
@@ -91,20 +91,7 @@ class BoilerPlate(gp.BatchFilter):
         mask = np.zeros_like(raw_data) > 0
         hot = raw_data.copy()
         mask, hot = self.rec_heater(raw_data, mask, hot)
-        # for i, data in enumerate(raw_data):
-        #     mask, hot = self.get_heat(data, mask, hot, i)
-
         return mask, hot
-    
-    # def get_heat(self, raw_data, mask, hot, ind):
-    #     ind = tuple([ind]) # yes, i know this is cudegy (jRho, August 2021)
-    #     coords = self.getStratifiedCoords(self.numPix, self.plate_shape)        
-    #     hot_pixels = np.random.choice(raw_data.flatten(), size=self.numPix)
-    #     for i, coord in enumerate(coords):
-    #         this_coord = tuple(np.add(coord, self.pad_width).astype(int))
-    #         mask[ind + this_coord] = True
-    #         hot[ind + this_coord] = hot_pixels[i]
-    #     return mask, hot
     
     def get_heat(self, raw_data, mask, hot):
         coords = self.getStratifiedCoords(self.numPix, self.plate_shape)        

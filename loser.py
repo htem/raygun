@@ -79,10 +79,13 @@ class MaskedMSELoss(_Loss):
 
         if mask.numel() > src.numel():
             pad_width = (np.array(mask.shape) - np.array(src.shape)) // 2
-            if pad_width.shape[0] == 2:
-                input_mask = mask[pad_width[0]:-pad_width[0], pad_width[1]:-pad_width[1]]
-            else: # assumes 3 dimensions...
-                input_mask = mask[pad_width[0]:-pad_width[0], pad_width[1]:-pad_width[1], pad_width[2]:-pad_width[2]] 
+            slices = []
+            for pad in pad_width:
+                if pad > 0:
+                    slices.append(slice(pad, -pad))
+                else:
+                    slices.append(slice(None))
+            input_mask = mask[tuple(slices)]
         else:
             input_mask = mask
         
