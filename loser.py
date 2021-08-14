@@ -23,6 +23,19 @@ def lossFunctionN2V(samples, labels, masks):
     loss= torch.sum( errors *masks  ) /torch.sum(masks)
     return loss
 
+def maskedMSE(src: Tensor, mask: Tensor or BoolTensor, target: Tensor) -> Tensor:
+        if not isinstance(mask, BoolTensor):
+            mask = torch.gt(mask, 0)
+        pad = tuple()
+        for i, j in zip(torch.tensor(mask.size()), torch.tensor(src.size())):
+            p = torch.div(torch.sub(i, j), 2)
+            pad += p, p
+        src = F.pad(src, pad[::-1])
+        
+        # Average over pixels and batch
+        loss = torch.sub(src[mask], target[mask])**2 /torch.sum(mask)
+        return loss
+
 class MaskedMSELoss(_Loss):
     r"""Creates a criterion that measures the mean squared error (squared L2 norm) between
     each non-masked element in the input :math:`x` and target :math:`y`.
@@ -75,18 +88,10 @@ class MaskedMSELoss(_Loss):
 
     def forward(self, src: Tensor, mask: Tensor or BoolTensor, target: Tensor) -> Tensor:
         if not isinstance(mask, BoolTensor):
-            mask = mask > 0
-
-        if mask.numel() > src.numel():
-            pad_width = (np.array(mask.shape) - np.array(src.shape)) // 2
-            slices = []
-            for pad in pad_width:
-                if pad > 0:
-                    slices.append(slice(pad, -pad))
-                else:
-                    slices.append(slice(None))
-            input_mask = mask[tuple(slices)]
-        else:
-            input_mask = mask
-        
-        return F.mse_loss(src[input_mask], target[mask], reduction=self.reduction)
+            mask = torch.gt(mask, 0)
+        pad = tuple()
+        for i, j in zip(torch.tensor(mask.size()), torch.tensor(src.size())):
+            p = torch.div(torch.sub(i, j), 2)
+            pad += p, p
+        src = F.pad(src, pad[::-1])
+        return F.mse_loss(src[mask], target[mask], reduction=self.reduction).requires_grad_()
