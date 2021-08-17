@@ -33,8 +33,8 @@ def maskedMSE(src: Tensor, mask: Tensor or BoolTensor, target: Tensor) -> Tensor
         src = F.pad(src, pad[::-1])
         
         # Average over pixels and batch
-        loss = torch.sub(src[mask], target[mask])**2 /torch.sum(mask)
-        return loss
+        loss = torch.mean(torch.sub(src[mask], target[mask])**2 /torch.sum(mask))
+        return loss.requires_grad_()
 
 class MaskedMSELoss(_Loss):
     r"""Creates a criterion that measures the mean squared error (squared L2 norm) between
