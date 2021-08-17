@@ -94,12 +94,12 @@ class BoilerPlate(gp.BatchFilter):
         return mask, hot
     
     def get_heat(self, raw_data, mask, hot):
-        coords = self.getStratifiedCoords(self.numPix, self.plate_shape)        
-        hot_pixels = np.random.choice(raw_data.flatten(), size=self.numPix)
+        coords = self.getStratifiedCoords()        
+        #hot_pixels = np.random.choice(raw_data.flatten(), size=self.numPix)
         for i, coord in enumerate(coords):
             this_coord = tuple(np.add(coord, self.pad_width).astype(int))
             mask[this_coord] = True
-            hot[this_coord] = hot_pixels[i]
+            hot[this_coord] = 0#hot_pixels[i]
         return mask, hot
 
     def rec_heater(self, raw_data, mask, hot):
@@ -110,16 +110,15 @@ class BoilerPlate(gp.BatchFilter):
         else:
             return self.get_heat(raw_data, mask, hot)
 
-    def getStratifiedCoords(self, numPix, shape):
+    def getStratifiedCoords(self):
         '''
         Produce a list of approx. 'numPix' random coordinate, sampled from 'shape' using startified sampling.
         '''
-        ndims = len(shape)
-        box_size = np.round((np.prod(shape) / numPix)**(1/ndims)).astype(np.int)
+        box_size = np.round((1/self.perc_hotPixels)**(1/self.ndims)).astype(np.int)
         coords = []
-        box_counts = np.ceil(shape / box_size).astype(int)
+        box_counts = np.ceil(self.plate_shape / box_size).astype(int)
         
-        rands = torch.tensor(np.random.randint(0, box_size, (np.prod(box_counts), ndims)))
+        rands = torch.tensor(np.random.randint(0, box_size, (np.prod(box_counts), self.ndims)))
         
         tensors = []
         for count in box_counts:
@@ -127,7 +126,7 @@ class BoilerPlate(gp.BatchFilter):
         
         offset_tensors = torch.meshgrid(tensors)
         
-        offsets = torch.zeros((len(offset_tensors[0].flatten()), ndims))
+        offsets = torch.zeros((len(offset_tensors[0].flatten()), self.ndims))
         for i, tensor in enumerate(offset_tensors):
             offsets[:, i] = tensor.flatten()
         
@@ -135,7 +134,7 @@ class BoilerPlate(gp.BatchFilter):
         coords = []
         for i in range(temp_coords.shape[0]):
             include = True
-            for l, lim in enumerate(shape):
+            for l, lim in enumerate(self.plate_shape):
                 include = include and (lim > temp_coords[i, l])
             if include:
                 coords.append(tuple(temp_coords[i, :]))

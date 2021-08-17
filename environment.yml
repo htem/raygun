@@ -13,6 +13,7 @@ dependencies:
   - astunparse=1.6.3=pyhd8ed1ab_0
   - async-timeout=3.0.1=py_1000
   - attrs=21.2.0=pyhd8ed1ab_0
+  - blas=1.0=openblas
   - blinker=1.4=py_1
   - brotlipy=0.7.0=py37h5e8e339_1001
   - c-ares=1.17.1=h7f98852_1
@@ -23,10 +24,12 @@ dependencies:
   - chardet=4.0.0=py37h89c1867_1
   - charset-normalizer=2.0.0=pyhd8ed1ab_0
   - click=8.0.1=py37h89c1867_0
+  - coverage=5.5=py37h27cfd23_2
   - cryptography=3.4.7=py37h5d9358c_0
   - cudatoolkit=10.1.243=h6bb024c_0
   - cudnn=7.6.5.32=hc0a50b0_1
   - cupti=10.1.168=0
+  - cython=0.29.24=py37h295c915_0
   - dataclasses=0.8=pyhc8e2a94_1
   - freetype=2.10.4=h5ab3b9f_0
   - gast=0.4.0=pyh9f0ad1d_0
@@ -35,7 +38,6 @@ dependencies:
   - google-pasta=0.2.0=pyh8c360ce_0
   - hdf5=1.10.6=nompi_h6a2412b_1114
   - idna=3.1=pyhd3deb0d_0
-  - importlib-metadata=4.6.1=py37h89c1867_0
   - intel-openmp=2021.3.0=h06a4308_3350
   - jpeg=9b=h024ee3a_2
   - keras=2.3.1=0
@@ -69,6 +71,7 @@ dependencies:
   - multidict=5.1.0=py37h5e8e339_1
   - ncurses=6.2=h58526e2_4
   - ninja=1.10.2=hff7bd54_1
+  - numpy-base=1.20.3=py37h39b7dee_0
   - oauthlib=3.1.1=pyhd8ed1ab_0
   - olefile=0.46=py37_0
   - openjpeg=2.3.0=h05c96fa_1
@@ -84,6 +87,7 @@ dependencies:
   - pyopenssl=20.0.1=pyhd8ed1ab_0
   - pysocks=1.7.1=py37h89c1867_3
   - python=3.7.10=h12debd9_4
+  - python-flatbuffers=1.12=pyhd3eb1b0_0
   - python_abi=3.7=2_cp37m
   - pytorch=1.4.0=py3.7_cuda10.1.243_cudnn7.6.3_0
   - pyu2f=0.1.5=pyhd8ed1ab_0
@@ -104,6 +108,7 @@ dependencies:
   - termcolor=1.1.0=py_2
   - tk=8.6.10=h21135ba_1
   - torchvision=0.5.0=py37_cu101
+  - typing_extensions=3.10.0.0=pyh06a4308_0
   - urllib3=1.26.6=pyhd8ed1ab_0
   - werkzeug=2.0.1=pyhd8ed1ab_0
   - wheel=0.36.2=pyhd3deb0d_0
@@ -127,8 +132,7 @@ dependencies:
     - colorbrewer==0.2.0
     # - csbdeep==0.6.2
     - cycler==0.10.0
-    - cython==0.29.24
-    - git+https://github.com/funkelab/daisy.git@0.3-dev
+    - git+https://github.com/funkelab/daisy.git@0.3-dev # daisy==0.3
     - debugpy==1.3.0
     - decorator==5.0.9
     - defusedxml==0.7.1
@@ -137,17 +141,19 @@ dependencies:
     - fasteners==0.16.3
     - flatbuffers==1.12
     - fpdf==1.7.2
-    - git+https://github.com/funkelab/funlib.learn.torch.git
-    - git+https://github.com/funkelab/funlib.math.git
+    - git+https://github.com/funkelab/funlib.learn.torch.git # funlib-learn-torch==0.1
+    - git+https://github.com/funkelab/funlib.math.git # funlib-math==0.1 
     # - genomedata==1.5.0
     - grpcio==1.34.1
     - gunpowder==1.2.1
-    - h5py #==3.1.0
+    - h5py==3.1.0
     - imagecodecs==2021.6.8
     - imageio==2.9.0
+    - importlib-metadata==3.10.1
     - ipykernel==6.0.3
     - ipython==7.25.0
     - ipython-genutils==0.2.0
+    - ipytree==0.2.1
     - ipywidgets==7.6.3
     - jedi==0.18.0
     - jinja2==3.0.1
@@ -174,7 +180,7 @@ dependencies:
     - nbformat==5.1.3
     - nest-asyncio==1.5.1
     - networkx==2.6.2
-    - notebook #==6.4.0
+    - notebook # ==6.4.0
     - numcodecs==0.8.0
     - numexpr==2.7.3
     - numpy==1.19.5
@@ -213,6 +219,7 @@ dependencies:
     - six==1.15.0
     - sklearn==0.0
     - tables==3.6.1
+    - tensorboardx==2.4
     - tensorflow-gpu==2.5.0
     - terminado==0.10.1
     - testpath==0.5.0
@@ -221,7 +228,7 @@ dependencies:
     - tifffile==2021.7.2
     - torch==1.9.0
     - torch-tb-profiler==0.2.1
-    - tornado==5.1.1
+    - tornado # ==6.1
     - tqdm==4.61.2
     - traitlets==5.0.5
     - typing-extensions==3.7.4.3

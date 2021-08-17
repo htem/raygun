@@ -28,7 +28,7 @@ def maskedMSE(src: Tensor, mask: Tensor or BoolTensor, target: Tensor) -> Tensor
             mask = torch.gt(mask, 0)
         pad = tuple()
         for i, j in zip(torch.tensor(mask.size()), torch.tensor(src.size())):
-            p = torch.div(torch.sub(i, j), 2)
+            p = int(torch.div(torch.sub(i, j), 2))
             pad += p, p
         src = F.pad(src, pad[::-1])
         
