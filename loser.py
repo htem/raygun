@@ -26,72 +26,12 @@ def lossFunctionN2V(samples, labels, masks):
 def maskedMSE(src: Tensor, mask: Tensor or BoolTensor, target: Tensor) -> Tensor:
         if not isinstance(mask, BoolTensor):
             mask = torch.gt(mask, 0)
-        pad = tuple()
-        for i, j in zip(torch.tensor(mask.size()), torch.tensor(src.size())):
-            p = int(torch.div(torch.sub(i, j), 2))
-            pad += p, p
-        src = F.pad(src, pad[::-1])
+        # pad = tuple()
+        # for i, j in zip(torch.tensor(mask.size()), torch.tensor(src.size())):
+        #     p = int(torch.div(torch.sub(i, j), 2))
+        #     pad += p, p
+        # src = F.pad(src, pad[::-1])
         
         # Average over pixels and batch
         loss = torch.mean(torch.sub(src[mask], target[mask])**2 /torch.sum(mask))
         return loss.requires_grad_()
-
-class MaskedMSELoss(_Loss):
-    r"""Creates a criterion that measures the mean squared error (squared L2 norm) between
-    each non-masked element in the input :math:`x` and target :math:`y`.
-
-    The unreduced (i.e. with :attr:`reduction` set to ``'none'``) loss can be described as:
-
-    .. math::
-        \ell(x, y) = L = \{l_1,\dots,l_N\}^\top, \quad
-        l_n = \left( x_n - y_n \right)^2,
-
-    where :math:`N` is the batch size. If :attr:`reduction` is not ``'none'``
-    (default ``'mean'``), then:
-
-    .. math::
-        \ell(x, y) =
-        \begin{cases}
-            \operatorname{mean}(L), &  \text{if reduction} = \text{`mean';}\\
-            \operatorname{sum}(L),  &  \text{if reduction} = \text{`sum'.}
-        \end{cases}
-
-    :math:`x` and :math:`y` are tensors of arbitrary shapes with a total
-    of :math:`n` elements each.
-
-    The mean operation still operates over all the elements, and divides by :math:`n`.
-
-    The division by :math:`n` can be avoided if one sets ``reduction = 'sum'``.
-
-    Args:
-        reduction (string, optional): Specifies the reduction to apply to the output:
-            ``'none'`` | ``'mean'`` | ``'sum'``. ``'none'``: no reduction will be applied,
-            ``'mean'``: the sum of the output will be divided by the number of
-            elements in the output, ``'sum'``: the output will be summed. Note: :attr:`size_average`
-            and :attr:`reduce` are in the process of being deprecated, and in the meantime,
-            specifying either of those two args will override :attr:`reduction`. Default: ``'mean'``
-
-    Shape:
-        - Input: :math:`(N, *)` where :math:`*` means, any number of additional
-          dimensions
-        - Mask: :math:`(N, *)`, same shape as the input
-        - Target: :math:`(N, *)`, same shape as the input
-
-    Examples::
-
-        ...
-    """
-    __constants__ = ['reduction']
-
-    def __init__(self, reduction: str = 'mean') -> None:
-        super(MaskedMSELoss, self).__init__(reduction)
-
-    def forward(self, src: Tensor, mask: Tensor or BoolTensor, target: Tensor) -> Tensor:
-        if not isinstance(mask, BoolTensor):
-            mask = torch.gt(mask, 0)
-        pad = tuple()
-        for i, j in zip(torch.tensor(mask.size()), torch.tensor(src.size())):
-            p = torch.div(torch.sub(i, j), 2)
-            pad += p, p
-        src = F.pad(src, pad[::-1])
-        return F.mse_loss(src[mask], target[mask], reduction=self.reduction).requires_grad_()

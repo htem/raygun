@@ -23,7 +23,7 @@ class BoilerPlate(gp.BatchFilter):
         self.raw_array = raw_array
         self.mask_array = mask_array
         self.hot_array = hot_array
-        self.plate_size = plate_size
+        self.plate_size = plate_size #TODO: CAN BE INFERRED
         self.perc_hotPixels = perc_hotPixels
         self.ndims = ndims
 
@@ -32,7 +32,6 @@ class BoilerPlate(gp.BatchFilter):
         mask_spec = self.spec[self.raw_array].copy()
         mask_spec.dtype = bool
         hot_spec = self.spec[self.raw_array].copy()
-        hot_spec.dtype = np.float32
         self.provides(
             self.mask_array,
             mask_spec)
@@ -41,9 +40,8 @@ class BoilerPlate(gp.BatchFilter):
             hot_spec)
 
     def prepare(self, request):
-        #self.ndims = request[self.raw_array].roi.dims()
         deps = gp.BatchRequest()
-        deps[self.raw_array] = request[self.hot_array].copy() # make sure we're getting the needed data (should already be requested, but just in case)
+        deps[self.raw_array] = request[self.hot_array].copy() # make sure we're getting the needed data 
         return deps
 
     def process(self, batch, request):
@@ -51,11 +49,9 @@ class BoilerPlate(gp.BatchFilter):
         mask_data, hot_data = self.boil(batch)
 
         # create the array spec for the new arrays
-        mask_spec = batch[self.raw_array].spec.copy() #TODO: DETERMINE IF THIS IS NECESSARY
-        mask_spec.roi = request[self.mask_array].roi.copy() #TODO: DETERMINE IF THIS IS NECESSARY
+        mask_spec = batch[self.raw_array].spec.copy() 
         mask_spec.dtype = bool
-        hot_spec = batch[self.raw_array].spec.copy() #TODO: DETERMINE IF THIS IS NECESSARY
-        hot_spec.roi = request[self.hot_array].roi.copy() #TODO: DETERMINE IF THIS IS NECESSARY
+        hot_spec = batch[self.raw_array].spec.copy()
         hot_spec.dtype = hot_data.dtype
 
         # create a new batch to hold the new array
@@ -63,19 +59,16 @@ class BoilerPlate(gp.BatchFilter):
 
         # create a new array
         mask = gp.Array(mask_data, mask_spec)
+        mask = mask.crop(request[self.mask_array].roi)
         hot = gp.Array(hot_data, hot_spec)
 
         # store it in the batch
         new_batch[self.mask_array] = mask
         new_batch[self.hot_array] = hot
-
-        # return the new batch
-        # print(f"Batch coming from upstream: {batch}")
-        # print(f"New batch going downstream: {new_batch}")
         return new_batch
 
     def boil(self, batch):
-        raw_data = batch[self.raw_array].data.astype(np.float32)
+        raw_data = batch[self.raw_array].data
 
         if not isinstance(self.plate_size, type(None)):
             if len(np.array(self.plate_size).flatten()) > 1:
@@ -95,11 +88,11 @@ class BoilerPlate(gp.BatchFilter):
     
     def get_heat(self, raw_data, mask, hot):
         coords = self.getStratifiedCoords()        
-        #hot_pixels = np.random.choice(raw_data.flatten(), size=self.numPix)
+        hot_pixels = np.random.choice(raw_data.flatten(), size=self.numPix)
         for i, coord in enumerate(coords):
             this_coord = tuple(np.add(coord, self.pad_width).astype(int))
             mask[this_coord] = True
-            hot[this_coord] = 0#hot_pixels[i]
+            hot[this_coord] = hot_pixels[i]
         return mask, hot
 
     def rec_heater(self, raw_data, mask, hot):
