@@ -151,7 +151,6 @@ class GaussBlur(gp.BatchFilter):
     def setup(self):
         # tell downstream nodes about the new arrays
         spec = self.spec[self.array].copy()
-        spec.dtype = np.float64
         self.updates(
             self.array,
             spec)
@@ -167,7 +166,7 @@ class GaussBlur(gp.BatchFilter):
         # 2. enlarge the requested ROI by the context
         context_roi = roi.grow(context, context)
         context_roi = request[self.array].roi.intersect(context_roi) # make sure it doesn't go out of bounds
-
+        
         # create a new request with our dependencies
         deps = gp.BatchRequest()
         deps[self.array] = context_roi
@@ -194,7 +193,7 @@ class GaussBlur(gp.BatchFilter):
         #         data = img_as_int(data)
         #     elif batch[self.array].spec.dtype == 'float64':
         #         data = img_as_float(data)
-        batch[self.array].spec.dtype = data.dtype
+        #batch[self.array].spec.dtype = data.dtype
         batch[self.array].data = data
 
         # 5. crop the array back to the request
