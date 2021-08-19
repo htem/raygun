@@ -26,6 +26,9 @@ class BoilerPlate(gp.BatchFilter):
         self.plate_size = plate_size #TODO: CAN BE INFERRED
         self.perc_hotPixels = perc_hotPixels
         self.ndims = ndims
+        #initialize stuff to be set on first call
+        self.offsets = None
+        self.plate_shape = None
 
     def setup(self):
         # tell downstream nodes about the new arrays
@@ -46,10 +49,11 @@ class BoilerPlate(gp.BatchFilter):
 
     def process(self, batch, request):
         # make heat mask
-        mask_data, hot_data = self.boil(batch)
+        mask_data, hot_data = self.boil(batch, request)
 
         # create the array spec for the new arrays
-        mask_spec = batch[self.raw_array].spec.copy() 
+        mask_spec = batch[self.raw_array].spec.copy()
+        #mask_spec.roi = request[self.mask_array].roi.copy()
         mask_spec.dtype = bool
         hot_spec = batch[self.raw_array].spec.copy()
         hot_spec.dtype = hot_data.dtype
@@ -67,31 +71,34 @@ class BoilerPlate(gp.BatchFilter):
         new_batch[self.hot_array] = hot
         return new_batch
 
-    def boil(self, batch):
-        raw_data = batch[self.raw_array].data
-
-        if not isinstance(self.plate_size, type(None)):
-            if len(np.array(self.plate_size).flatten()) > 1:
-                self.plate_shape = self.plate_size
-            else:
-                self.plate_shape = [self.plate_size,]*self.ndims           
-            self.pad_width = (np.array(raw_data.shape[-self.ndims:]) - np.array(self.plate_shape)) // 2
-        else:
-            self.plate_shape = raw_data.shape[-self.ndims:]
-            self.pad_width = (0,)*self.ndims
-        
-        self.numPix = int(np.prod(self.plate_shape) * self.perc_hotPixels)
-        mask = np.zeros_like(raw_data) > 0
-        hot = raw_data.copy()
-        mask, hot = self.rec_heater(raw_data, mask, hot)
+    def boil(self, batch, request):
+        if self.plate_shape is None:
+            hot_data_shape = batch[self.raw_array].data.shape
+            if self.plate_size is not None:
+                if len(np.array(self.plate_size).flatten()) > 1:
+                    self.plate_shape = self.plate_size
+                else:
+                    self.plate_shape = [self.plate_size,]*self.ndims           
+                self.pad_width = gp.Coordinate((np.array(hot_data_shape[-self.ndims:]) - np.array(self.plate_shape)) // 2)
+            elif self.plate_shape:
+                self.plate_shape = hot_data_shape[-self.ndims:]
+                self.pad_width = gp.Coordinate((0,)*self.ndims)
+            self.numPix = int(np.prod(self.plate_shape) * self.perc_hotPixels)
+        raw_data_small = batch[self.raw_array].crop(request[self.mask_array].roi).data.copy()
+        raw_data_big = batch[self.raw_array].data.copy()
+        mask = np.zeros_like(raw_data_big) > 0
+        #mask = np.zeros_like(raw_data_small) > 0
+        hot = raw_data_big
+        mask, hot = self.rec_heater(raw_data_small, mask, hot)
         return mask, hot
     
     def get_heat(self, raw_data, mask, hot):
         coords = self.getStratifiedCoords()        
         hot_pixels = np.random.choice(raw_data.flatten(), size=self.numPix)
         for i, coord in enumerate(coords):
-            this_coord = tuple(np.add(coord, self.pad_width).astype(int))
-            mask[this_coord] = True
+            this_coord = coord + self.pad_width
+            mask[this_coord] = True 
+            #mask[coord] = True #TODO: FIX WHOLE MASK BEING SET TRUE...
             hot[this_coord] = hot_pixels[i]
         return mask, hot
 
@@ -103,34 +110,35 @@ class BoilerPlate(gp.BatchFilter):
         else:
             return self.get_heat(raw_data, mask, hot)
 
-    def getStratifiedCoords(self):
+    def getStratifiedCoords(self): 
         '''
         Produce a list of approx. 'numPix' random coordinate, sampled from 'shape' using startified sampling.
         '''
-        box_size = np.round((1/self.perc_hotPixels)**(1/self.ndims)).astype(np.int)
+        if self.offsets is None: # SET ON FIRST PASS (will break if tried again with different size inputs)
+            #TODO: DETERMINE IF THIS IS SLOWING THINGS DOWN?
+            self.box_size = np.round((1/self.perc_hotPixels)**(1/self.ndims)).astype(np.int)
+            self.box_counts = np.ceil(self.plate_shape / self.box_size).astype(int)
+        
+            tensors = []
+            for count in self.box_counts:
+                tensors.append(torch.tensor(range(count)) * self.box_size)        
+            
+            offset_tensors = torch.meshgrid(tensors)
+            
+            self.offsets = torch.zeros((len(offset_tensors[0].flatten()), self.ndims))
+            for i, tensor in enumerate(offset_tensors):
+                self.offsets[:, i] = tensor.flatten()
+        
+        rands = torch.tensor(np.random.randint(0, self.box_size, (np.prod(self.box_counts), self.ndims)))
+        
+        temp_coords = self.offsets + rands
         coords = []
-        box_counts = np.ceil(self.plate_shape / box_size).astype(int)
-        
-        rands = torch.tensor(np.random.randint(0, box_size, (np.prod(box_counts), self.ndims)))
-        
-        tensors = []
-        for count in box_counts:
-            tensors.append(torch.tensor(range(count)))        
-        
-        offset_tensors = torch.meshgrid(tensors)
-        
-        offsets = torch.zeros((len(offset_tensors[0].flatten()), self.ndims))
-        for i, tensor in enumerate(offset_tensors):
-            offsets[:, i] = tensor.flatten()
-        
-        temp_coords = offsets + rands
-        coords = []
-        for i in range(temp_coords.shape[0]):
+        for i in range(temp_coords.shape[0]): #TODO: SPEED THIS UP
             include = True
             for l, lim in enumerate(self.plate_shape):
                 include = include and (lim > temp_coords[i, l])
             if include:
-                coords.append(tuple(temp_coords[i, :]))
+                coords.append(gp.Coordinate(temp_coords[i, :]))
         return coords
 
 class GaussBlur(gp.BatchFilter):
