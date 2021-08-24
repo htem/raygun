@@ -6,12 +6,6 @@ from skimage import filters
 from skimage.util import *
 
 import gunpowder as gp
-from gunpowder.array import ArrayKey, Array
-from gunpowder.array_spec import ArraySpec
-from gunpowder.ext import torch, tensorboardX, NoSuchModule
-from gunpowder.nodes.generic_train import GenericTrain
-
-from typing import Dict, Union, Optional
 
 logger = logging.getLogger(__name__)
 logger.setLevel('DEBUG')
@@ -143,29 +137,33 @@ class BoilerPlate(gp.BatchFilter):
 
 class GaussBlur(gp.BatchFilter):
 
-    def __init__(self, array, sigma):
+    def __init__(self, array, sigma, truncate=4, new_array=None):
         self.array = array
         self.sigma = sigma
-        self.truncate = 4
+        self.new_array=new_array
+        self.truncate = truncate
     
     def setup(self):
-        # tell downstream nodes about the new arrays
-        spec = self.spec[self.array].copy()
-        self.updates(
-            self.array,
-            spec)
+        self.enable_autoskip()
+        if self.new_array is None:
+            self.updates(self.array, self.spec[self.array])
+        else:
+            self.provides(self.new_array, self.spec[self.array].copy())
 
     def prepare(self, request):
-
+        if self.new_array is None:
+            this_array = self.array
+        else:
+            this_array = self.new_array
         # the requested ROI for array
-        roi = request[self.array].roi
+        roi = request[this_array].roi
 
         # 1. compute the context
         context = gp.Coordinate((self.truncate,)*roi.dims()) * self.sigma
 
         # 2. enlarge the requested ROI by the context
         context_roi = roi.grow(context, context)
-        context_roi = request[self.array].roi.intersect(context_roi) # make sure it doesn't go out of bounds
+        context_roi = request[this_array].roi.intersect(context_roi) # make sure it doesn't go out of bounds
         
         # create a new request with our dependencies
         deps = gp.BatchRequest()
@@ -176,25 +174,100 @@ class GaussBlur(gp.BatchFilter):
 
     def process(self, batch, request):
 
-        # 3. smooth the whole array (including the context)
-        data = batch[self.array].data
+        # smooth the whole array (including the context)
+        data = batch[self.array].data.copy()
         data = filters.gaussian(
-        data,
-        sigma=self.sigma,
-        truncate=self.truncate)
+                            data,
+                            sigma=self.sigma,
+                            truncate=self.truncate)
 
-        # 4. make sure to match original datatype
-        # if data.dtype != batch[self.array].spec.dtype:
-        #     if batch[self.array].spec.dtype == 'uint8':
-        #         data = img_as_ubyte(data)
-        #     elif batch[self.array].spec.dtype == 'uint16':
-        #         data = img_as_uint(data)
-        #     elif batch[self.array].spec.dtype == 'int16':
-        #         data = img_as_int(data)
-        #     elif batch[self.array].spec.dtype == 'float64':
-        #         data = img_as_float(data)
-        #batch[self.array].spec.dtype = data.dtype
-        batch[self.array].data = data
+        if self.new_array is None:
+            batch[self.array].data = data
+            # crop the array back to the request
+            batch[self.array] = batch[self.array].crop(request[self.array].roi)
+        else:
+            new_batch = gp.Batch()
+            blurred = gp.Array(data, batch[self.array].spec.copy())
+            new_batch[self.new_array] = blurred.crop(request[self.new_array].roi)
+            
+            return new_batch
 
-        # 5. crop the array back to the request
-        batch[self.array] = batch[self.array].crop(request[self.array].roi)
+class Noiser(gp.BatchFilter):
+    '''Add random noise to an array. Uses the scikit-image function skimage.util.random_noise.
+    See scikit-image documentation for more information on arguments and additional kwargs.
+
+    Args:
+
+        array (:class:`ArrayKey`):
+
+            The intensity array to modify. Should be of type float and within range [-1, 1] or [0, 1].
+
+        mode (``string``):
+
+            Type of noise to add, see scikit-image documentation.
+
+        seed (``int``):
+
+            Optionally set a random seed, see scikit-image documentation.
+
+        clip (``bool``):
+
+            Whether to preserve the image range (either [-1, 1] or [0, 1]) by clipping values in the end, see
+            scikit-image documentation
+
+        new_array (:class:`ArrayKey`):
+
+            New array (if any) to store result in, instead of array
+    '''
+
+    def __init__(self, array, mode='gaussian', seed=None, clip=True, new_array=None, **kwargs):
+        self.array = array
+        self.mode = mode
+        self.seed = seed
+        self.clip = clip
+        self.new_array = new_array
+        self.kwargs = kwargs
+
+    def setup(self):
+        self.enable_autoskip()
+        if self.new_array is None:
+            self.updates(self.array, self.spec[self.array])
+        else:
+            self.provides(self.new_array, self.spec[self.array].copy())
+
+    def prepare(self, request):
+        deps = gp.BatchRequest()
+        if self.new_array is None:
+            deps[self.array] = request[self.array].copy()
+        else:
+            deps[self.array] = request[self.new_array].copy()
+
+        return deps
+
+    def process(self, batch, request):
+
+        raw = batch.arrays[self.array]
+
+        assert raw.data.dtype == np.float32 or raw.data.dtype == np.float64, "Noise augmentation requires float types for the raw array (not " + str(raw.data.dtype) + "). Consider using Normalize before."
+        assert raw.data.min() >= -1 and raw.data.max() <= 1, "Noise augmentation expects raw values in [-1,1] or [0,1]. Consider using Normalize before."
+        if self.new_array is None:
+            raw.data = random_noise(
+                            raw.data,
+                            mode=self.mode,
+                            seed=self.seed,
+                            clip=self.clip,
+                            **self.kwargs).astype(raw.data.dtype)
+        else:
+            noised_data = random_noise(
+                            raw.data,
+                            mode=self.mode,
+                            seed=self.seed,
+                            clip=self.clip,
+                            **self.kwargs).astype(raw.data.dtype)
+            
+            new_batch = gp.Batch()
+            noised_spec = raw.spec.copy()
+            noised = gp.Array(noised_data, noised_spec)
+            new_batch[self.new_array] = noised
+            
+            return new_batch
