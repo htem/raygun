@@ -154,8 +154,6 @@ def test_noise(sample,
 
     pipeline, arrays, noise_name = bring_the_noise(raw, proto_pipe, noise_order, noise_dict)
 
-    noisy = arrays[-1] # data noise added
-
     # request matching the model input and output sizes
     request = gp.BatchRequest()
     for array in arrays:
