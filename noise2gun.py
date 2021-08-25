@@ -20,8 +20,7 @@ class Noise2Gun():
     def __init__(self,
             train_source, #EXPECTS ZARR VOLUME
             voxel_size,
-            out_dir,
-            out_name,
+            out_path,
             model_name='noise2gun',
             model_path='./models/',
             side_length=64,#12 # in voxels for prediction (i.e. network output) - actual used ROI for network input will be bigger for valid padding
@@ -42,8 +41,7 @@ class Noise2Gun():
             ):
             self.train_source = train_source
             self.voxel_size = voxel_size
-            self.out_dir = out_dir
-            self.out_name = out_name
+            self.out_path = out_path
             self.model_name = model_name
             self.model_path = model_path
             self.side_length = side_length
@@ -137,7 +135,7 @@ class Noise2Gun():
             else:
                 img = self.batch[array].data[i].squeeze()
             mid = img.shape[0] // 2 # assumes 3D volume
-            self.summary_writer.add_image(array.identifier, img[mid], global_step=self.train.iteration, dataformats='HW')
+            self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
     
     def build_training_pipeline(self):
         # declare arrays to use in the pipeline
@@ -145,6 +143,9 @@ class Noise2Gun():
         self.hot = gp.ArrayKey('HOT') # data with random pixels heated
         self.mask = gp.ArrayKey('MASK') # data with random pixels heated
         self.prediction = gp.ArrayKey('PREDICTION') # prediction of denoised data
+        
+        self.arrays = [self.raw, self.mask, self.hot, self.prediction]
+        self.crops = {self.hot:self.raw}
 
         self.source = gp.ZarrSource(    # add the data source
             self.train_source,  # the zarr container
@@ -153,7 +154,7 @@ class Noise2Gun():
         )
 
         # add normalization
-        self.normalize = gp.Normalize(self.raw) # context dependent so not added to object
+        self.normalize_raw = gp.Normalize(self.raw) # context dependent so not added to object
 
         # add a RandomLocation node to the pipeline to randomly select a sample
         self.random_location = gp.RandomLocation()
@@ -173,7 +174,7 @@ class Noise2Gun():
                                     ndims=3) # assumes volumes
 
         # prepare tensors for UNet
-        self.unsqueeze = gp.Unsqueeze([self.hot, self.mask, self.raw]) # context dependent so not added to object
+        unsqueeze = gp.Unsqueeze([self.hot, self.mask, self.raw]) # context dependent so not added to object
 
         # setup a cache
         self.cache = gp.PreCache(num_workers=os.cpu_count())
@@ -202,7 +203,7 @@ class Noise2Gun():
                                             lr=self.init_learning_rate)
 
         # create a train node using our model, loss, and optimizer
-        self.train = gp.torch.Train(
+        self.trainer = gp.torch.Train(
                             self.model,
                             self.loss,
                             self.optimizer,
@@ -237,14 +238,14 @@ class Noise2Gun():
 
         # assemble pipeline
         self.training_pipeline = (self.source +
-                                self.normalize + 
+                                self.normalize_raw + 
                                 self.random_location +
                                 self.simple_augment + 
                                 self.boilerPlate +
-                                self.unsqueeze + 
+                                unsqueeze + 
                                 self.cache +
                                 self.stack + 
-                                self.train +
+                                self.trainer +
                                 self.performance
                                 )
     
@@ -270,9 +271,14 @@ class Noise2Gun():
                     self.batch_tBoard_write()
         return self.batch
         
-    def test_prediction(self):
+    def test_prediction(self, n=1):
         #set model into evaluation mode
         self.model.eval()
+
+        unsqueeze = gp.Unsqueeze([self.raw])
+        stack = gp.Stack(n)
+
+        self.normalize_pred = gp.Normalize(self.prediction)
 
         self.predict = gp.torch.Predict(self.model,
                                 inputs = {'input': self.raw},
@@ -284,10 +290,12 @@ class Noise2Gun():
         request.add(self.raw, self.voxel_size*self.context_side_length)
 
         predicter = (self.source + 
-                    self.normalize + 
+                    self.normalize_raw + 
                     self.random_location + 
-                    self.unsqueeze +
-                    self.predict)
+                    unsqueeze +
+                    stack +
+                    self.predict +
+                    self.normalize_pred)
 
         with gp.build(predicter):
             self.batch = predicter.request_batch(request)
@@ -297,9 +305,13 @@ class Noise2Gun():
         self.imshow(raw_data, prediction=self.batch[self.prediction].data[i].squeeze())
         return self.batch
 
-    def predict_full(self):
+    def render_full(self):
         #set model into evaluation mode
         self.model.eval()
+
+        unsqueeze = gp.Unsqueeze([self.raw])
+
+        self.normalize_pred = gp.Normalize(self.prediction)
 
         self.predict = gp.torch.Predict(self.model,
                                 inputs = {'input': self.raw},
@@ -315,16 +327,16 @@ class Noise2Gun():
                         dataset_names = {
                             self.prediction:self.model_name
                             },
-                        output_dir = self.output_dir,
-                        output_filename = self.out_name
+                        output_filename = self.out_path
                         )
 
         renderer = (self.source + 
-                    self.normalize +  
-                    self.unsqueeze +
+                    self.normalize_raw +  
+                    unsqueeze +
                     self.cache +
                     self.stack +
                     self.predict +
+                    self.normalize_pred +
                     destination +
                     scan +
                     self.performance)

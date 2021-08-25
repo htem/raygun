@@ -107,8 +107,9 @@ def noise_batch(samples,
 
         destination = gp.ZarrWrite(
                 dataset_names = {noisy: noise_name},
-                output_dir = f'{src_path}{sample}',
-                output_filename = f'{sample}.zarr/volumes',
+                # output_dir = f'{src_path}{sample}',
+                # output_filename = f'{sample}.zarr/volumes',
+                output_filename = src
                 #dataset_dtypes = {noisy: np.uint8} # save as 0-255 values (should match raw)
         )
 
