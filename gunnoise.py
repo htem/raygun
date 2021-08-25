@@ -53,7 +53,6 @@ def noise_batch(samples,
     noise_order,
     src_voxel_size=(40, 4, 4),
     check_every=250,
-    stack_size=8,
     scan_size=(40, 512, 512)
     ):
     # assemble and run pipeline for each dataset
@@ -87,8 +86,6 @@ def noise_batch(samples,
 
         noisy = arrays[-1] # data noise added
         
-        stack = gp.Stack(stack_size)
-
         # request matching the model input and output sizes
         scan_request = gp.BatchRequest()
         for array in arrays:
@@ -114,7 +111,6 @@ def noise_batch(samples,
         )
 
         pipeline += (cache +
-                stack + 
                 destination + 
                 scan + 
                 performance)

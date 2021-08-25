@@ -163,7 +163,7 @@ class Noise2Gun():
         self.simple_augment = gp.SimpleAugment()
 
         # stack for batches
-        self.stack = gp.Stack(self.batch_size)
+        self.stack = gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
 
         # add pixel heater
         self.boilerPlate = BoilerPlate(self.raw, 
