@@ -1,26 +1,30 @@
 # !conda activate n2v
+from gunpowder import array_spec
+from gunpowder.coordinate import Coordinate
 import numpy as np
 from matplotlib import pyplot as plt
 import torch
-import zarr
 import os
+import glob
+import re
+import zarr
 
 from funlib.learn.torch.models import UNet, ConvPass
 import gunpowder as gp
 import logging
 logging.basicConfig(level=logging.INFO)
-# from tqdm.auto import trange
+logger = logging.Logger('noise2gun', 'INFO')
 
 # from this repo
 import loser
 from boilerPlate import BoilerPlate
-# from segway.tasks.make_zarr_from_tiff import task_make_zarr_from_tiff_volume as tif2zarr
 
 class Noise2Gun():
     def __init__(self,
             train_source, #EXPECTS ZARR VOLUME
             voxel_size,
-            out_path,
+            src_name='train',
+            out_path=None,
             model_name='noise2gun',
             model_path='./models/',
             side_length=64,#12 # in voxels for prediction (i.e. network output) - actual used ROI for network input will be bigger for valid padding
@@ -37,11 +41,16 @@ class Noise2Gun():
             log_every=100,
             save_every=2000,
             tensorboard_path='./tensorboard/',
-            verbose=True
+            verbose=True,
+            checkpoint=None # Used for prediction/rendering, training always starts from latest
             ):
             self.train_source = train_source
             self.voxel_size = voxel_size
-            self.out_path = out_path
+            self.src_name = src_name
+            if out_path is None:
+                self.out_path = self.train_source + '/volumes'
+            else:
+                self.out_path = out_path
             self.model_name = model_name
             self.model_path = model_path
             self.side_length = side_length
@@ -61,6 +70,16 @@ class Noise2Gun():
             self.verbose = verbose
             if self.verbose:                
                 logging.basicConfig(level=logging.INFO)
+            if checkpoint is None:
+                try:
+                    self.checkpoint, self.iteration = self._get_latest_checkpoint
+                except:
+                    logger.info('Checkpoint not found. Starting from scratch.')
+                    self.checkpoint = None
+            else:
+                self.checkpoint = checkpoint
+            self.build_pipeline_parts()
+
     
     def set_device(self, id=0):
         torch.cuda.set_device(id)   
@@ -136,50 +155,66 @@ class Noise2Gun():
                 img = self.batch[array].data[i].squeeze()
             mid = img.shape[0] // 2 # assumes 3D volume
             self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
+
+    def _get_latest_checkpoint(self):
+        basename = self.model_path + self.model_name
+        def atoi(text):
+            return int(text) if text.isdigit() else text
+
+        def natural_keys(text):
+            return [ atoi(c) for c in re.split(r'(\d+)', text) ]
+
+        checkpoints = glob.glob(basename + '_checkpoint_*')
+        checkpoints.sort(key=natural_keys)
+
+        if len(checkpoints) > 0:
+
+            checkpoint = checkpoints[-1]
+            iteration = int(checkpoint.split('_')[-1])
+            return checkpoint, iteration
+
+        return None, 0
     
-    def build_training_pipeline(self):
-        # declare arrays to use in the pipeline
+    def build_pipeline_parts(self):        
+        # declare arrays to use in the pipelines
         self.raw = gp.ArrayKey('RAW') # raw data
         self.hot = gp.ArrayKey('HOT') # data with random pixels heated
         self.mask = gp.ArrayKey('MASK') # data with random pixels heated
         self.prediction = gp.ArrayKey('PREDICTION') # prediction of denoised data
-        
         self.arrays = [self.raw, self.mask, self.hot, self.prediction]
-        self.crops = {self.hot:self.raw}
-
+        
+        # automatically generate some config variables
+        self.gen_context_side_length()
+        self.crops = {self.hot:self.prediction, self.raw:self.prediction}
+        
+        # setup data source
         self.source = gp.ZarrSource(    # add the data source
             self.train_source,  # the zarr container
-            {self.raw: 'volumes/train'},  # which dataset to associate to the array key
+            {self.raw: self.src_name},  # which dataset to associate to the array key
             {self.raw: gp.ArraySpec(interpolatable=True)}  # meta-information
         )
-
-        # add normalization
-        self.normalize_raw = gp.Normalize(self.raw) # context dependent so not added to object
-
-        # add a RandomLocation node to the pipeline to randomly select a sample
-        self.random_location = gp.RandomLocation()
-
-        # add transpositions/reflections
-        self.simple_augment = gp.SimpleAugment()
+        
+        # get performance stats
+        self.performance = gp.PrintProfilingStats(every=self.log_every)
 
         # stack for batches
         self.stack = gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
-
-        # add pixel heater
-        self.boilerPlate = BoilerPlate(self.raw, 
-                                    self.mask, 
-                                    self.hot, 
-                                    plate_size=self.side_length,
-                                    perc_hotPixels=self.perc_hotPixels, 
-                                    ndims=3) # assumes volumes
-
-        # prepare tensors for UNet
-        unsqueeze = gp.Unsqueeze([self.hot, self.mask, self.raw]) # context dependent so not added to object
 
         # setup a cache
         self.cache = gp.PreCache(num_workers=os.cpu_count())
 
         # define our network model for training
+        self.build_model()
+        
+        # add normalization
+        self.normalize_raw = gp.Normalize(self.raw)
+        self.normalize_pred = gp.Normalize(self.prediction)
+        
+        # add a RandomLocation node to the pipeline to randomly select a sample
+        self.random_location = gp.RandomLocation()
+
+
+    def build_model(self):
         self.unet = UNet(
                 in_channels=1,
                 num_fmaps=self.num_fmaps,
@@ -193,7 +228,22 @@ class Noise2Gun():
         self.model = torch.nn.Sequential(
                             self.unet,
                             ConvPass(self.num_fmaps, 1, [(1, 1, 1)], activation=None),
-                            torch.nn.Sigmoid())
+                            torch.nn.Sigmoid())        
+
+    def build_training_pipeline(self):
+        # add transpositions/reflections
+        self.simple_augment = gp.SimpleAugment()
+
+        # add pixel heater
+        self.boilerPlate = BoilerPlate(self.raw, 
+                                    self.mask, 
+                                    self.hot, 
+                                    plate_size=self.side_length,
+                                    perc_hotPixels=self.perc_hotPixels, 
+                                    ndims=3) # assumes volumes
+
+        # prepare tensors for UNet
+        unsqueeze = gp.Unsqueeze([self.hot, self.mask, self.raw]) # context dependent so not added to object
 
         # pick loss function
         self.loss = loser.maskedMSE
@@ -224,17 +274,12 @@ class Noise2Gun():
                             save_every=self.save_every
                             )
 
-        self.gen_context_side_length()
-
         # create request
         self.train_request = gp.BatchRequest()
         self.train_request.add(self.raw, self.voxel_size*self.side_length)
         self.train_request.add(self.mask, self.voxel_size*self.side_length)
         self.train_request.add(self.prediction, self.voxel_size*self.side_length)
         self.train_request.add(self.hot, self.voxel_size*self.context_side_length)
-
-        # get performance stats
-        self.performance = gp.PrintProfilingStats(every=self.log_every)
 
         # assemble pipeline
         self.training_pipeline = (self.source +
@@ -255,14 +300,14 @@ class Noise2Gun():
         self.kernel_size = 3 # set by default in unet
         self.context_side_length = 2 * np.sum([(self.conv_passes * (self.kernel_size - 1)) * (2 ** level) for level in np.arange(self.unet_depth - 1)]) + (self.conv_passes * (self.kernel_size - 1)) * (2 ** (self.unet_depth - 1)) + (self.conv_passes * (self.kernel_size - 1)) + self.side_length
 
-    def test_train(self):
+    def test_train(self): #TODO: Setup to automatically build pipeline if necessary
         self.model.train()
         with gp.build(self.training_pipeline):
             self.batch = self.training_pipeline.request_batch(self.train_request)
         self.batch_show()
         return self.batch
 
-    def train(self):
+    def train(self): #TODO: Setup to automatically build pipeline if necessary
         self.model.train()
         with gp.build(self.training_pipeline):
             for i in range(self.num_epochs):
@@ -278,11 +323,10 @@ class Noise2Gun():
         unsqueeze = gp.Unsqueeze([self.raw])
         stack = gp.Stack(n)
 
-        self.normalize_pred = gp.Normalize(self.prediction)
-
         self.predict = gp.torch.Predict(self.model,
                                 inputs = {'input': self.raw},
-                                outputs = {0: self.prediction}
+                                outputs = {0: self.prediction},
+                                checkpoint = self.checkpoint
                                 )
 
         request = gp.BatchRequest()
@@ -311,21 +355,31 @@ class Noise2Gun():
 
         unsqueeze = gp.Unsqueeze([self.raw])
 
-        self.normalize_pred = gp.Normalize(self.prediction)
+        # set prediction spec
+        context = self.voxel_size * (self.context_side_length - self.side_length) // 2
+        if self.source.spec is None:
+            data_file = zarr.open(self.train_source)
+            pred_spec = self.source._Hdf5LikeSource__read_spec(self.raw, data_file, self.src_name).copy()
+        else:
+            pred_spec = self.source.spec[self.raw].copy()        
+        pred_spec.roi.grow(-context, -context)
+        pred_spec.dtype = self.normalize_pred.dtype
 
         self.predict = gp.torch.Predict(self.model,
                                 inputs = {'input': self.raw},
-                                outputs = {0: self.prediction}
+                                outputs = {0: self.prediction},
+                                checkpoint = self.checkpoint,
+                                array_specs = {self.prediction: pred_spec}
                                 )
 
         scan_request = gp.BatchRequest()
         scan_request.add(self.prediction, self.voxel_size*self.side_length)
         scan_request.add(self.raw, self.voxel_size*self.context_side_length)
-        scan = gp.Scan(scan_request, num_workers=os.cpu_count())
+        scan = gp.Scan(scan_request, num_workers=self.batch_size)#os.cpu_count())
 
         destination = gp.ZarrWrite(
                         dataset_names = {
-                            self.prediction:self.model_name
+                            self.prediction: self.model_name
                             },
                         output_filename = self.out_path
                         )
@@ -333,7 +387,6 @@ class Noise2Gun():
         renderer = (self.source + 
                     self.normalize_raw +  
                     unsqueeze +
-                    self.cache +
                     self.stack +
                     self.predict +
                     self.normalize_pred +
@@ -343,7 +396,7 @@ class Noise2Gun():
 
         request = gp.BatchRequest()
 
-        print('Full rendering pipeline built.')
+        print('Full rendering pipeline declared. Building...')
         with gp.build(renderer):
             print('Starting full volume render...')
             renderer.request_batch(request)
