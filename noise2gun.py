@@ -72,7 +72,7 @@ class Noise2Gun():
                 logging.basicConfig(level=logging.INFO)
             if checkpoint is None:
                 try:
-                    self.checkpoint, self.iteration = self._get_latest_checkpoint
+                    self.checkpoint, self.iteration = self._get_latest_checkpoint()
                 except:
                     logger.info('Checkpoint not found. Starting from scratch.')
                     self.checkpoint = None
@@ -80,7 +80,6 @@ class Noise2Gun():
                 self.checkpoint = checkpoint
             self.build_pipeline_parts()
 
-    
     def set_device(self, id=0):
         torch.cuda.set_device(id)   
     
@@ -212,7 +211,6 @@ class Noise2Gun():
         
         # add a RandomLocation node to the pipeline to randomly select a sample
         self.random_location = gp.RandomLocation()
-
 
     def build_model(self):
         self.unet = UNet(
@@ -354,6 +352,8 @@ class Noise2Gun():
         self.model.eval()
 
         unsqueeze = gp.Unsqueeze([self.raw])
+        squeeze_1 = gp.Squeeze([self.prediction])
+        squeeze_2 = gp.Squeeze([self.prediction])
 
         # set prediction spec
         context = self.voxel_size * (self.context_side_length - self.side_length) // 2
@@ -381,7 +381,8 @@ class Noise2Gun():
                         dataset_names = {
                             self.prediction: self.model_name
                             },
-                        output_filename = self.out_path
+                        output_filename = self.out_path,
+                        dataset_dtypes = {self.prediction: pred_spec.dtype}
                         )
 
         renderer = (self.source + 
@@ -389,6 +390,8 @@ class Noise2Gun():
                     unsqueeze +
                     self.stack +
                     self.predict +
+                    squeeze_1 +
+                    squeeze_2 +
                     self.normalize_pred +
                     destination +
                     scan +
