@@ -5,18 +5,18 @@ import neuroglancer
 import zarr
 import sys
 
+from segway.gt_scripts.gt_tools import *
+
 def ng_view_zarr(src, layers=None): #src should be zarr data file (i.e. "/path/to/data/file.zarr")
-    neuroglancer.set_server_bind_address('0.0.0.0', 33484)
-    # config = gt_tools.load_config(sys.argv[1])
     if src[-1] == '/':
         src = src[:-1]
 
     if layers is None:        
         zarr_file = zarr.open(src+'/volumes')
         layers = [array for array in zarr_file.array_keys()]
+    
+    viewer = make_ng_viewer(unsynced=True)
 
-
-    viewer = neuroglancer.Viewer()
     with viewer.txn() as s:
         for layer in layers:
             daisy_array = daisy.open_ds(src, 'volumes/'+layer)            
@@ -24,16 +24,7 @@ def ng_view_zarr(src, layers=None): #src should be zarr data file (i.e. "/path/t
         # xyz
         # s.navigation.position.voxelCoordinates = (63*1024, 180*1024, 1129)
 
-    link = str(viewer)
-    print(link)
-    ip_mapping = [
-        ['gandalf', 'catmaid3.hms.harvard.edu'],
-        ['lee-htem-gpu0', '10.117.28.249'],
-        ['lee-lab-gpu1', '10.117.28.82'],
-        ]
-    for alias, ip in ip_mapping:
-        if alias in link:
-            print(link.replace(alias, ip))
+    print_ng_link(viewer)
     
     return viewer
 
