@@ -161,3 +161,4 @@ def test_noise(sample,
     for i, array in enumerate(arrays):
         axs[i].imshow(batch[array].data.squeeze(), cmap='gray')
         axs[i].set_title(array.identifier)
+    return batch, arrays

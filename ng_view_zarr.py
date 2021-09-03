@@ -3,9 +3,10 @@
 import daisy
 import neuroglancer
 import zarr
+import sys
 
 def ng_view_zarr(src, layers=None): #src should be zarr data file (i.e. "/path/to/data/file.zarr")
-    neuroglancer.set_server_bind_address('0.0.0.0')
+    neuroglancer.set_server_bind_address('0.0.0.0', 33484)
     # config = gt_tools.load_config(sys.argv[1])
     if src[-1] == '/':
         src = src[:-1]
@@ -68,3 +69,9 @@ def add_layer(s, a, name, shader=None):
             ),
             **kwargs)
     # print(s.layers)
+
+if __name__ == "__main__":
+    # print(*sys.argv)
+    viewer = ng_view_zarr(*sys.argv[1:])
+    while True:
+        x = 1

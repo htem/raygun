@@ -13,19 +13,16 @@ from funlib.learn.torch.models import UNet, ConvPass
 import gunpowder as gp
 import logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.Logger('noise2gun', 'INFO')
+logger = logging.Logger('CARE', 'INFO')
 
-# from this repo
-import loser
-from boilerPlate import BoilerPlate
-
-class Noise2Gun():
+class CARE():
     def __init__(self,
-            train_source, #EXPECTS ZARR VOLUME
+            src, #EXPECTS ZARR VOLUME
             voxel_size,
-            src_name='train',
+            gt_name='gt',
+            raw_name='train',
             out_path=None,
-            model_name='noise2gun',
+            model_name='CARE',
             model_path='./models/',
             side_length=64,#12 # in voxels for prediction (i.e. network output) - actual used ROI for network input will be bigger for valid padding
             unet_depth=4, # number of layers in unet
@@ -33,7 +30,6 @@ class Noise2Gun():
             conv_padding='valid',
             num_fmaps=12,
             fmap_inc_factor=5,
-            perc_hotPixels=0.198,
             constant_upsample=True,
             num_epochs=10000,
             batch_size=1,
@@ -44,11 +40,12 @@ class Noise2Gun():
             verbose=True,
             checkpoint=None # Used for prediction/rendering, training always starts from latest
             ):
-            self.train_source = train_source
+            self.src = src
             self.voxel_size = voxel_size
-            self.src_name = src_name
+            self.gt_name = gt_name
+            self.raw_name = raw_name
             if out_path is None:
-                self.out_path = self.train_source + '/volumes'
+                self.out_path = self.src + '/volumes'
             else:
                 self.out_path = out_path
             self.model_name = model_name
@@ -59,7 +56,6 @@ class Noise2Gun():
             self.conv_padding = conv_padding
             self.num_fmaps = num_fmaps
             self.fmap_inc_factor = fmap_inc_factor
-            self.perc_hotPixels = perc_hotPixels
             self.constant_upsample = constant_upsample
             self.num_epochs = num_epochs
             self.batch_size = batch_size
@@ -92,8 +88,8 @@ class Noise2Gun():
         else:
             logging.basicConfig(level=logging.WARNING)
 
-    def imshow(self, raw, mask=None, hot=None, prediction=None, context=None):
-        cols = 1 + (mask is not None) + (hot is not None) + (prediction is not None) + (context is not None)
+    def imshow(self, raw, gt, prediction=None, context=None):
+        cols = 2 + (prediction is not None) + (context is not None)
         fig, axes = plt.subplots(1, cols, figsize=(30,30*cols))
         if len(raw.shape) == 3:
             middle = raw.shape[0] // 2
@@ -102,19 +98,12 @@ class Noise2Gun():
             axes[0].imshow(raw, cmap='gray', vmin=0, vmax=1)
         axes[0].set_title('Raw')
         col = 1
-        if mask is not None:
-            if len(mask.shape) == 3:
-                axes[col].imshow(mask[middle], vmin=0, vmax=1)
+        if gt is not None:
+            if len(gt.shape) == 3:
+                axes[col].imshow(gt[middle], vmin=0, vmax=1)
             else:
-                axes[col].imshow(mask, vmin=0, vmax=1)
-            axes[col].set_title('Heat Mask')
-            col += 1
-        if hot is not None:
-            if len(hot.shape) == 3:
-                axes[col].imshow(hot[middle], cmap='gray', vmin=0, vmax=1)
-            else:
-                axes[col].imshow(hot, cmap='gray', vmin=0, vmax=1)
-            axes[col].set_title("Heated image")
+                axes[col].imshow(gt, vmin=0, vmax=1)
+            axes[col].set_title('Ground Truth')
             col += 1
         if prediction is not None:
             if prediction.size < raw.size:
