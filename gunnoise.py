@@ -91,7 +91,7 @@ def noise_batch(samples,
         for array in arrays:
                 scan_request.add(array, scan_size)
 
-        scan = gp.Scan(scan_request, num_workers=os.cpu_count())
+        scan = gp.Scan(scan_request, num_workers=1)#os.cpu_count())
 
         # request an empty batch from scan
         request = gp.BatchRequest()
@@ -108,7 +108,8 @@ def noise_batch(samples,
                 #dataset_dtypes = {noisy: np.uint8} # save as 0-255 values (should match raw)
         )
 
-        pipeline += (cache +
+        pipeline += (
+                # cache +
                 destination + 
                 scan + 
                 performance)
@@ -161,4 +162,4 @@ def test_noise(sample,
     for i, array in enumerate(arrays):
         axs[i].imshow(batch[array].data.squeeze(), cmap='gray')
         axs[i].set_title(array.identifier)
-    return batch, arrays
+    return batch, arrays, noise_name

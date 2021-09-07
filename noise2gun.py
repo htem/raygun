@@ -48,7 +48,7 @@ class Noise2Gun():
             self.voxel_size = voxel_size
             self.src_name = src_name
             if out_path is None:
-                self.out_path = self.train_source + '/volumes'
+                self.out_path = self.train_source
             else:
                 self.out_path = out_path
             self.model_name = model_name
@@ -78,6 +78,7 @@ class Noise2Gun():
             else:
                 self.checkpoint = checkpoint
             self.build_pipeline_parts()
+            self.training_pipeline = None
 
     def set_device(self, id=0):
         torch.cuda.set_device(id)   
@@ -300,14 +301,18 @@ class Noise2Gun():
         self.kernel_size = 3 # set by default in unet
         self.context_side_length = 2 * np.sum([(self.conv_passes * (self.kernel_size - 1)) * (2 ** level) for level in np.arange(self.unet_depth - 1)]) + (self.conv_passes * (self.kernel_size - 1)) * (2 ** (self.unet_depth - 1)) + (self.conv_passes * (self.kernel_size - 1)) + self.side_length
 
-    def test_train(self): #TODO: Setup to automatically build pipeline if necessary
+    def test_train(self): 
+        if self.training_pipeline is None:
+            self.build_training_pipeline()
         self.model.train()
         with gp.build(self.training_pipeline):
             self.batch = self.training_pipeline.request_batch(self.train_request)
         self.batch_show()
         return self.batch
 
-    def train(self): #TODO: Setup to automatically build pipeline if necessary
+    def train(self):
+        if self.training_pipeline is None:
+            self.build_training_pipeline()
         self.model.train()
         with gp.build(self.training_pipeline):
             for i in range(self.num_epochs):

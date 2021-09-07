@@ -45,7 +45,7 @@ class CARE():
             self.gt_name = gt_name
             self.raw_name = raw_name
             if out_path is None:
-                self.out_path = self.src + '/volumes'
+                self.out_path = self.src
             else:
                 self.out_path = out_path
             self.model_name = model_name
@@ -74,6 +74,7 @@ class CARE():
             else:
                 self.checkpoint = checkpoint
             self.build_pipeline_parts()
+            self.training_pipeline = None
 
     def set_device(self, id=0):
         torch.cuda.set_device(id)   
@@ -88,8 +89,8 @@ class CARE():
         else:
             logging.basicConfig(level=logging.WARNING)
 
-    def imshow(self, raw, gt, prediction=None, context=None):
-        cols = 2 + (prediction is not None) + (context is not None)
+    def imshow(self, raw, gt=None, prediction=None, context=None):
+        cols = 1 + (gt is not None) + (prediction is not None) + (context is not None)
         fig, axes = plt.subplots(1, cols, figsize=(30,30*cols))
         if len(raw.shape) == 3:
             middle = raw.shape[0] // 2
@@ -130,11 +131,10 @@ class CARE():
     def batch_show(self, batch=None, i=0):
         if batch is None:
             batch = self.batch
-        self.imshow(batch[self.raw].data[i].squeeze(), 
-            batch[self.mask].data[i].squeeze(), 
-            batch[self.hot].crop(batch[self.raw].spec.roi).data[i].squeeze(),
+        self.imshow(batch[self.raw].data[i].crop(batch[self.gt].spec.roi).data[i].squeeze(), 
+            batch[self.gt].data[i].squeeze(), 
             batch[self.prediction].data[i].squeeze(),
-            batch[self.hot].data[i].squeeze(),
+            batch[self.raw].data[i].squeeze(),
             )
     
     def batch_tBoard_write(self, i=0):
@@ -168,20 +168,23 @@ class CARE():
     def build_pipeline_parts(self):        
         # declare arrays to use in the pipelines
         self.raw = gp.ArrayKey('RAW') # raw data
-        self.hot = gp.ArrayKey('HOT') # data with random pixels heated
-        self.mask = gp.ArrayKey('MASK') # data with random pixels heated
-        self.prediction = gp.ArrayKey('PREDICTION') # prediction of denoised data
-        self.arrays = [self.raw, self.mask, self.hot, self.prediction]
+        self.gt = gp.ArrayKey('GT') # ground truth data
+        self.prediction = gp.ArrayKey('PREDICTION') # prediction of GT data from raw
+        self.arrays = [self.raw, self.gt, self.prediction]
         
         # automatically generate some config variables
         self.gen_context_side_length()
-        self.crops = {self.hot:self.prediction, self.raw:self.prediction}
+        self.crops = {self.raw:self.prediction}
         
         # setup data source
         self.source = gp.ZarrSource(    # add the data source
-            self.train_source,  # the zarr container
-            {self.raw: self.src_name},  # which dataset to associate to the array key
-            {self.raw: gp.ArraySpec(interpolatable=True)}  # meta-information
+            self.src,  # the zarr container
+            {   self.raw: self.raw_name,
+                self.gt: self.gt_name
+                },  # which dataset to associate to the array key
+            {   self.raw: gp.ArraySpec(interpolatable=True),
+                self.gt: gp.ArraySpec(interpolatable=True)
+                }  # meta-information
         )
         
         # get performance stats
@@ -198,6 +201,7 @@ class CARE():
         
         # add normalization
         self.normalize_raw = gp.Normalize(self.raw)
+        self.normalize_gt = gp.Normalize(self.gt)
         self.normalize_pred = gp.Normalize(self.prediction)
         
         # add a RandomLocation node to the pipeline to randomly select a sample
@@ -223,19 +227,11 @@ class CARE():
         # add transpositions/reflections
         self.simple_augment = gp.SimpleAugment()
 
-        # add pixel heater
-        self.boilerPlate = BoilerPlate(self.raw, 
-                                    self.mask, 
-                                    self.hot, 
-                                    plate_size=self.side_length,
-                                    perc_hotPixels=self.perc_hotPixels, 
-                                    ndims=3) # assumes volumes
-
         # prepare tensors for UNet
-        unsqueeze = gp.Unsqueeze([self.hot, self.mask, self.raw]) # context dependent so not added to object
+        unsqueeze = gp.Unsqueeze([self.raw])#, self.gt]) # context dependent so not added to object
 
         # pick loss function
-        self.loss = loser.maskedMSE
+        self.loss = torch.nn.L1Loss()
 
         # pick optimizer
         self.optimizer = torch.optim.Adam(self.model.parameters(), 
@@ -247,12 +243,11 @@ class CARE():
                             self.loss,
                             self.optimizer,
                             inputs = {
-                                'input': self.hot
+                                'input': self.raw
                             },
                             loss_inputs = {
-                                'src': self.prediction,
-                                'mask': self.mask,
-                                'target': self.raw
+                                0: self.prediction,
+                                1: self.gt
                             },
                             outputs = {
                                 0: self.prediction
@@ -265,17 +260,16 @@ class CARE():
 
         # create request
         self.train_request = gp.BatchRequest()
-        self.train_request.add(self.raw, self.voxel_size*self.side_length)
-        self.train_request.add(self.mask, self.voxel_size*self.side_length)
+        self.train_request.add(self.raw, self.voxel_size*self.context_side_length)
+        self.train_request.add(self.gt, self.voxel_size*self.side_length)
         self.train_request.add(self.prediction, self.voxel_size*self.side_length)
-        self.train_request.add(self.hot, self.voxel_size*self.context_side_length)
 
         # assemble pipeline
         self.training_pipeline = (self.source +
                                 self.normalize_raw + 
+                                self.normalize_gt +
                                 self.random_location +
                                 self.simple_augment + 
-                                self.boilerPlate +
                                 unsqueeze + 
                                 self.cache +
                                 self.stack + 
@@ -289,14 +283,18 @@ class CARE():
         self.kernel_size = 3 # set by default in unet
         self.context_side_length = 2 * np.sum([(self.conv_passes * (self.kernel_size - 1)) * (2 ** level) for level in np.arange(self.unet_depth - 1)]) + (self.conv_passes * (self.kernel_size - 1)) * (2 ** (self.unet_depth - 1)) + (self.conv_passes * (self.kernel_size - 1)) + self.side_length
 
-    def test_train(self): #TODO: Setup to automatically build pipeline if necessary
+    def test_train(self):
+        if self.training_pipeline is None:
+            self.build_training_pipeline()
         self.model.train()
         with gp.build(self.training_pipeline):
             self.batch = self.training_pipeline.request_batch(self.train_request)
         self.batch_show()
         return self.batch
 
-    def train(self): #TODO: Setup to automatically build pipeline if necessary
+    def train(self):
+        if self.training_pipeline is None:
+            self.build_training_pipeline()
         self.model.train()
         with gp.build(self.training_pipeline):
             for i in range(self.num_epochs):
@@ -320,10 +318,12 @@ class CARE():
 
         request = gp.BatchRequest()
         request.add(self.prediction, self.voxel_size*self.side_length)
+        request.add(self.gt, self.voxel_size*self.side_length)
         request.add(self.raw, self.voxel_size*self.context_side_length)
 
         predicter = (self.source + 
                     self.normalize_raw + 
+                    self.normalize_gt +
                     self.random_location + 
                     unsqueeze +
                     stack +
@@ -333,9 +333,7 @@ class CARE():
         with gp.build(predicter):
             self.batch = predicter.request_batch(request)
 
-        i = 0
-        raw_data = self.batch[self.raw].crop(self.batch[self.prediction].spec.roi).data[i].squeeze()
-        self.imshow(raw_data, prediction=self.batch[self.prediction].data[i].squeeze())
+        self.batch_show()
         return self.batch
 
     def render_full(self):
@@ -349,8 +347,8 @@ class CARE():
         # set prediction spec
         context = self.voxel_size * (self.context_side_length - self.side_length) // 2
         if self.source.spec is None:
-            data_file = zarr.open(self.train_source)
-            pred_spec = self.source._Hdf5LikeSource__read_spec(self.raw, data_file, self.src_name).copy()
+            data_file = zarr.open(self.src)
+            pred_spec = self.source._Hdf5LikeSource__read_spec(self.raw, data_file, self.raw_name).copy()
         else:
             pred_spec = self.source.spec[self.raw].copy()        
         pred_spec.roi.grow(-context, -context)
