@@ -1,6 +1,4 @@
 # !conda activate n2v
-from gunpowder import array_spec
-from gunpowder.coordinate import Coordinate
 import numpy as np
 from matplotlib import pyplot as plt
 import torch

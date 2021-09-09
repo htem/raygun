@@ -1,6 +1,4 @@
 # !conda activate n2v
-from gunpowder import array_spec
-from gunpowder.coordinate import Coordinate
 import numpy as np
 from matplotlib import pyplot as plt
 import torch
@@ -143,7 +141,7 @@ class CARE():
                 img = self.batch[array].crop(self.batch[self.crops[array]].spec.roi).data[i].squeeze()
             else:
                 img = self.batch[array].data[i].squeeze()
-            mid = img.shape[0] // 2 # assumes 3D volume
+            mid = img.shape[0] // 2 # TODO: assumes 3D volume
             self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
 
     def _get_latest_checkpoint(self):
@@ -228,10 +226,10 @@ class CARE():
         self.simple_augment = gp.SimpleAugment()
 
         # prepare tensors for UNet
-        unsqueeze = gp.Unsqueeze([self.raw])#, self.gt]) # context dependent so not added to object
+        unsqueeze = gp.Unsqueeze([self.raw, self.gt]) # context dependent so not added to object
 
         # pick loss function
-        self.loss = torch.nn.L1Loss()
+        self.loss = torch.nn.MSELoss()
 
         # pick optimizer
         self.optimizer = torch.optim.Adam(self.model.parameters(), 

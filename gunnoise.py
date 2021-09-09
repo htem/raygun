@@ -1,11 +1,10 @@
 # !conda activate n2v
 
 import zarr
-import os
 import matplotlib.pyplot as plt
 
 import gunpowder as gp
-import logging
+# import logging
 # logging.basicConfig(level=logging.INFO)
 
 # from this repo
