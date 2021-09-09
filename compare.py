@@ -15,8 +15,8 @@ logger = logging.Logger('Compare', 'INFO')
 class Compare():
     def __init__(self, 
                 src_path, # 'path/to/data.zarr/volumes'
-                gt_name, # 'gt_dataset_name'
-                ds_names, # ['dataset_1_name', 'dataset_2_name', ...]
+                gt_name='gt', # 'gt_dataset_name'
+                ds_names=None, # ['dataset_1_name', 'dataset_2_name', ...]
                 out_path=None,
                 batch_size=1,
                 metric_list=None,
@@ -24,14 +24,19 @@ class Compare():
     ):
         self.src_path = src_path
         self.gt_name = gt_name
-        self.ds_names = ds_names
+        if ds_names is None:
+            data = zarr.open(self.src_path)
+            self.ds_names = [key for key in data.keys() if key!=self.gt_name]
+        else:
+            self.ds_names = ds_names
         self.out_path = out_path
         self.batch_size = batch_size
         if metric_list is None:
             self.metric_list = ['normalized_root_mse', 
                                 'peak_signal_noise_ratio',
                                 'structural_similarity',
-                                'normalized_mutual_information']
+                                # 'normalized_mutual_information'
+                                ]
         else:
             self.metric_list = metric_list
         self.vizualize = vizualize
@@ -60,9 +65,6 @@ class Compare():
         data_file = zarr.open(self.src_path)
         for key, name in self.array_dict.items():
             self.voxel_sizes[key] = self.source._Hdf5LikeSource__read_spec(key, data_file, name).voxel_size
-
-        # get performance stats
-        self.performance = gp.PrintProfilingStats(every=self.log_every)
 
        # setup a cache
         self.cache = gp.PreCache(num_workers=os.cpu_count())
@@ -135,7 +137,7 @@ class Compare():
         return self.results, self.batch
 
 
-    def compare(self, patch_size=gp.Coordinate((64,64,64))):
+    def compare(self, patch_size=gp.Coordinate((64,64,64))): #TODO: FIX MISSING REGIONS ROIS
         scan_request = gp.BatchRequest()
         for array in self.array_dict:
             scan_request.add(array, self.voxel_sizes[array] * patch_size)
@@ -145,8 +147,7 @@ class Compare():
                     self.normalizers + 
                     # self.cache +
                     self.comparator +
-                    scan +
-                    self.performance
+                    scan
                     )
         
         with gp.build(pipeline):
@@ -172,7 +173,8 @@ class Comparator(gp.BatchFilter):
             self.metric_list = ['normalized_root_mse', 
                                 'peak_signal_noise_ratio',
                                 'structural_similarity',
-                                'normalized_mutual_information']
+                                # 'normalized_mutual_information'
+                                ]
         else:
             self.metric_list = metric_list
         self.results = None
