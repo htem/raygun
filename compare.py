@@ -153,7 +153,7 @@ class Compare():
         with gp.build(pipeline):
             pipeline.request_batch(gp.BatchRequest())
         
-        self.results = self.comparator.results
+        self.results = self.comparator.get_results()
         
         if self.vizualize:
             self.results.plot.bar()
@@ -203,3 +203,6 @@ class Comparator(gp.BatchFilter):
         self.iter += 1
 
         return
+    
+    def get_results(self):
+        return self.results / self.iter # TODO: DETERMINE BEST WAY TO COMBINE ACROSS SCANS... (currently average)
