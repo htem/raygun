@@ -297,7 +297,10 @@ class Noise2Gun():
         # figure out proper ROI padding for context
         self.conv_passes = 2 # set by default in unet
         self.kernel_size = 3 # set by default in unet
-        self.context_side_length = 2 * np.sum([(self.conv_passes * (self.kernel_size - 1)) * (2 ** level) for level in np.arange(self.unet_depth - 1)]) + (self.conv_passes * (self.kernel_size - 1)) * (2 ** (self.unet_depth - 1)) + (self.conv_passes * (self.kernel_size - 1)) + self.side_length
+        if self.conv_padding == 'valid':
+            self.context_side_length = 2 * np.sum([(self.conv_passes * (self.kernel_size - 1)) * (2 ** level) for level in np.arange(self.unet_depth - 1)]) + (self.conv_passes * (self.kernel_size - 1)) * (2 ** (self.unet_depth - 1)) + (self.conv_passes * (self.kernel_size - 1)) + self.side_length
+        else:
+            self.context_side_length = self.side_length
 
     def test_train(self): 
         if self.training_pipeline is None:

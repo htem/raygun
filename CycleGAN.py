@@ -11,9 +11,9 @@ from funlib.learn.torch.models import UNet, ConvPass
 import gunpowder as gp
 import logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.Logger('CARE', 'INFO')
+logger = logging.Logger('CycleGAN', 'INFO')
 
-class CARE():
+class CycleGAN(): #TODO: REWRITE FOR CYCLEGAN (copied from CARE)
     def __init__(self,
             src, #EXPECTS ZARR VOLUME
             voxel_size,
@@ -276,13 +276,10 @@ class CARE():
                                 )
     
     def gen_context_side_length(self):
-        # figure out proper ROI padding for context
+        # figure out proper ROI padding for context for the UNet generators
         self.conv_passes = 2 # set by default in unet
         self.kernel_size = 3 # set by default in unet
-        if self.conv_padding == 'valid':
-            self.context_side_length = 2 * np.sum([(self.conv_passes * (self.kernel_size - 1)) * (2 ** level) for level in np.arange(self.unet_depth - 1)]) + (self.conv_passes * (self.kernel_size - 1)) * (2 ** (self.unet_depth - 1)) + (self.conv_passes * (self.kernel_size - 1)) + self.side_length
-        else:
-            self.context_side_length = self.side_length
+        self.context_side_length = 2 * np.sum([(self.conv_passes * (self.kernel_size - 1)) * (2 ** level) for level in np.arange(self.unet_depth - 1)]) + (self.conv_passes * (self.kernel_size - 1)) * (2 ** (self.unet_depth - 1)) + (self.conv_passes * (self.kernel_size - 1)) + self.side_length
 
     def test_train(self):
         if self.training_pipeline is None:
@@ -395,3 +392,378 @@ class CARE():
             renderer.request_batch(request)
             print('Finished.')
 
+
+#===================================================================================
+
+from gunpowder.torch import Train
+import math
+import sys
+import functools
+from tqdm import tqdm
+
+torch.backends.cudnn.benchmark = True
+
+from tri_utils import NLayerDiscriminator3D, GANLoss, init_weights, UnetGenerator3D
+
+n_samples = 11
+
+l_gan_lambda = 2
+l1_lambda = 150
+l_gan_lambda = 1
+l1_lambda = 100
+
+data_dir = "/n/groups/htem/Segmentation/networks/tmn7/gunpowder/gt"
+zarr_name = "cortex2.zarr"
+zarr_path = os.path.join(data_dir, zarr_name)
+log_dir = "logs"
+
+# mult_xy = 0
+# mult_xy = 4*30
+mult_xy = 4*9
+mult_xz = -4*21
+# mult_xy = 0
+# mult_xz = 0
+input_shape = gp.Coordinate((132+mult_xz, 132+mult_xy, 132+mult_xy))
+output_shape = gp.Coordinate((92+mult_xz, 92+mult_xy, 92+mult_xy))
+
+voxel_size = gp.Coordinate((60, 60, 60))  # TODO: change later
+input_size = input_shape * voxel_size
+output_size = output_shape * voxel_size
+
+checkpoint_every = 5000
+train_until = 40000
+snapshot_every = 1000
+zarr_snapshot = False
+num_workers = 11
+
+net_g_num_fmaps = 64
+net_d_num_fmaps = 64
+net_g_num_fmaps = 32
+# net_d_num_fmaps = 32
+
+def mk_unet_3d():
+    unet = UNet(
+        in_channels=1,
+        num_fmaps=net_g_num_fmaps,
+        # num_fmaps_out=1,
+        fmap_inc_factor=2,
+        downsample_factors=[
+            [2, 2, 2],
+            [2, 2, 2],
+            # [2, 2, 2],
+            ],
+        )
+
+    return torch.nn.Sequential(
+        unet,
+        ConvPass(net_g_num_fmaps, 1, [[1, 1, 1]], activation='Sigmoid'))
+
+class CycleGAN_Model(torch.nn.Module):
+    def __init__(self, netG1, netD1, netG2, netD2):
+        super(CycleGAN_Model, self).__init__()
+        self.netG1 = netG1
+        self.netD1 = netD1
+        self.netG2 = netG2
+        self.netD2= netD2
+
+    def forward(self, real_A, real_B):
+        fake_B = self.netG1(real_A)
+        cycled_A = self.netG2(fake_B)
+        fake_A = self.netG2(real_B)
+        cycled_B = self.netG1(fake_A)
+
+        return fake_B, cycled_B, fake_A, cycled_A
+
+
+class CycleGAN_Optimizer(torch.nn.Module):
+    def __init__(self, optimizer_G1, optimizer_D1, optimizer_G2, optimizer_D2):
+        super(CycleGAN_Optimizer, self).__init__()
+        self.optimizer_G1 = optimizer_G1
+        self.optimizer_D1 = optimizer_D1
+        self.optimizer_G2 = optimizer_G2
+        self.optimizer_D2 = optimizer_D2
+
+    def step(self):
+        """Dummy step pass for Gunpowder's Train node step() call"""
+        pass
+
+
+class CycleGAN_Loss(torch.nn.Module):
+    def __init__(self, l1_loss, gan_loss, netD, netG, optimizer_D, optimizer_G,
+                 ):
+        super(CycleGAN_Loss, self).__init__()
+        self.l1_loss = l1_loss
+        self.gan_loss = gan_loss
+        self.netD = netD
+        self.netG = netG
+        self.optimizer_D = optimizer_D
+        self.optimizer_G = optimizer_G
+
+    def backward_D(self, fake_B, real_A, real_B):
+
+        # Fake; stop backprop to the generator by detaching fake_B
+        fake_AB = torch.cat((real_A, fake_B), 1)  # we use conditional GANs; we need to feed both input and output to the discriminator
+        pred_fake = self.netD(fake_AB.detach())
+        loss_D_fake = self.gan_loss(pred_fake, False)
+
+        # Real
+        real_AB = torch.cat((real_A, real_B), 1)
+        pred_real = self.netD(real_AB)
+        loss_D_real = self.gan_loss(pred_real, True)
+
+        loss_D = (loss_D_fake + loss_D_real) * 0.5
+        loss_D.backward()
+        return loss_D
+
+    def backward_G(self, fake_B, real_A, real_B):
+        """Calculate GAN and L1 loss for the generator"""
+
+        # First, G(A) should fake the discriminator
+        fake_AB = torch.cat((real_A, fake_B), 1)
+        pred_fake = self.netD(fake_AB)
+        self.loss_G_GAN = self.gan_loss(pred_fake, True) * l_gan_lambda
+        # Second, G(A) = B
+        self.loss_G_L1 = self.l1_loss(fake_B, real_B) * l1_lambda  # TODO: check lambda
+        # combine loss and calculate gradients
+        loss_G = self.loss_G_GAN + self.loss_G_L1
+        loss_G.backward()
+        return loss_G
+
+        # loss_G_L1 = self.l1_loss(fake_B, real_B) * 1  # TODO: check lambda
+        # loss_G_L1.backward()
+        # return loss_G_L1
+
+    def forward(self, fake_B, real_A, real_B, mask):
+
+        fake_B_mask = fake_B * mask
+        real_A_mask = real_A * mask
+        real_B_mask = real_B * mask
+
+        # # update D
+        self.set_requires_grad(self.netD, True)  # enable backprop for D
+        self.optimizer_D.zero_grad()     # set D's gradients to zero
+        loss_D = self.backward_D(fake_B_mask, real_A_mask, real_B_mask)
+        self.optimizer_D.step()          # update D's weights
+
+        # update G
+        self.set_requires_grad(self.netD, False)  # D requires no gradients when optimizing G
+        self.optimizer_G.zero_grad()        # set G's gradients to zero
+        loss_G = self.backward_G(fake_B_mask, real_A_mask, real_B_mask)                   # calculate gradient for G
+        self.optimizer_G.step()             # udpate G's weights
+
+        self.loss_dict = {
+            'loss_D': float(loss_D),
+            'loss_G_GAN': float(self.loss_G_GAN),
+            'loss_G_L1': float(self.loss_G_L1),
+        }
+
+        total_loss = loss_D + loss_G
+        # define dummy backward pass to disable Gunpowder's Train node loss.backward() call
+        total_loss.backward = lambda: None
+
+        print(self.loss_dict)
+        return total_loss
+
+    def set_requires_grad(self, nets, requires_grad=False):
+        """Set requies_grad=Fasle for all the networks to avoid unnecessary computations
+        Parameters:
+            nets (network list)   -- a list of networks
+            requires_grad (bool)  -- whether the networks require gradients or not
+        """
+        if not isinstance(nets, list):
+            nets = [nets]
+        for net in nets:
+            if net is not None:
+                for param in net.parameters():
+                    param.requires_grad = requires_grad
+
+
+def mknet(mask=None):
+    norm_layer = functools.partial(torch.nn.InstanceNorm3d, affine=False, track_running_stats=False)
+
+    netG = mk_unet_3d()
+    # netG = UnetGenerator3D(input_nc=1, output_nc=1, num_downs=7, ngf=64, 
+    #                      norm_layer=norm_layer, use_dropout=False)
+    # init_weights(netG, init_type='orthogonal')
+    init_weights(netG, init_type='normal', init_gain=0.05)
+    # init_weights(netG, init_type='normal')
+    # init_weights(netG, init_type='xavier')
+
+    netD = NLayerDiscriminator3D(input_nc=2, ndf=net_d_num_fmaps, n_layers=3, norm_layer=norm_layer,
+                                 downsampling_kw=2, kw=3,
+                                 )
+    init_weights(netD, init_type='normal')
+
+    model = CycleGAN_Model(netG, netD)
+
+    l1_loss = torch.nn.L1Loss()
+    gan_loss = GANLoss(gan_mode='lsgan')
+
+    optimizer_G = torch.optim.Adam(netG.parameters(), lr=0.0002, betas=(0.95, 0.999))
+    optimizer_D = torch.optim.Adam(netD.parameters(), lr=0.0002, betas=(0.95, 0.999))
+    optimizer = CycleGAN_Optimizer(optimizer_G, optimizer_D)
+
+    loss = CycleGAN_Loss(l1_loss, gan_loss, netD, netG, optimizer_D, optimizer_G)
+
+    return (model, loss, optimizer)
+
+
+def train(iterations):
+
+    source = gp.ArrayKey('source')
+    source_cropped = gp.ArrayKey('source_cropped')
+    target = gp.ArrayKey('target')
+    fake = gp.ArrayKey('fake')
+    mask = gp.ArrayKey('mask')
+    gradients = gp.ArrayKey('GRADIENTS')
+
+    model, loss, optimizer = mknet()
+
+    # alias
+    real_A = source
+    real_A_cropped = source_cropped
+    fake_B = fake
+    real_B = target
+
+    request = gp.BatchRequest()
+    request.add(source, input_size)
+    request.add(source_cropped, output_size)
+    request.add(target, output_size)
+    request.add(mask, output_size)
+    request.add(gradients, output_size)
+
+    snapshot_request = gp.BatchRequest()
+    snapshot_request[fake] = request[target].copy()
+
+    sources = tuple(
+        [gp.ZarrSource(
+            zarr_path,
+            {
+                source: f'volumes/raw_100nm',
+                source_cropped: f'volumes/raw_100nm',
+                target: f'volumes/raw_30nm',
+                # mask: f'volumes/train_mask',
+                mask: f'volumes/train_mask1',
+                # mask: f'volumes/train_mask2',
+            },
+            {
+                source: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size),
+                source_cropped: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size),
+                target: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size),
+                mask: gp.ArraySpec(interpolatable=False, voxel_size=voxel_size),
+            }) +
+        gp.RandomLocation(min_masked=0.5, mask=mask) +
+        # gp.RandomLocation(mask=mask) +
+        # gp.RandomLocation() +
+        # gp.Reject(mask=mask) +
+        gp.Normalize(source) +
+        gp.Normalize(source_cropped) +
+        gp.Normalize(target)]
+    )
+
+    pipeline = sources
+    pipeline += gp.RandomProvider()
+
+    pipeline += gp.SimpleAugment()
+    pipeline += gp.ElasticAugment(
+        # control_point_spacing=(64, 64),
+        # control_point_spacing=(48*30, 48*30, 48*30),
+        control_point_spacing=(48, 48, 48),
+        jitter_sigma=(5.0, 5.0, 5.0),
+        rotation_interval=(0, math.pi/2),
+        subsample=4,
+        )
+    # pipeline += gp.IntensityAugment(
+    #     source,
+    #     scale_min=0.8,
+    #     scale_max=1.2,
+    #     shift_min=-0.2,
+    #     shift_max=0.2)
+    # pipeline += gp.NoiseAugment(source, var=0.01)
+    # pipeline += gp.NoiseAugment(source, var=0.001)
+    # pipeline += gp.NoiseAugment(source, var=0.002)
+
+    # add "channel" dimensions
+    pipeline += gp.Unsqueeze([source, target, source_cropped])
+    # add "batch" dimensions
+    pipeline += gp.Unsqueeze([source, target, source_cropped])
+    # pipeline += gp.Unsqueeze([target])
+
+    pipeline += gp.PreCache(num_workers=num_workers)
+    pipeline += Train(
+        model,
+        loss,
+        optimizer,
+        inputs={
+            'real_A': source
+            # 'x': source
+            # 'input': source
+        },
+        outputs={
+            0: fake_B,
+        },
+        gradients={
+            0: gradients
+         },
+        loss_inputs={
+            0: fake_B,
+            1: real_A_cropped,
+            2: real_B,
+            3: mask,
+        },
+        log_dir = log_dir,
+        save_every=checkpoint_every,
+        )
+
+    pipeline += gp.Squeeze([source, source_cropped, target, fake, gradients], axis=0)
+    pipeline += gp.Squeeze([source, source_cropped, target, fake, gradients], axis=0)
+    # pipeline += gp.Squeeze([gradients], axis=1)
+
+    pipeline += gp.Snapshot({
+            real_A: 'real_A',
+            real_B: 'real_B',
+            fake_B: 'fake_B',
+            gradients: 'gradients',
+            mask: 'mask',
+        },
+        every=snapshot_every,
+        output_filename='batch_{iteration}.zarr' if zarr_snapshot else 'batch_{iteration}.hdf',
+        additional_request=snapshot_request)
+
+    with gp.build(pipeline):
+        for i in tqdm(range(iterations)):
+            pipeline.request_batch(request)
+
+if __name__ == '__main__':
+
+    import json
+    mult_xy = 8*8
+    # mult_xy = 8*8
+    test_input_shape = gp.Coordinate((132+mult_xy, 132+mult_xy, 132+mult_xy))
+    test_output_shape = gp.Coordinate((92+mult_xy, 92+mult_xy, 92+mult_xy))
+    config = {
+        'raw': 'real_A',
+        'input_shape': test_input_shape,
+        'output_shape': test_output_shape,
+        'out_dims': 1,
+        'out_dtype': "uint8",
+    }
+    with open('test_net.json', 'w') as f:
+        json.dump(config, f)
+    print('Dumped config...')
+    if 'mknet' in sys.argv:
+        exit()
+
+    try:
+        train_until = int(sys.argv[1])
+    except:
+        pass
+
+    if 'test' in sys.argv:
+        # global train_until
+        train_until = 10
+        snapshot_every = 1
+        zarr_snapshot = True
+        num_workers = 1
+
+    train(train_until)
