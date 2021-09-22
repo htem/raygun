@@ -13,51 +13,87 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.Logger('CycleGAN', 'INFO')
 
-class CycleGAN(): #TODO: REWRITE FOR CYCLEGAN (copied from CARE)
+class CycleGAN(): #TODO: Just pass config file or dictionary
     def __init__(self,
-            src, #EXPECTS ZARR VOLUME
-            voxel_size,
-            gt_name='gt',
-            raw_name='train',
-            out_path=None,
-            model_name='CARE',
+            src_A, #EXPECTS ZARR VOLUME
+            src_B,
+            voxel_size, # TODO:should be same as for BOTH datasets, otherwise resave
+            #TODO: MAYBE INCLUDE UP/DOWNSAMPLING?
+            A_name='raw',
+            B_name='raw',
+            mask_A_name='mask', # expects mask to be in same place as real zarr
+            mask_B_name='mask',
+            A_out_path=None,
+            B_out_path=None,
+            model_prefix='CycleGAN',
             model_path='./models/',
             side_length=64,#12 # in voxels for prediction (i.e. network output) - actual used ROI for network input will be bigger for valid padding
-            unet_depth=4, # number of layers in unet
-            downsample_factor=2,
-            conv_padding='valid',
-            num_fmaps=12,
-            fmap_inc_factor=5,
-            constant_upsample=True,
+            gnet_depth=4, # number of layers in unets (i.e. generators)
+            dnet_depth=3, # number of layers in Discriminator networks
+            g_downsample_factor=2,
+            d_downsample_factor=2,
+            g_conv_padding='valid',
+            d_conv_padding='valid',
+            g_num_fmaps=64,
+            d_num_fmaps=64,
+            g_fmap_inc_factor=2,
+            d_fmap_inc_factor=2,
+            g_constant_upsample=True,
+            d_constant_upsample=True,
+            g_conv_passes=2, 
+            d_conv_passes=2,
+            g_kernel_size=3,
+            d_kernel_size=3, 
             num_epochs=10000,
             batch_size=1,
-            init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
+            num_workers=1,
+            g_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
+            d_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             log_every=100,
             save_every=2000,
             tensorboard_path='./tensorboard/',
             verbose=True,
             checkpoint=None # Used for prediction/rendering, training always starts from latest
             ):
-            self.src = src
+            self.src_A = src_A
+            self.src_B = src_B
             self.voxel_size = voxel_size
-            self.gt_name = gt_name
-            self.raw_name = raw_name
-            if out_path is None:
-                self.out_path = self.src
+            self.A_name = A_name
+            self.B_name = B_name
+            self.mask_A_name = mask_A_name
+            self.mask_B_name = mask_B_name
+            if A_out_path is None:
+                self.A_out_path = self.src_A
             else:
-                self.out_path = out_path
-            self.model_name = model_name
+                self.A_out_path = A_out_path
+            if B_out_path is None:
+                self.B_out_path = self.src_B
+            else:
+                self.B_out_path = B_out_path
+            self.model_prefix = model_prefix
             self.model_path = model_path
             self.side_length = side_length
-            self.unet_depth = unet_depth
-            self.downsample_factor = downsample_factor
-            self.conv_padding = conv_padding
-            self.num_fmaps = num_fmaps
-            self.fmap_inc_factor = fmap_inc_factor
-            self.constant_upsample = constant_upsample
+            self.gnet_depth = gnet_depth
+            self.dnet_depth = dnet_depth
+            self.g_downsample_factor = g_downsample_factor
+            self.d_downsample_factor = d_downsample_factor
+            self.g_conv_padding = g_conv_padding
+            self.d_conv_padding = d_conv_padding
+            self.g_num_fmaps = g_num_fmaps
+            self.d_num_fmaps = d_num_fmaps
+            self.g_fmap_inc_factor = g_fmap_inc_factor
+            self.d_fmap_inc_factor = d_fmap_inc_factor
+            self.g_constant_upsample = g_constant_upsample
+            self.d_constant_upsample = d_constant_upsample
+            self.g_conv_passes = g_conv_passes 
+            self.d_conv_passes = d_conv_passes 
+            self.g_kernel_size = g_kernel_size 
+            self.d_kernel_size = d_kernel_size 
             self.num_epochs = num_epochs
             self.batch_size = batch_size
-            self.init_learning_rate = init_learning_rate
+            self.num_workers = num_workers
+            self.g_init_learning_rate = g_init_learning_rate
+            self.d_init_learning_rate = d_init_learning_rate
             self.log_every = log_every
             self.save_every = save_every
             self.tensorboard_path = tensorboard_path
@@ -165,26 +201,41 @@ class CycleGAN(): #TODO: REWRITE FOR CYCLEGAN (copied from CARE)
     
     def build_pipeline_parts(self):        
         # declare arrays to use in the pipelines
-        self.raw = gp.ArrayKey('RAW') # raw data
-        self.gt = gp.ArrayKey('GT') # ground truth data
-        self.prediction = gp.ArrayKey('PREDICTION') # prediction of GT data from raw
-        self.arrays = [self.raw, self.gt, self.prediction]
+        self.array_names = ['real_A', 'real_A_cropped', 'mask_A', 'fake_A', 'cycled_A', 'real_B', 'real_B_cropped', 'mask_B', 'fake_B', 'cycled_B']#, 'gradients_G1', 'gradients_G2']
+        # [from source A, cropped version to match netG2 output size, mask of source for training (cropped size), netG2 output, netG2(netG1(real_A)) output,...for other side...] #TODO: add gradients for network training debugging
+        self.arrays = []
+        for array in self.array_names:
+            setattr(self, array, gp.ArrayKey(array.upper()))
+            self.arrays.append(getattr(self, array))
         
         # automatically generate some config variables
         self.gen_context_side_length()
-        self.crops = {self.raw:self.prediction}
+        # self.crops = {self.raw:self.prediction}
         
-        # setup data source
-        self.source = gp.ZarrSource(    # add the data source
-            self.src,  # the zarr container
-            {   self.raw: self.raw_name,
-                self.gt: self.gt_name
+        # setup data sources
+        self.source_A = gp.ZarrSource(    # add the data source
+            self.src_A,  # the zarr container
+            {   self.real_A: self.A_name,
+                self.real_A_cropped: self.A_name,
+                self.mask_A: self.mask_A_name,
                 },  # which dataset to associate to the array key
-            {   self.raw: gp.ArraySpec(interpolatable=True),
-                self.gt: gp.ArraySpec(interpolatable=True)
+            {   self.real_A: gp.ArraySpec(interpolatable=True),
+                self.real_A_cropped: gp.ArraySpec(interpolatable=True),
+                self.mask_A: gp.ArraySpec(interpolatable=False), #TODO: Determine whether to include voxel_size
                 }  # meta-information
         )
-        
+        self.source_B = gp.ZarrSource(    # add the data source
+            self.src_B,  # the zarr container
+            {   self.real_B: self.B_name,
+                self.real_B_cropped: self.B_name,
+                self.mask_B: self.mask_B_name,
+                },  # which dataset to associate to the array key
+            {   self.real_B: gp.ArraySpec(interpolatable=True),
+                self.real_B_cropped: gp.ArraySpec(interpolatable=True),
+                self.mask_B: gp.ArraySpec(interpolatable=False), #TODO: Determine whether to include voxel_size
+                }  # meta-information
+        )
+
         # get performance stats
         self.performance = gp.PrintProfilingStats(every=self.log_every)
 
@@ -192,10 +243,10 @@ class CycleGAN(): #TODO: REWRITE FOR CYCLEGAN (copied from CARE)
         self.stack = gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
 
         # setup a cache
-        self.cache = gp.PreCache(num_workers=os.cpu_count())
+        self.cache = gp.PreCache(num_workers=self.num_workers)#os.cpu_count())
 
         # define our network model for training
-        self.build_model()
+        self.setup_networks()
         
         # add normalization
         self.normalize_raw = gp.Normalize(self.raw)
@@ -205,35 +256,95 @@ class CycleGAN(): #TODO: REWRITE FOR CYCLEGAN (copied from CARE)
         # add a RandomLocation node to the pipeline to randomly select a sample
         self.random_location = gp.RandomLocation()
 
-    def build_model(self):
-        self.unet = UNet(
+    def setup_networks(self):
+        #For netG1:
+        unet = UNet(
                 in_channels=1,
-                num_fmaps=self.num_fmaps,
-                fmap_inc_factor=self.fmap_inc_factor,
-                downsample_factors=[(self.downsample_factor,)*3,] * (self.unet_depth - 1),
-                padding=self.conv_padding,
-                constant_upsample=self.constant_upsample,
+                num_fmaps=self.g_num_fmaps,
+                fmap_inc_factor=self.g_fmap_inc_factor,
+                downsample_factors=[(self.g_downsample_factor,)*3,] * (self.gnet_depth - 1), #TODO: make work for arbitrary dimensionality
+                padding=self.g_conv_padding,
+                constant_upsample=self.g_constant_upsample,
                 voxel_size=self.voxel_size # set for each dataset
                 )
+        self.netG1 = torch.nn.Sequential(
+                            unet,
+                            ConvPass(self.g_num_fmaps, 1, [(1,)*3], activation=None),
+                            torch.nn.Sigmoid())
+        init_weights(self.netG1, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
 
-        self.model = torch.nn.Sequential(
-                            self.unet,
-                            ConvPass(self.num_fmaps, 1, [(1, 1, 1)], activation=None),
-                            torch.nn.Sigmoid())        
+        #For netG2:
+        unet = UNet(
+                in_channels=1,
+                num_fmaps=self.g_num_fmaps,
+                fmap_inc_factor=self.g_fmap_inc_factor,
+                downsample_factors=[(self.g_downsample_factor,)*3,] * (self.gnet_depth - 1), #TODO: make work for arbitrary dimensionality
+                padding=self.g_conv_padding,
+                constant_upsample=self.g_constant_upsample,
+                voxel_size=self.voxel_size # set for each dataset
+                )        
+        self.netG2 = torch.nn.Sequential(
+                            unet,
+                            ConvPass(self.g_num_fmaps, 1, [(1,)*3], activation=None),
+                            torch.nn.Sigmoid())
+        init_weights(self.netG2, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
+
+        #For netD1:
+        norm_layer = functools.partial(torch.nn.InstanceNorm3d, affine=False, track_running_stats=False)
+        self.netD1 = NLayerDiscriminator3D(input_nc=1, 
+                                        ndf=self.d_num_fmaps, 
+                                        n_layers=self.dnet_depth, 
+                                        norm_layer=norm_layer,
+                                        downsampling_kw=self.d_downsample_factor, 
+                                        kw=self.d_kernel_size,
+                                 )
+        init_weights(self.netD1, init_type='normal')
+
+        #For netD2:
+        norm_layer = functools.partial(torch.nn.InstanceNorm3d, affine=False, track_running_stats=False)
+        self.netD2 = NLayerDiscriminator3D(input_nc=1, 
+                                        ndf=self.d_num_fmaps, 
+                                        n_layers=self.dnet_depth, 
+                                        norm_layer=norm_layer,
+                                        downsampling_kw=self.d_downsample_factor, 
+                                        kw=self.d_kernel_size,
+                                 )
+        init_weights(self.netD2, init_type='normal')
+
+    def setup_model(self):
+        if not hasattr(self, 'netG1'):
+            self.setup_networks()
+        self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2)
+
+        self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=(0.95, 0.999))#TODO: add betas to config variables
+        self.optimizer_D1 = torch.optim.Adam(self.netD1.parameters(), lr=self.d_init_learning_rate, betas=(0.95, 0.999))
+        self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=(0.95, 0.999))#TODO: add betas to config variables
+        self.optimizer_D2 = torch.optim.Adam(self.netD2.parameters(), lr=self.d_init_learning_rate, betas=(0.95, 0.999))
+        self.optimizer = CycleGAN_Optimizer(self.optimizer_G1, self.optimizer_D1, self.optimizer_G2, self.optimizer_D2)
+
+        self.l1_loss = torch.nn.L1Loss()
+        self.gan_loss = GANLoss(gan_mode='lsgan')
+        self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2) #TODO: add l1_lambda=### to config
 
     def build_training_pipeline(self):
         # add transpositions/reflections
         self.simple_augment = gp.SimpleAugment()
+        self.elastic_augment = gp.ElasticAugment(
+            # control_point_spacing=(64, 64),
+            # control_point_spacing=(48*30, 48*30, 48*30),
+            control_point_spacing=(48, 48, 48),
+            jitter_sigma=(5.0, 5.0, 5.0),
+            rotation_interval=(0, math.pi/2),
+            subsample=4,
+            )
+        # pipeline += gp.IntensityAugment(
+        #     source,
+        #     scale_min=0.8,
+        #     scale_max=1.2,
+        #     shift_min=-0.2,
+        #     shift_max=0.2)
 
-        # prepare tensors for UNet
-        unsqueeze = gp.Unsqueeze([self.raw, self.gt]) # context dependent so not added to object
-
-        # pick loss function
-        self.loss = torch.nn.MSELoss()
-
-        # pick optimizer
-        self.optimizer = torch.optim.Adam(self.model.parameters(), 
-                                            lr=self.init_learning_rate)
+        self.setup_model()
 
         # create a train node using our model, loss, and optimizer
         self.trainer = gp.torch.Train(
@@ -241,14 +352,24 @@ class CycleGAN(): #TODO: REWRITE FOR CYCLEGAN (copied from CARE)
                             self.loss,
                             self.optimizer,
                             inputs = {
-                                'input': self.raw
-                            },
-                            loss_inputs = {
-                                0: self.prediction,
-                                1: self.gt
+                                'real_A': self.real_A,
+                                'real_B': self.real_B
                             },
                             outputs = {
-                                0: self.prediction
+                                'fake_B': self.fake_B,
+                                'cycled_B': self.cycled_B,
+                                'fake_A': self.fake_A,
+                                'cycled_A': self.cycled_A
+                            },
+                            loss_inputs = {
+                                'real_A': self.real_A_cropped,
+                                'fake_A': self.fake_A,
+                                'cycled_A': self.cycled_A,
+                                'real_B': self.real_B_cropped,
+                                'fake_B': self.fake_B,
+                                'cycled_B': self.cycled_B,
+                                'mask_A': self.mask_A,
+                                'mask_B': self.mask_B
                             },
                             log_dir=self.tensorboard_path,
                             log_every=self.log_every,
@@ -277,9 +398,10 @@ class CycleGAN(): #TODO: REWRITE FOR CYCLEGAN (copied from CARE)
     
     def gen_context_side_length(self):
         # figure out proper ROI padding for context for the UNet generators
-        self.conv_passes = 2 # set by default in unet
-        self.kernel_size = 3 # set by default in unet
-        self.context_side_length = 2 * np.sum([(self.conv_passes * (self.kernel_size - 1)) * (2 ** level) for level in np.arange(self.unet_depth - 1)]) + (self.conv_passes * (self.kernel_size - 1)) * (2 ** (self.unet_depth - 1)) + (self.conv_passes * (self.kernel_size - 1)) + self.side_length
+        if self.g_conv_padding == 'valid':
+            self.context_side_length = 2 * np.sum([(self.g_conv_passes * (self.g_kernel_size - 1)) * (2 ** level) for level in np.arange(self.gnet_depth - 1)]) + (self.g_conv_passes * (self.g_kernel_size - 1)) * (2 ** (self.gnet_depth - 1)) + (self.g_conv_passes * (self.g_kernel_size - 1)) + self.side_length
+        else:
+            self.context_side_length = self.side_length
 
     def test_train(self):
         if self.training_pipeline is None:
@@ -362,7 +484,7 @@ class CycleGAN(): #TODO: REWRITE FOR CYCLEGAN (copied from CARE)
         scan_request = gp.BatchRequest()
         scan_request.add(self.prediction, self.voxel_size*self.side_length)
         scan_request.add(self.raw, self.voxel_size*self.context_side_length)
-        scan = gp.Scan(scan_request, num_workers=self.batch_size)#os.cpu_count())
+        scan = gp.Scan(scan_request, num_workers=self.num_workers)#os.cpu_count())
 
         destination = gp.ZarrWrite(
                         dataset_names = {
@@ -489,75 +611,114 @@ class CycleGAN_Optimizer(torch.nn.Module):
 
 
 class CycleGAN_Loss(torch.nn.Module):
-    def __init__(self, l1_loss, gan_loss, netD, netG, optimizer_D, optimizer_G,
+    def __init__(self, l1_loss, gan_loss, netD1, netG1, netD2, netG2, optimizer_D1, optimizer_G1, optimizer_D2, optimizer_G2, l1_lambda=100
                  ):
         super(CycleGAN_Loss, self).__init__()
         self.l1_loss = l1_loss
         self.gan_loss = gan_loss
-        self.netD = netD
-        self.netG = netG
-        self.optimizer_D = optimizer_D
-        self.optimizer_G = optimizer_G
+        self.netD1 = netD1 # differentiates between fake and real Bs
+        self.netG1 = netG1 # turns As into Bs
+        self.netD2 = netD2 # differentiates between fake and real As
+        self.netG2 = netG2 # turns Bs into As
+        self.optimizer_D1 = optimizer_D1
+        self.optimizer_G1 = optimizer_G1
+        self.optimizer_D2 = optimizer_D2
+        self.optimizer_G2 = optimizer_G2
+        self.l1_lambda = l1_lambda
 
-    def backward_D(self, fake_B, real_A, real_B):
-
-        # Fake; stop backprop to the generator by detaching fake_B
-        fake_AB = torch.cat((real_A, fake_B), 1)  # we use conditional GANs; we need to feed both input and output to the discriminator
-        pred_fake = self.netD(fake_AB.detach())
+    def backward_D(self, Dnet, real, fake, cycled):
+        # Real
+        pred_real = Dnet(real)
+        loss_D_real = self.gan_loss(pred_real, True)
+        
+        # Fake; stop backprop to the generator by detaching fake
+        pred_fake = Dnet(fake.detach())
         loss_D_fake = self.gan_loss(pred_fake, False)
 
-        # Real
-        real_AB = torch.cat((real_A, real_B), 1)
-        pred_real = self.netD(real_AB)
-        loss_D_real = self.gan_loss(pred_real, True)
+        # Cycled; stop backprop to the generator by detaching cycled
+        pred_cycled = Dnet(cycled.detach())
+        loss_D_cycled = self.gan_loss(pred_cycled, False)
 
-        loss_D = (loss_D_fake + loss_D_real) * 0.5
+        loss_D = (loss_D_real + loss_D_fake + loss_D_cycled) / 3
         loss_D.backward()
         return loss_D
 
-    def backward_G(self, fake_B, real_A, real_B):
+    def backward_Ds(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
+        self.set_requires_grad([self.netD1, self.netD2], True)  # enable backprop for D
+        self.optimizer_D1.zero_grad()     # set D's gradients to zero
+        self.optimizer_D2.zero_grad()     # set D's gradients to zero
+
+        #Do D1 first
+        loss_D1 = self.backward_D(self.netD1, real_B, fake_B, cycled_B)
+        self.optimizer_D1.step()          # update D's weights
+
+        #Then D2
+        loss_D2 = self.backward_D(self.netD2, real_A, fake_A, cycled_A)
+        self.optimizer_D2.step()
+
+        #return losses
+        return loss_D1, loss_D2
+
+    def backward_G(self, Dnet, fake, cycled, cycle_loss):
         """Calculate GAN and L1 loss for the generator"""
+        # Include L1 loss for forward and reverse cycle consistency
+        loss_G = cycle_loss.clone() #TODO: verify, maybe should be detach() instead?
 
         # First, G(A) should fake the discriminator
-        fake_AB = torch.cat((real_A, fake_B), 1)
-        pred_fake = self.netD(fake_AB)
-        self.loss_G_GAN = self.gan_loss(pred_fake, True) * l_gan_lambda
-        # Second, G(A) = B
-        self.loss_G_L1 = self.l1_loss(fake_B, real_B) * l1_lambda  # TODO: check lambda
-        # combine loss and calculate gradients
-        loss_G = self.loss_G_GAN + self.loss_G_L1
+        pred_fake = Dnet(fake)
+        loss_G += self.gan_loss(pred_fake, True)
+
+        # Second, G(F(B)) should also fake the discriminator TODO: VERIFY THIS (maybe unnecessary)
+        pred_cycled = Dnet(cycled)
+        loss_G += self.gan_loss(pred_cycled, True)
+
+        # calculate gradients
         loss_G.backward()
         return loss_G
 
-        # loss_G_L1 = self.l1_loss(fake_B, real_B) * 1  # TODO: check lambda
-        # loss_G_L1.backward()
-        # return loss_G_L1
+    def backward_Gs(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
+        self.set_requires_grad([self.netD1, self.netD2], False)  # D requires no gradients when optimizing G
+        self.optimizer_G1.zero_grad()        # set G's gradients to zero
+        self.optimizer_G2.zero_grad()        # set G's gradients to zero
 
-    def forward(self, fake_B, real_A, real_B, mask):
+        #get cycle loss for both directions (i.e. real == cycled, a.k.a. real_A == netG2(netG1(real_A)) for A and B)
+        cycle_loss = self.l1_lambda * (self.l1_loss(real_A, cycled_A) + self.l1_loss(real_B, cycled_B))
 
-        fake_B_mask = fake_B * mask
-        real_A_mask = real_A * mask
-        real_B_mask = real_B * mask
+        #Then G1 first
+        loss_G1 = self.backward_G(self.netD1, fake_B, cycled_B, cycle_loss)                   # calculate gradient for G
+        self.optimizer_G1.step()             # udpate G's weights
 
-        # # update D
-        self.set_requires_grad(self.netD, True)  # enable backprop for D
-        self.optimizer_D.zero_grad()     # set D's gradients to zero
-        loss_D = self.backward_D(fake_B_mask, real_A_mask, real_B_mask)
-        self.optimizer_D.step()          # update D's weights
+        #Then G2
+        loss_G2 = self.backward_G(self.netD2, fake_A, cycled_A, cycle_loss)                   # calculate gradient for G
+        self.optimizer_G2.step()             # udpate G's weights
 
-        # update G
-        self.set_requires_grad(self.netD, False)  # D requires no gradients when optimizing G
-        self.optimizer_G.zero_grad()        # set G's gradients to zero
-        loss_G = self.backward_G(fake_B_mask, real_A_mask, real_B_mask)                   # calculate gradient for G
-        self.optimizer_G.step()             # udpate G's weights
+        #return losses
+        return cycle_loss, loss_G1, loss_G2
+
+    def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, mask_A, mask_B):
+
+        real_A_mask = real_A * mask_A
+        cycled_A_mask = cycled_A * mask_A
+        fake_A_mask = fake_A * mask_B # masked based on mask from "real" version of array before generator pass
+        real_B_mask = real_B * mask_B
+        cycled_B_mask = cycled_B * mask_B
+        fake_B_mask = fake_B * mask_A
+
+        # # update Ds
+        loss_D1, loss_D2 = self.backward_Ds(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
+
+        # update Gs
+        cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
 
         self.loss_dict = {
-            'loss_D': float(loss_D),
-            'loss_G_GAN': float(self.loss_G_GAN),
-            'loss_G_L1': float(self.loss_G_L1),
+            'loss_D1': float(loss_D1),
+            'loss_D2': float(loss_D2),
+            'loss_cycle': float(cycle_loss),
+            'loss_G1': float(loss_G1),
+            'loss_G2': float(loss_G2),
         }
 
-        total_loss = loss_D + loss_G
+        total_loss = loss_D1 + loss_D2 + cycle_loss + loss_G1 + loss_G2
         # define dummy backward pass to disable Gunpowder's Train node loss.backward() call
         total_loss.backward = lambda: None
 
