@@ -1,8 +1,8 @@
 # !conda activate n2v
 import numpy as np
 from matplotlib import pyplot as plt
+# from numpy.lib.utils import source
 import torch
-import os
 import glob
 import re
 import zarr
@@ -13,19 +13,27 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.Logger('CycleGAN', 'INFO')
 
+import math
+import sys
+import functools
+from tqdm import tqdm
+
+torch.backends.cudnn.benchmark = True
+
+from tri_utils import NLayerDiscriminator3D, GANLoss, init_weights, UnetGenerator3D
+
 class CycleGAN(): #TODO: Just pass config file or dictionary
     def __init__(self,
             src_A, #EXPECTS ZARR VOLUME
             src_B,
-            voxel_size, # TODO:should be same as for BOTH datasets, otherwise resave
-            #TODO: MAYBE INCLUDE UP/DOWNSAMPLING?
+            voxel_size, # voxel size of src_B (for each dimension)
+            AB_voxel_ratio=1, #determines whether to add up/downsampling node (always rendered to B's voxel_size), (int or tuple of ints)
             A_name='raw',
             B_name='raw',
             mask_A_name='mask', # expects mask to be in same place as real zarr
             mask_B_name='mask',
             A_out_path=None,
             B_out_path=None,
-            model_prefix='CycleGAN',
             model_path='./models/',
             side_length=64,#12 # in voxels for prediction (i.e. network output) - actual used ROI for network input will be bigger for valid padding
             gnet_depth=4, # number of layers in unets (i.e. generators)
@@ -34,8 +42,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             d_downsample_factor=2,
             g_conv_padding='valid',
             d_conv_padding='valid',
-            g_num_fmaps=64,
-            d_num_fmaps=64,
+            g_num_fmaps=32,
+            d_num_fmaps=32,
             g_fmap_inc_factor=2,
             d_fmap_inc_factor=2,
             g_constant_upsample=True,
@@ -46,7 +54,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             d_kernel_size=3, 
             num_epochs=10000,
             batch_size=1,
-            num_workers=1,
+            num_workers=11,
             g_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             d_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             log_every=100,
@@ -57,7 +65,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             ):
             self.src_A = src_A
             self.src_B = src_B
-            self.voxel_size = voxel_size
+            self.voxel_size = gp.Coordinate(voxel_size)
+            self.AB_voxel_ratio = AB_voxel_ratio
             self.A_name = A_name
             self.B_name = B_name
             self.mask_A_name = mask_A_name
@@ -70,7 +79,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 self.B_out_path = self.src_B
             else:
                 self.B_out_path = B_out_path
-            self.model_prefix = model_prefix
             self.model_path = model_path
             self.side_length = side_length
             self.gnet_depth = gnet_depth
@@ -123,62 +131,30 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             logging.basicConfig(level=logging.WARNING)
 
-    def imshow(self, raw, gt=None, prediction=None, context=None):
-        cols = 1 + (gt is not None) + (prediction is not None) + (context is not None)
-        fig, axes = plt.subplots(1, cols, figsize=(30,30*cols))
-        if len(raw.shape) == 3:
-            middle = raw.shape[0] // 2
-            axes[0].imshow(raw[middle], cmap='gray', vmin=0, vmax=1)
-        else:
-            axes[0].imshow(raw, cmap='gray', vmin=0, vmax=1)
-        axes[0].set_title('Raw')
-        col = 1
-        if gt is not None:
-            if len(gt.shape) == 3:
-                axes[col].imshow(gt[middle], vmin=0, vmax=1)
-            else:
-                axes[col].imshow(gt, vmin=0, vmax=1)
-            axes[col].set_title('Ground Truth')
-            col += 1
-        if prediction is not None:
-            if prediction.size < raw.size:
-                pads = np.subtract(raw.shape, prediction.shape) // 2
-                pad_tuple = []
-                for p in pads:
-                    pad_tuple.append((p, p))
-                prediction = np.pad(prediction, tuple(pad_tuple))
-            if len(prediction.shape) == 3:
-                axes[col].imshow(prediction[middle], cmap='gray')
-            else:
-                axes[col].imshow(prediction, cmap='gray')
-            axes[col].set_title('Prediction')
-            col += 1
-        if context is not None:
-            middle = context.shape[0] // 2
-            if len(context.shape) == 3:
-                axes[col].imshow(context[middle], cmap='gray', vmin=0, vmax=1)
-            else:
-                axes[col].imshow(context, cmap='gray', vmin=0, vmax=1)
-            axes[col].set_title('Context')
-            col += 1
    
     def batch_show(self, batch=None, i=0):
         if batch is None:
             batch = self.batch
-        self.imshow(batch[self.raw].data[i].crop(batch[self.gt].spec.roi).data[i].squeeze(), 
-            batch[self.gt].data[i].squeeze(), 
-            batch[self.prediction].data[i].squeeze(),
-            batch[self.raw].data[i].squeeze(),
-            )
+        if not hasattr(self, 'col_dict'): 
+            self.col_dict = {'REAL':0, 'FAKE':1, 'CYCL':2, 'MASK':3}
+        fig, axes = plt.subplots(2, len(self.col_dict), figsize=(30*2, 30*len(self.col_dict)))
+        for array, value in batch.items():
+            if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
+                label = array.identifier
+                c = self.col_dict[label[:4]]
+                r = (int('_B' in label) + int('FAKE' in label)) % 2
+                img = value.data[i].squeeze()
+                mid = img.shape[0] // 2 # TODO: assumes 3D volume
+                data = img[mid]
+                axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
+                axes[r, c].set_title(label)
     
     def batch_tBoard_write(self, i=0):
         for array in self.arrays:
-            if array in self.crops.keys():
-                img = self.batch[array].crop(self.batch[self.crops[array]].spec.roi).data[i].squeeze()
-            else:
+            if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
                 img = self.batch[array].data[i].squeeze()
-            mid = img.shape[0] // 2 # TODO: assumes 3D volume
-            self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
+                mid = img.shape[0] // 2 # TODO: assumes 3D volume
+                self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
 
     def _get_latest_checkpoint(self):
         basename = self.model_path + self.model_name
@@ -207,23 +183,46 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         for array in self.array_names:
             setattr(self, array, gp.ArrayKey(array.upper()))
             self.arrays.append(getattr(self, array))
+            #add normalizations, if appropriate
+            if 'mask' not in array:
+                setattr(self, 'normalize_'+array, gp.Normalize(getattr(self, array)))
         
         # automatically generate some config variables
         self.gen_context_side_length()
         # self.crops = {self.raw:self.prediction}
         
+        if not self.AB_voxel_ratio == 1:
+            self.real_A_src = gp.ArrayKey('REAL_A_SRC')
+            self.real_A_cropped_src = gp.ArrayKey('REAL_A_CROPPED_SRC')
+            self.mask_A_src = gp.ArrayKey('MASK_A_SRC')
+            if self.AB_voxel_ratio < 1:
+                self.resample = gp.DownSample(self.real_A_src, self.AB_voxel_ratio, self.real_A)
+                self.resample += gp.DownSample(self.real_A_cropped_src, self.AB_voxel_ratio, self.real_A_cropped)
+                self.resample += gp.DownSample(self.mask_A_src, self.AB_voxel_ratio, self.mask_A)
+            if self.AB_voxel_ratio > 1:
+                self.resample = gp.UpSample(self.real_A_src, self.AB_voxel_ratio, self.real_A)
+                self.resample += gp.UpSample(self.real_A_cropped_src, self.AB_voxel_ratio, self.real_A_cropped)
+                self.resample += gp.UpSample(self.mask_A_src, self.AB_voxel_ratio, self.mask_A)
+        else:            
+            self.real_A_src = self.real_A
+            self.real_A_cropped_src = self.real_A_cropped
+            self.mask_A_src = self.mask_A
+            self.resample = None
+
         # setup data sources
         self.source_A = gp.ZarrSource(    # add the data source
             self.src_A,  # the zarr container
-            {   self.real_A: self.A_name,
-                self.real_A_cropped: self.A_name,
-                self.mask_A: self.mask_A_name,
+            {   self.real_A_src: self.A_name,
+                self.real_A_cropped_src: self.A_name,
+                self.mask_A_src: self.mask_A_name,
                 },  # which dataset to associate to the array key
-            {   self.real_A: gp.ArraySpec(interpolatable=True),
-                self.real_A_cropped: gp.ArraySpec(interpolatable=True),
-                self.mask_A: gp.ArraySpec(interpolatable=False), #TODO: Determine whether to include voxel_size
+            {   self.real_A_src: gp.ArraySpec(interpolatable=True),
+                self.real_A_cropped_src: gp.ArraySpec(interpolatable=True),
+                self.mask_A_src: gp.ArraySpec(interpolatable=False), #TODO: Determine whether to include voxel_size
                 }  # meta-information
         )
+        self.source_A += self.resample
+
         self.source_B = gp.ZarrSource(    # add the data source
             self.src_B,  # the zarr container
             {   self.real_B: self.B_name,
@@ -240,21 +239,14 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.performance = gp.PrintProfilingStats(every=self.log_every)
 
         # stack for batches
-        self.stack = gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
+        # self.stack = gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
 
         # setup a cache
         self.cache = gp.PreCache(num_workers=self.num_workers)#os.cpu_count())
 
         # define our network model for training
         self.setup_networks()
-        
-        # add normalization
-        self.normalize_raw = gp.Normalize(self.raw)
-        self.normalize_gt = gp.Normalize(self.gt)
-        self.normalize_pred = gp.Normalize(self.prediction)
-        
-        # add a RandomLocation node to the pipeline to randomly select a sample
-        self.random_location = gp.RandomLocation()
+
 
     def setup_networks(self):
         #For netG1:
@@ -327,22 +319,25 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2) #TODO: add l1_lambda=### to config
 
     def build_training_pipeline(self):
-        # add transpositions/reflections
-        self.simple_augment = gp.SimpleAugment()
-        self.elastic_augment = gp.ElasticAugment(
-            # control_point_spacing=(64, 64),
-            # control_point_spacing=(48*30, 48*30, 48*30),
-            control_point_spacing=(48, 48, 48),
-            jitter_sigma=(5.0, 5.0, 5.0),
-            rotation_interval=(0, math.pi/2),
-            subsample=4,
-            )
-        # pipeline += gp.IntensityAugment(
-        #     source,
-        #     scale_min=0.8,
-        #     scale_max=1.2,
-        #     shift_min=-0.2,
-        #     shift_max=0.2)
+        # # add augmentations
+        # self.simple_augment = gp.SimpleAugment()
+        # self.elastic_augment = gp.ElasticAugment(
+        #     # control_point_spacing=(64, 64),
+        #     # control_point_spacing=(48*30, 48*30, 48*30),
+        #     control_point_spacing=(48, 48, 48),
+        #     jitter_sigma=(5.0, 5.0, 5.0),
+        #     rotation_interval=(0, math.pi/2),
+        #     subsample=4,
+        #     )
+        # # pipeline += gp.IntensityAugment(
+        # #     source,
+        # #     scale_min=0.8,
+        # #     scale_max=1.2,
+        # #     shift_min=-0.2,
+        # #     shift_max=0.2)
+
+        # # add a RandomLocation node to the pipeline to randomly select a sample
+        # self.random_location = gp.RandomLocation()
 
         self.setup_model()
 
@@ -379,22 +374,48 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # create request
         self.train_request = gp.BatchRequest()
-        self.train_request.add(self.raw, self.voxel_size*self.context_side_length)
-        self.train_request.add(self.gt, self.voxel_size*self.side_length)
-        self.train_request.add(self.prediction, self.voxel_size*self.side_length)
+        for array in self.arrays:
+            if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
+                self.train_request.add(array, self.voxel_size*self.side_length)
+            else:
+                self.train_request.add(array, self.voxel_size*self.context_side_length)
+
+        #make initial pipe section for A: TODO: Make min_masked part of config
+        pipe_A = self.source_A + gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.normalize_real_A + self.normalize_real_A_cropped + gp.SimpleAugment()
+        pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+            # control_point_spacing=(64, 64),
+            # control_point_spacing=(48*30, 48*30, 48*30),
+            control_point_spacing=(48, 48, 48),
+            jitter_sigma=(5.0, 5.0, 5.0),
+            rotation_interval=(0, math.pi/2),
+            subsample=4,
+            )
+        # add "channel" dimensions
+        pipe_A += gp.Unsqueeze([self.real_A, self.real_A_cropped]) #MAY NEED TO ADD MASK TO LIST
+        # add "batch" dimensions
+        pipe_A += gp.Unsqueeze([self.real_A, self.real_A_cropped]) #MAY NEED TO ADD MASK TO LIST
+
+        #make initial pipe section for B: TODO: Make min_masked part of config
+        pipe_B = self.source_B + gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B + self.normalize_real_B_cropped + gp.SimpleAugment()
+        pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+            # control_point_spacing=(64, 64),
+            # control_point_spacing=(48*30, 48*30, 48*30),
+            control_point_spacing=(48, 48, 48),
+            jitter_sigma=(5.0, 5.0, 5.0),
+            rotation_interval=(0, math.pi/2),
+            subsample=4,
+            )
+        # add "channel" dimensions
+        pipe_B += gp.Unsqueeze([self.real_B, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
+        # add "batch" dimensions
+        pipe_B += gp.Unsqueeze([self.real_B, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
 
         # assemble pipeline
-        self.training_pipeline = (self.source +
-                                self.normalize_raw + 
-                                self.normalize_gt +
-                                self.random_location +
-                                self.simple_augment + 
-                                unsqueeze + 
-                                self.cache +
-                                self.stack + 
-                                self.trainer +
-                                self.performance
-                                )
+        self.training_pipeline = (pipe_A + pipe_B) + gp.MergeProvider #merge upstream pipelines for two sources
+        self.training_pipeline += self.cache + self.trainer
+        self.training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
+        self.training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
+        self.training_pipeline += self.performance
     
     def gen_context_side_length(self):
         # figure out proper ROI padding for context for the UNet generators
@@ -417,7 +438,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.build_training_pipeline()
         self.model.train()
         with gp.build(self.training_pipeline):
-            for i in range(self.num_epochs):
+            for i in tqdm(range(self.num_epochs)):
                 self.batch = self.training_pipeline.request_batch(self.train_request)
                 if i % self.log_every == 0:
                     self.batch_tBoard_write()
@@ -514,71 +535,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             renderer.request_batch(request)
             print('Finished.')
 
-
-#===================================================================================
-
-from gunpowder.torch import Train
-import math
-import sys
-import functools
-from tqdm import tqdm
-
-torch.backends.cudnn.benchmark = True
-
-from tri_utils import NLayerDiscriminator3D, GANLoss, init_weights, UnetGenerator3D
-
-n_samples = 11
-
-l_gan_lambda = 2
-l1_lambda = 150
-l_gan_lambda = 1
-l1_lambda = 100
-
-data_dir = "/n/groups/htem/Segmentation/networks/tmn7/gunpowder/gt"
-zarr_name = "cortex2.zarr"
-zarr_path = os.path.join(data_dir, zarr_name)
-log_dir = "logs"
-
-# mult_xy = 0
-# mult_xy = 4*30
-mult_xy = 4*9
-mult_xz = -4*21
-# mult_xy = 0
-# mult_xz = 0
-input_shape = gp.Coordinate((132+mult_xz, 132+mult_xy, 132+mult_xy))
-output_shape = gp.Coordinate((92+mult_xz, 92+mult_xy, 92+mult_xy))
-
-voxel_size = gp.Coordinate((60, 60, 60))  # TODO: change later
-input_size = input_shape * voxel_size
-output_size = output_shape * voxel_size
-
-checkpoint_every = 5000
-train_until = 40000
-snapshot_every = 1000
-zarr_snapshot = False
-num_workers = 11
-
-net_g_num_fmaps = 64
-net_d_num_fmaps = 64
-net_g_num_fmaps = 32
-# net_d_num_fmaps = 32
-
-def mk_unet_3d():
-    unet = UNet(
-        in_channels=1,
-        num_fmaps=net_g_num_fmaps,
-        # num_fmaps_out=1,
-        fmap_inc_factor=2,
-        downsample_factors=[
-            [2, 2, 2],
-            [2, 2, 2],
-            # [2, 2, 2],
-            ],
-        )
-
-    return torch.nn.Sequential(
-        unet,
-        ConvPass(net_g_num_fmaps, 1, [[1, 1, 1]], activation='Sigmoid'))
 
 class CycleGAN_Model(torch.nn.Module):
     def __init__(self, netG1, netD1, netG2, netD2):
@@ -738,193 +694,22 @@ class CycleGAN_Loss(torch.nn.Module):
                 for param in net.parameters():
                     param.requires_grad = requires_grad
 
+# TODO:
+# if __name__ == '__main__':
 
-def mknet(mask=None):
-    norm_layer = functools.partial(torch.nn.InstanceNorm3d, affine=False, track_running_stats=False)
+#     import json    
+#     config = json.loads(sys.argv[0])
+#     print('Loaded config...')
 
-    netG = mk_unet_3d()
-    # netG = UnetGenerator3D(input_nc=1, output_nc=1, num_downs=7, ngf=64, 
-    #                      norm_layer=norm_layer, use_dropout=False)
-    # init_weights(netG, init_type='orthogonal')
-    init_weights(netG, init_type='normal', init_gain=0.05)
-    # init_weights(netG, init_type='normal')
-    # init_weights(netG, init_type='xavier')
+#     cycleGAN = CycleGAN(config)
 
-    netD = NLayerDiscriminator3D(input_nc=2, ndf=net_d_num_fmaps, n_layers=3, norm_layer=norm_layer,
-                                 downsampling_kw=2, kw=3,
-                                 )
-    init_weights(netD, init_type='normal')
+#     try:
+#         cycleGAN.num_epochs = int(sys.argv[1])
+#     except:
+#         pass    
 
-    model = CycleGAN_Model(netG, netD)
-
-    l1_loss = torch.nn.L1Loss()
-    gan_loss = GANLoss(gan_mode='lsgan')
-
-    optimizer_G = torch.optim.Adam(netG.parameters(), lr=0.0002, betas=(0.95, 0.999))
-    optimizer_D = torch.optim.Adam(netD.parameters(), lr=0.0002, betas=(0.95, 0.999))
-    optimizer = CycleGAN_Optimizer(optimizer_G, optimizer_D)
-
-    loss = CycleGAN_Loss(l1_loss, gan_loss, netD, netG, optimizer_D, optimizer_G)
-
-    return (model, loss, optimizer)
-
-
-def train(iterations):
-
-    source = gp.ArrayKey('source')
-    source_cropped = gp.ArrayKey('source_cropped')
-    target = gp.ArrayKey('target')
-    fake = gp.ArrayKey('fake')
-    mask = gp.ArrayKey('mask')
-    gradients = gp.ArrayKey('GRADIENTS')
-
-    model, loss, optimizer = mknet()
-
-    # alias
-    real_A = source
-    real_A_cropped = source_cropped
-    fake_B = fake
-    real_B = target
-
-    request = gp.BatchRequest()
-    request.add(source, input_size)
-    request.add(source_cropped, output_size)
-    request.add(target, output_size)
-    request.add(mask, output_size)
-    request.add(gradients, output_size)
-
-    snapshot_request = gp.BatchRequest()
-    snapshot_request[fake] = request[target].copy()
-
-    sources = tuple(
-        [gp.ZarrSource(
-            zarr_path,
-            {
-                source: f'volumes/raw_100nm',
-                source_cropped: f'volumes/raw_100nm',
-                target: f'volumes/raw_30nm',
-                # mask: f'volumes/train_mask',
-                mask: f'volumes/train_mask1',
-                # mask: f'volumes/train_mask2',
-            },
-            {
-                source: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size),
-                source_cropped: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size),
-                target: gp.ArraySpec(interpolatable=True, voxel_size=voxel_size),
-                mask: gp.ArraySpec(interpolatable=False, voxel_size=voxel_size),
-            }) +
-        gp.RandomLocation(min_masked=0.5, mask=mask) +
-        # gp.RandomLocation(mask=mask) +
-        # gp.RandomLocation() +
-        # gp.Reject(mask=mask) +
-        gp.Normalize(source) +
-        gp.Normalize(source_cropped) +
-        gp.Normalize(target)]
-    )
-
-    pipeline = sources
-    pipeline += gp.RandomProvider()
-
-    pipeline += gp.SimpleAugment()
-    pipeline += gp.ElasticAugment(
-        # control_point_spacing=(64, 64),
-        # control_point_spacing=(48*30, 48*30, 48*30),
-        control_point_spacing=(48, 48, 48),
-        jitter_sigma=(5.0, 5.0, 5.0),
-        rotation_interval=(0, math.pi/2),
-        subsample=4,
-        )
-    # pipeline += gp.IntensityAugment(
-    #     source,
-    #     scale_min=0.8,
-    #     scale_max=1.2,
-    #     shift_min=-0.2,
-    #     shift_max=0.2)
-    # pipeline += gp.NoiseAugment(source, var=0.01)
-    # pipeline += gp.NoiseAugment(source, var=0.001)
-    # pipeline += gp.NoiseAugment(source, var=0.002)
-
-    # add "channel" dimensions
-    pipeline += gp.Unsqueeze([source, target, source_cropped])
-    # add "batch" dimensions
-    pipeline += gp.Unsqueeze([source, target, source_cropped])
-    # pipeline += gp.Unsqueeze([target])
-
-    pipeline += gp.PreCache(num_workers=num_workers)
-    pipeline += Train(
-        model,
-        loss,
-        optimizer,
-        inputs={
-            'real_A': source
-            # 'x': source
-            # 'input': source
-        },
-        outputs={
-            0: fake_B,
-        },
-        gradients={
-            0: gradients
-         },
-        loss_inputs={
-            0: fake_B,
-            1: real_A_cropped,
-            2: real_B,
-            3: mask,
-        },
-        log_dir = log_dir,
-        save_every=checkpoint_every,
-        )
-
-    pipeline += gp.Squeeze([source, source_cropped, target, fake, gradients], axis=0)
-    pipeline += gp.Squeeze([source, source_cropped, target, fake, gradients], axis=0)
-    # pipeline += gp.Squeeze([gradients], axis=1)
-
-    pipeline += gp.Snapshot({
-            real_A: 'real_A',
-            real_B: 'real_B',
-            fake_B: 'fake_B',
-            gradients: 'gradients',
-            mask: 'mask',
-        },
-        every=snapshot_every,
-        output_filename='batch_{iteration}.zarr' if zarr_snapshot else 'batch_{iteration}.hdf',
-        additional_request=snapshot_request)
-
-    with gp.build(pipeline):
-        for i in tqdm(range(iterations)):
-            pipeline.request_batch(request)
-
-if __name__ == '__main__':
-
-    import json
-    mult_xy = 8*8
-    # mult_xy = 8*8
-    test_input_shape = gp.Coordinate((132+mult_xy, 132+mult_xy, 132+mult_xy))
-    test_output_shape = gp.Coordinate((92+mult_xy, 92+mult_xy, 92+mult_xy))
-    config = {
-        'raw': 'real_A',
-        'input_shape': test_input_shape,
-        'output_shape': test_output_shape,
-        'out_dims': 1,
-        'out_dtype': "uint8",
-    }
-    with open('test_net.json', 'w') as f:
-        json.dump(config, f)
-    print('Dumped config...')
-    if 'mknet' in sys.argv:
-        exit()
-
-    try:
-        train_until = int(sys.argv[1])
-    except:
-        pass
-
-    if 'test' in sys.argv:
-        # global train_until
-        train_until = 10
-        snapshot_every = 1
-        zarr_snapshot = True
-        num_workers = 1
-
-    train(train_until)
+#     if 'test' in sys.argv:
+#         cycleGAN.num_workers = 1        
+#         cycleGAN.test_train()
+#     else:
+#         cycleGAN.train()
