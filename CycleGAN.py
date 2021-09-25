@@ -34,6 +34,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             mask_B_name='mask',
             A_out_path=None,
             B_out_path=None,
+            model_name='CycleGun',
             model_path='./models/',
             side_length=64,#12 # in voxels for prediction (i.e. network output) - actual used ROI for network input will be bigger for valid padding
             gnet_depth=4, # number of layers in unets (i.e. generators)
@@ -79,6 +80,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 self.B_out_path = self.src_B
             else:
                 self.B_out_path = B_out_path
+            self.model_name = model_name
             self.model_path = model_path
             self.side_length = side_length
             self.gnet_depth = gnet_depth
@@ -131,7 +133,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             logging.basicConfig(level=logging.WARNING)
 
-   
     def batch_show(self, batch=None, i=0):
         if batch is None:
             batch = self.batch
@@ -149,12 +150,26 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
                 axes[r, c].set_title(label)
     
+    def get_validation_loss(self):
+        validation_loss = self.loss(self.batch[self.real_A_cropped].data, 
+                        self.batch[self.fake_A].data, 
+                        self.batch[self.cycled_A].data, 
+                        self.batch[self.real_B_cropped].data, 
+                        self.batch[self.fake_B].data, 
+                        self.batch[self.cycled_B].data, 
+                        not self.batch[self.mask_A].data, 
+                        not self.batch[self.mask_B].data)
+        self.validation_loss = validation_loss
+        return validation_loss
+
     def batch_tBoard_write(self, i=0):
         for array in self.arrays:
             if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
                 img = self.batch[array].data[i].squeeze()
                 mid = img.shape[0] // 2 # TODO: assumes 3D volume
                 self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
+        validation_loss = self.get_validation_loss()
+        self.trainer.summary_writer.add_scalar('validation_loss', validation_loss, self.trainer.iteration)
 
     def _get_latest_checkpoint(self):
         basename = self.model_path + self.model_name
@@ -246,7 +261,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # define our network model for training
         self.setup_networks()
-
 
     def setup_networks(self):
         #For netG1:
@@ -351,10 +365,14 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 'real_B': self.real_B
                             },
                             outputs = {
-                                'fake_B': self.fake_B,
-                                'cycled_B': self.cycled_B,
-                                'fake_A': self.fake_A,
-                                'cycled_A': self.cycled_A
+                                # 'fake_B': self.fake_B,
+                                # 'cycled_B': self.cycled_B,
+                                # 'fake_A': self.fake_A,
+                                # 'cycled_A': self.cycled_A
+                                0: self.fake_B,
+                                1: self.cycled_B,
+                                2: self.fake_A,
+                                3: self.cycled_A
                             },
                             loss_inputs = {
                                 'real_A': self.real_A_cropped,
@@ -411,7 +429,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         pipe_B += gp.Unsqueeze([self.real_B, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
 
         # assemble pipeline
-        self.training_pipeline = (pipe_A + pipe_B) + gp.MergeProvider #merge upstream pipelines for two sources
+        self.training_pipeline = (pipe_A + pipe_B) #+ gp.MergeProvider #merge upstream pipelines for two sources
         self.training_pipeline += self.cache + self.trainer
         self.training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
         self.training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
@@ -693,6 +711,11 @@ class CycleGAN_Loss(torch.nn.Module):
             if net is not None:
                 for param in net.parameters():
                     param.requires_grad = requires_grad
+    
+    def validation(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, mask_A, mask_B):
+        with torch.no_grad(): #MAY NOT WORK
+            validation_loss = self.forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, mask_A, mask_B)
+        return validation_loss
 
 # TODO:
 # if __name__ == '__main__':
