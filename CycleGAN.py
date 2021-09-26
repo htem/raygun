@@ -151,7 +151,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 axes[r, c].set_title(label)
     
     def get_validation_loss(self):
-        validation_loss = self.loss(self.batch[self.real_A_cropped].data, 
+        validation_loss = self.loss.validation(
+                        self.batch[self.real_A_cropped].data, 
                         self.batch[self.fake_A].data, 
                         self.batch[self.cycled_A].data, 
                         self.batch[self.real_B_cropped].data, 
@@ -168,8 +169,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 img = self.batch[array].data[i].squeeze()
                 mid = img.shape[0] // 2 # TODO: assumes 3D volume
                 self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
-        validation_loss = self.get_validation_loss()
-        self.trainer.summary_writer.add_scalar('validation_loss', validation_loss, self.trainer.iteration)
+        # TODO:
+        # validation_loss = self.get_validation_loss()
+        # self.trainer.summary_writer.add_scalar('validation_loss', validation_loss, self.trainer.iteration)
 
     def _get_latest_checkpoint(self):
         basename = self.model_path + self.model_name
