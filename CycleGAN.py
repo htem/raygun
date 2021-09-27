@@ -1,6 +1,7 @@
 # !conda activate n2v
 import numpy as np
 from matplotlib import pyplot as plt
+from numpy.lib.utils import source
 # from numpy.lib.utils import source
 import torch
 import glob
@@ -30,13 +31,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             AB_voxel_ratio=1, #determines whether to add up/downsampling node (always rendered to B's voxel_size), (int or tuple of ints)
             A_name='raw',
             B_name='raw',
-            mask_A_name='mask', # expects mask to be in same place as real zarr
-            mask_B_name='mask',
+            # mask_A_name='mask', # expects mask to be in same place as real zarr
+            # mask_B_name='mask',
             A_out_path=None,
             B_out_path=None,
             model_name='CycleGun',
             model_path='./models/',
-            side_length=64,#12 # in voxels for prediction (i.e. network output) - actual used ROI for network input will be bigger for valid padding
+            side_length=64,# in dataset A sized voxels at output layer - actual used ROI for network input will be bigger for valid padding
             gnet_depth=4, # number of layers in unets (i.e. generators)
             dnet_depth=3, # number of layers in Discriminator networks
             g_downsample_factor=2,
@@ -70,8 +71,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.AB_voxel_ratio = AB_voxel_ratio
             self.A_name = A_name
             self.B_name = B_name
-            self.mask_A_name = mask_A_name
-            self.mask_B_name = mask_B_name
+            # self.mask_A_name = mask_A_name
+            # self.mask_B_name = mask_B_name
             if A_out_path is None:
                 self.A_out_path = self.src_A
             else:
@@ -119,6 +120,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 self.checkpoint = checkpoint
             self.build_pipeline_parts()
             self.training_pipeline = None
+            self.test_training_pipeline = None
 
     def set_device(self, id=0):
         torch.cuda.set_device(id)   
@@ -137,7 +139,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if batch is None:
             batch = self.batch
         if not hasattr(self, 'col_dict'): 
-            self.col_dict = {'REAL':0, 'FAKE':1, 'CYCL':2, 'MASK':3}
+            self.col_dict = {'REAL':0, 'FAKE':1, 'CYCL':2}#, 'MASK':3}
         fig, axes = plt.subplots(2, len(self.col_dict), figsize=(30*2, 30*len(self.col_dict)))
         for array, value in batch.items():
             if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
@@ -150,18 +152,20 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
                 axes[r, c].set_title(label)
     
-    def get_validation_loss(self):
-        validation_loss = self.loss.validation(
-                        self.batch[self.real_A_cropped].data, 
-                        self.batch[self.fake_A].data, 
-                        self.batch[self.cycled_A].data, 
-                        self.batch[self.real_B_cropped].data, 
-                        self.batch[self.fake_B].data, 
-                        self.batch[self.cycled_B].data, 
-                        not self.batch[self.mask_A].data, 
-                        not self.batch[self.mask_B].data)
-        self.validation_loss = validation_loss
-        return validation_loss
+    # @torch.no_grad()
+    # def get_validation_loss(self):
+    #     validation_loss = self.loss.validation(
+    #                     self.batch[self.real_A_cropped].data, 
+    #                     self.batch[self.fake_A].data, 
+    #                     self.batch[self.cycled_A].data, 
+    #                     self.batch[self.real_B_cropped].data, 
+    #                     self.batch[self.fake_B].data, 
+    #                     self.batch[self.cycled_B].data, 
+    #                     not self.batch[self.mask_A].data, 
+    #                     not self.batch[self.mask_B].data
+    #                     )
+    #     self.validation_loss = validation_loss
+    #     return validation_loss
 
     def batch_tBoard_write(self, i=0):
         for array in self.arrays:
@@ -192,78 +196,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         return None, 0
     
-    def build_pipeline_parts(self):        
-        # declare arrays to use in the pipelines
-        self.array_names = ['real_A', 'real_A_cropped', 'mask_A', 'fake_A', 'cycled_A', 'real_B', 'real_B_cropped', 'mask_B', 'fake_B', 'cycled_B']#, 'gradients_G1', 'gradients_G2']
-        # [from source A, cropped version to match netG2 output size, mask of source for training (cropped size), netG2 output, netG2(netG1(real_A)) output,...for other side...] #TODO: add gradients for network training debugging
-        self.arrays = []
-        for array in self.array_names:
-            setattr(self, array, gp.ArrayKey(array.upper()))
-            self.arrays.append(getattr(self, array))
-            #add normalizations, if appropriate
-            if 'mask' not in array:
-                setattr(self, 'normalize_'+array, gp.Normalize(getattr(self, array)))
-        
-        # automatically generate some config variables
-        self.gen_context_side_length()
-        # self.crops = {self.raw:self.prediction}
-        
-        if not self.AB_voxel_ratio == 1:
-            self.real_A_src = gp.ArrayKey('REAL_A_SRC')
-            self.real_A_cropped_src = gp.ArrayKey('REAL_A_CROPPED_SRC')
-            self.mask_A_src = gp.ArrayKey('MASK_A_SRC')
-            if self.AB_voxel_ratio < 1:
-                self.resample = gp.DownSample(self.real_A_src, self.AB_voxel_ratio, self.real_A)
-                self.resample += gp.DownSample(self.real_A_cropped_src, self.AB_voxel_ratio, self.real_A_cropped)
-                self.resample += gp.DownSample(self.mask_A_src, self.AB_voxel_ratio, self.mask_A)
-            if self.AB_voxel_ratio > 1:
-                self.resample = gp.UpSample(self.real_A_src, self.AB_voxel_ratio, self.real_A)
-                self.resample += gp.UpSample(self.real_A_cropped_src, self.AB_voxel_ratio, self.real_A_cropped)
-                self.resample += gp.UpSample(self.mask_A_src, self.AB_voxel_ratio, self.mask_A)
-        else:            
-            self.real_A_src = self.real_A
-            self.real_A_cropped_src = self.real_A_cropped
-            self.mask_A_src = self.mask_A
-            self.resample = None
-
-        # setup data sources
-        self.source_A = gp.ZarrSource(    # add the data source
-            self.src_A,  # the zarr container
-            {   self.real_A_src: self.A_name,
-                self.real_A_cropped_src: self.A_name,
-                self.mask_A_src: self.mask_A_name,
-                },  # which dataset to associate to the array key
-            {   self.real_A_src: gp.ArraySpec(interpolatable=True),
-                self.real_A_cropped_src: gp.ArraySpec(interpolatable=True),
-                self.mask_A_src: gp.ArraySpec(interpolatable=False), #TODO: Determine whether to include voxel_size
-                }  # meta-information
-        )
-        self.source_A += self.resample
-
-        self.source_B = gp.ZarrSource(    # add the data source
-            self.src_B,  # the zarr container
-            {   self.real_B: self.B_name,
-                self.real_B_cropped: self.B_name,
-                self.mask_B: self.mask_B_name,
-                },  # which dataset to associate to the array key
-            {   self.real_B: gp.ArraySpec(interpolatable=True),
-                self.real_B_cropped: gp.ArraySpec(interpolatable=True),
-                self.mask_B: gp.ArraySpec(interpolatable=False), #TODO: Determine whether to include voxel_size
-                }  # meta-information
-        )
-
-        # get performance stats
-        self.performance = gp.PrintProfilingStats(every=self.log_every)
-
-        # stack for batches
-        # self.stack = gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
-
-        # setup a cache
-        self.cache = gp.PreCache(num_workers=self.num_workers)#os.cpu_count())
-
-        # define our network model for training
-        self.setup_networks()
-
     def setup_networks(self):
         #For netG1:
         unet = UNet(
@@ -334,6 +266,87 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.gan_loss = GANLoss(gan_mode='lsgan')
         self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2) #TODO: add l1_lambda=### to config
 
+    def build_pipeline_parts(self):        
+        # declare arrays to use in the pipelines
+        self.array_names = ['real_A', 
+                            'real_A_cropped', 
+                            # 'mask_A', 
+                            'fake_A', 
+                            'cycled_A', 
+                            'real_B', 
+                            'real_B_cropped', 
+                            # 'mask_B', 
+                            'fake_B', 
+                            'cycled_B']#, 'gradients_G1', 'gradients_G2']
+        # [from source A, cropped version to match netG2 output size, mask of source for training (cropped size), netG2 output, netG2(netG1(real_A)) output,...for other side...] #TODO: add gradients for network training debugging
+        self.arrays = []
+        for array in self.array_names:
+            setattr(self, array, gp.ArrayKey(array.upper()))
+            self.arrays.append(getattr(self, array))
+            #add normalizations, if appropriate
+            if 'mask' not in array:
+                setattr(self, 'normalize_'+array, gp.Normalize(getattr(self, array)))
+        
+        # automatically generate some config variables
+        self.gen_context_side_length()
+        # self.crops = {self.raw:self.prediction}
+        
+        if not self.AB_voxel_ratio == 1:
+            self.real_A_src = gp.ArrayKey('REAL_A_SRC')
+            self.real_A_cropped_src = gp.ArrayKey('REAL_A_CROPPED_SRC')
+            # self.mask_A_src = gp.ArrayKey('MASK_A_SRC')
+            if self.AB_voxel_ratio < 1:
+                self.resample = gp.DownSample(self.real_A_src, self.AB_voxel_ratio, self.real_A)
+                self.resample += gp.DownSample(self.real_A_cropped_src, self.AB_voxel_ratio, self.real_A_cropped)
+                # self.resample += gp.DownSample(self.mask_A_src, self.AB_voxel_ratio, self.mask_A)
+            if self.AB_voxel_ratio > 1:
+                self.resample = gp.UpSample(self.real_A_src, self.AB_voxel_ratio, self.real_A)
+                self.resample += gp.UpSample(self.real_A_cropped_src, self.AB_voxel_ratio, self.real_A_cropped)
+                # self.resample += gp.UpSample(self.mask_A_src, self.AB_voxel_ratio, self.mask_A)
+        else:            
+            self.real_A_src = self.real_A
+            self.real_A_cropped_src = self.real_A_cropped
+            # self.mask_A_src = self.mask_A
+            self.resample = None
+
+        # setup data sources
+        self.source_A = gp.ZarrSource(    # add the data source
+            self.src_A,  # the zarr container
+            {   self.real_A_src: self.A_name,
+                self.real_A_cropped_src: self.A_name,
+                # self.mask_A_src: self.mask_A_name,
+                },  # which dataset to associate to the array key
+            {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size * self.AB_voxel_ratio),
+                self.real_A_cropped_src: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size * self.AB_voxel_ratio),
+                # self.mask_A_src: gp.ArraySpec(interpolatable=False), #TODO: Determine whether to include voxel_size
+                }  # meta-information
+        )
+        self.source_A += self.resample
+
+        self.source_B = gp.ZarrSource(    # add the data source
+            self.src_B,  # the zarr container
+            {   self.real_B: self.B_name,
+                self.real_B_cropped: self.B_name,
+                # self.mask_B: self.mask_B_name,
+                },  # which dataset to associate to the array key
+            {   self.real_B: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size),
+                self.real_B_cropped: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size),
+                # self.mask_B: gp.ArraySpec(interpolatable=False), #TODO: Determine whether to include voxel_size
+                }  # meta-information
+        )
+
+        # get performance stats
+        self.performance = gp.PrintProfilingStats(every=self.log_every)
+
+        # stack for batches
+        # self.stack = gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
+
+        # setup a cache
+        self.cache = gp.PreCache(num_workers=self.num_workers)#os.cpu_count())
+
+        # define our network model for training
+        self.setup_networks()
+
     def build_training_pipeline(self):
         # # add augmentations
         # self.simple_augment = gp.SimpleAugment()
@@ -383,8 +396,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 'real_B': self.real_B_cropped,
                                 'fake_B': self.fake_B,
                                 'cycled_B': self.cycled_B,
-                                'mask_A': self.mask_A,
-                                'mask_B': self.mask_B
+                                # 'mask_A': self.mask_A,
+                                # 'mask_B': self.mask_B
                             },
                             log_dir=self.tensorboard_path,
                             log_every=self.log_every,
@@ -392,16 +405,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                             save_every=self.save_every
                             )
 
-        # create request
-        self.train_request = gp.BatchRequest()
-        for array in self.arrays:
-            if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
-                self.train_request.add(array, self.voxel_size*self.side_length)
-            else:
-                self.train_request.add(array, self.voxel_size*self.context_side_length)
-
         #make initial pipe section for A: TODO: Make min_masked part of config
-        pipe_A = self.source_A + gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.normalize_real_A + self.normalize_real_A_cropped + gp.SimpleAugment()
+        # pipe_A = self.source_A + gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.normalize_real_A + self.normalize_real_A_cropped + gp.SimpleAugment()
+        pipe_A = self.source_A + gp.RandomLocation() + self.normalize_real_A + self.normalize_real_A_cropped + gp.SimpleAugment()
         pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             # control_point_spacing=(64, 64),
             # control_point_spacing=(48*30, 48*30, 48*30),
@@ -416,7 +422,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         pipe_A += gp.Unsqueeze([self.real_A, self.real_A_cropped]) #MAY NEED TO ADD MASK TO LIST
 
         #make initial pipe section for B: TODO: Make min_masked part of config
-        pipe_B = self.source_B + gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B + self.normalize_real_B_cropped + gp.SimpleAugment()
+        # pipe_B = self.source_B + gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B + self.normalize_real_B_cropped + gp.SimpleAugment()
+        pipe_B = self.source_B + gp.RandomLocation() + self.normalize_real_B + self.normalize_real_B_cropped + gp.SimpleAugment()
         pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             # control_point_spacing=(64, 64),
             # control_point_spacing=(48*30, 48*30, 48*30),
@@ -431,12 +438,27 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         pipe_B += gp.Unsqueeze([self.real_B, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
 
         # assemble pipeline
-        self.training_pipeline = (pipe_A + pipe_B) #+ gp.MergeProvider #merge upstream pipelines for two sources
-        self.training_pipeline += self.cache + self.trainer
+        self.training_pipeline = (pipe_A, pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
+        self.training_pipeline += self.cache
+        self.training_pipeline += self.trainer
         self.training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
         self.training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
         self.training_pipeline += self.performance
+
+        self.test_training_pipeline = (pipe_A, pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
+        self.test_training_pipeline += self.trainer
+        self.test_training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
+        self.test_training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
     
+        # create request
+        self.train_request = gp.BatchRequest()
+        for array in self.arrays:
+            if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
+                self.train_request.add(array, self.voxel_size*self.AB_voxel_ratio*self.side_length)
+            else:
+                self.train_request.add(array, self.voxel_size*self.AB_voxel_ratio*self.context_side_length)
+
+
     def gen_context_side_length(self):
         # figure out proper ROI padding for context for the UNet generators
         if self.g_conv_padding == 'valid':
@@ -445,11 +467,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.context_side_length = self.side_length
 
     def test_train(self):
-        if self.training_pipeline is None:
+        if self.test_training_pipeline is None:
             self.build_training_pipeline()
         self.model.train()
-        with gp.build(self.training_pipeline):
-            self.batch = self.training_pipeline.request_batch(self.train_request)
+        with gp.build(self.test_training_pipeline):
+            self.batch = self.test_training_pipeline.request_batch(self.train_request)
         self.batch_show()
         return self.batch
 
@@ -671,20 +693,22 @@ class CycleGAN_Loss(torch.nn.Module):
         #return losses
         return cycle_loss, loss_G1, loss_G2
 
-    def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, mask_A, mask_B):
+    def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):#s, mask_A, mask_B):
 
-        real_A_mask = real_A * mask_A
-        cycled_A_mask = cycled_A * mask_A
-        fake_A_mask = fake_A * mask_B # masked based on mask from "real" version of array before generator pass
-        real_B_mask = real_B * mask_B
-        cycled_B_mask = cycled_B * mask_B
-        fake_B_mask = fake_B * mask_A
+        # real_A_mask = real_A * mask_A
+        # cycled_A_mask = cycled_A * mask_A
+        # fake_A_mask = fake_A * mask_B # masked based on mask from "real" version of array before generator pass
+        # real_B_mask = real_B * mask_B
+        # cycled_B_mask = cycled_B * mask_B
+        # fake_B_mask = fake_B * mask_A
 
         # # update Ds
-        loss_D1, loss_D2 = self.backward_Ds(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
+        # loss_D1, loss_D2 = self.backward_Ds(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
+        loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
 
         # update Gs
-        cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
+        # cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
+        cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
 
         self.loss_dict = {
             'loss_D1': float(loss_D1),
@@ -714,10 +738,11 @@ class CycleGAN_Loss(torch.nn.Module):
                 for param in net.parameters():
                     param.requires_grad = requires_grad
     
-    def validation(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, mask_A, mask_B):
-        with torch.no_grad(): #MAY NOT WORK
-            validation_loss = self.forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, mask_A, mask_B)
-        return validation_loss
+    # #TODO:
+    # def validation(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, mask_A, mask_B):
+    #     with torch.no_grad(): #MAY NOT WORK
+    #         validation_loss = self.forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, mask_A, mask_B)
+    #     return validation_loss
 
 # TODO:
 # if __name__ == '__main__':
