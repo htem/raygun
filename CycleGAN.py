@@ -44,8 +44,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             d_downsample_factor=2,
             g_conv_padding='same', # CURRENTLY NOT IMPLEMENTED FOR 'VALID' PADDING
             d_conv_padding='valid',
-            g_num_fmaps=4,
-            d_num_fmaps=4,
+            g_num_fmaps=16,
+            d_num_fmaps=16,
             g_fmap_inc_factor=2,
             d_fmap_inc_factor=2,
             g_constant_upsample=True,
@@ -123,6 +123,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.test_training_pipeline = None
 
     def set_device(self, id=0):
+        self.device_id = id
         torch.cuda.set_device(id)   
     
     def set_verbose(self, verbose=True):
@@ -146,7 +147,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             label = array.identifier
             c = self.col_dict[label[:4]]
             r = (int('_B' in label) + int('FAKE' in label)) % 2
-            img = value.data[i].squeeze()
+            if len(value.data.shape) > 3:
+                img = value.data[i].squeeze()
+            else:
+                img = value.data.squeeze()
             mid = img.shape[0] // 2 # TODO: assumes 3D volume
             data = img[mid]
             axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
@@ -170,7 +174,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def batch_tBoard_write(self, i=0):
         for array in self.arrays:
             # if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
-            img = self.batch[array].data[i].squeeze()
+            if len(self.batch[array].data.shape) > 3: # pull out batch dimension if necessary
+                img = self.batch[array].data[i].squeeze()
+            else:
+                img = self.batch[array].data.squeeze()
             mid = img.shape[0] // 2 # TODO: assumes 3D volume
             self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
         # TODO:
