@@ -37,7 +37,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             B_out_path=None,
             model_name='CycleGun',
             model_path='./models/',
-            side_length=64,# in dataset A sized voxels at output layer - actual used ROI for network input will be bigger for valid padding
+            side_length=32,# in dataset A sized voxels at output layer - actual used ROI for network input will be bigger for valid padding
             gnet_depth=4, # number of layers in unets (i.e. generators)
             dnet_depth=3, # number of layers in Discriminator networks
             g_downsample_factor=2,
@@ -321,7 +321,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 # self.mask_A_src: gp.ArraySpec(interpolatable=False), #TODO: Determine whether to include voxel_size
                 }  # meta-information
         )
-        self.source_A += self.resample
 
         self.source_B = gp.ZarrSource(    # add the data source
             self.src_B,  # the zarr container
@@ -351,8 +350,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # # add augmentations
         # self.simple_augment = gp.SimpleAugment()
         # self.elastic_augment = gp.ElasticAugment(
-        #     # control_point_spacing=(64, 64),
-        #     # control_point_spacing=(48*30, 48*30, 48*30),
         #     control_point_spacing=(48, 48, 48),
         #     jitter_sigma=(5.0, 5.0, 5.0),
         #     rotation_interval=(0, math.pi/2),
@@ -365,9 +362,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # #     shift_min=-0.2,
         # #     shift_max=0.2)
 
-        # # add a RandomLocation node to the pipeline to randomly select a sample
-        # self.random_location = gp.RandomLocation()
-
         self.setup_model()
 
         # create a train node using our model, loss, and optimizer
@@ -378,6 +372,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                             inputs = {
                                 'real_A': self.real_A,
                                 'real_B': self.real_B
+                                # 0: self.real_A,
+                                # 1: self.real_B
                             },
                             outputs = {
                                 # 'fake_B': self.fake_B,
@@ -390,14 +386,20 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 3: self.cycled_A
                             },
                             loss_inputs = {
-                                'real_A': self.real_A_cropped,
+                                'real_A_cropped': self.real_A_cropped,
                                 'fake_A': self.fake_A,
                                 'cycled_A': self.cycled_A,
-                                'real_B': self.real_B_cropped,
+                                'real_B_cropped': self.real_B_cropped,
                                 'fake_B': self.fake_B,
                                 'cycled_B': self.cycled_B,
                                 # 'mask_A': self.mask_A,
                                 # 'mask_B': self.mask_B
+                                # 0: self.real_A_cropped,
+                                # 1: self.fake_A,
+                                # 2: self.cycled_A,
+                                # 3: self.real_B_cropped,
+                                # 4: self.fake_B,
+                                # 5: self.cycled_B,
                             },
                             log_dir=self.tensorboard_path,
                             log_every=self.log_every,
@@ -406,46 +408,46 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                             )
 
         #make initial pipe section for A: TODO: Make min_masked part of config
-        # pipe_A = self.source_A + gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.normalize_real_A + self.normalize_real_A_cropped + gp.SimpleAugment()
-        pipe_A = self.source_A + gp.RandomLocation() + self.normalize_real_A + self.normalize_real_A_cropped + gp.SimpleAugment()
-        pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            # control_point_spacing=(64, 64),
-            # control_point_spacing=(48*30, 48*30, 48*30),
-            control_point_spacing=(48, 48, 48),
-            jitter_sigma=(5.0, 5.0, 5.0),
-            rotation_interval=(0, math.pi/2),
-            subsample=4,
-            )
+        # self.pipe_A = self.source_A + gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.normalize_real_A + self.normalize_real_A_cropped + gp.SimpleAugment()
+        self.pipe_A = self.source_A + gp.RandomLocation() + self.resample + self.normalize_real_A + self.normalize_real_A_cropped# + gp.SimpleAugment()
+        # self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+        #     # control_point_spacing=(64, 64),
+        #     # control_point_spacing=(48*30, 48*30, 48*30),
+        #     control_point_spacing=(48, 48, 48),
+        #     jitter_sigma=(5.0, 5.0, 5.0),
+        #     rotation_interval=(0, math.pi/2),
+        #     subsample=4,
+        #     )
         # add "channel" dimensions
-        pipe_A += gp.Unsqueeze([self.real_A, self.real_A_cropped]) #MAY NEED TO ADD MASK TO LIST
+        self.pipe_A += gp.Unsqueeze([self.real_A, self.real_A_cropped]) #MAY NEED TO ADD MASK TO LIST
         # add "batch" dimensions
-        pipe_A += gp.Unsqueeze([self.real_A, self.real_A_cropped]) #MAY NEED TO ADD MASK TO LIST
+        self.pipe_A += gp.Unsqueeze([self.real_A, self.real_A_cropped]) #MAY NEED TO ADD MASK TO LIST
 
         #make initial pipe section for B: TODO: Make min_masked part of config
-        # pipe_B = self.source_B + gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B + self.normalize_real_B_cropped + gp.SimpleAugment()
-        pipe_B = self.source_B + gp.RandomLocation() + self.normalize_real_B + self.normalize_real_B_cropped + gp.SimpleAugment()
-        pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            # control_point_spacing=(64, 64),
-            # control_point_spacing=(48*30, 48*30, 48*30),
-            control_point_spacing=(48, 48, 48),
-            jitter_sigma=(5.0, 5.0, 5.0),
-            rotation_interval=(0, math.pi/2),
-            subsample=4,
-            )
+        # self.pipe_B = self.source_B + gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B + self.normalize_real_B_cropped + gp.SimpleAugment()
+        self.pipe_B = self.source_B + gp.RandomLocation() + self.normalize_real_B + self.normalize_real_B_cropped# + gp.SimpleAugment()
+        # self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+        #     # control_point_spacing=(64, 64),
+        #     # control_point_spacing=(48*30, 48*30, 48*30),
+        #     control_point_spacing=(48, 48, 48),
+        #     jitter_sigma=(5.0, 5.0, 5.0),
+        #     rotation_interval=(0, math.pi/2),
+        #     subsample=4,
+        #     )
         # add "channel" dimensions
-        pipe_B += gp.Unsqueeze([self.real_B, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
+        self.pipe_B += gp.Unsqueeze([self.real_B, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
         # add "batch" dimensions
-        pipe_B += gp.Unsqueeze([self.real_B, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
+        self.pipe_B += gp.Unsqueeze([self.real_B, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
 
         # assemble pipeline
-        self.training_pipeline = (pipe_A, pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
+        self.training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
         self.training_pipeline += self.cache
         self.training_pipeline += self.trainer
         self.training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
         self.training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
         self.training_pipeline += self.performance
 
-        self.test_training_pipeline = (pipe_A, pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
+        self.test_training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
         self.test_training_pipeline += self.trainer
         self.test_training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
         self.test_training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
@@ -454,9 +456,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.train_request = gp.BatchRequest()
         for array in self.arrays:
             if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
-                self.train_request.add(array, self.voxel_size*self.AB_voxel_ratio*self.side_length)
+                self.train_request.add(array, self.voxel_size*self.AB_voxel_ratio*self.side_length, self.voxel_size)
             else:
-                self.train_request.add(array, self.voxel_size*self.AB_voxel_ratio*self.context_side_length)
+                self.train_request.add(array, self.voxel_size*self.AB_voxel_ratio*self.context_side_length, self.voxel_size)
 
 
     def gen_context_side_length(self):
@@ -693,7 +695,7 @@ class CycleGAN_Loss(torch.nn.Module):
         #return losses
         return cycle_loss, loss_G1, loss_G2
 
-    def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):#s, mask_A, mask_B):
+    def forward(self, real_A_cropped, fake_A, cycled_A, real_B_cropped, fake_B, cycled_B):#s, mask_A, mask_B):
 
         # real_A_mask = real_A * mask_A
         # cycled_A_mask = cycled_A * mask_A
@@ -704,11 +706,11 @@ class CycleGAN_Loss(torch.nn.Module):
 
         # # update Ds
         # loss_D1, loss_D2 = self.backward_Ds(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
-        loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
+        loss_D1, loss_D2 = self.backward_Ds(real_A_cropped, fake_A, cycled_A, real_B_cropped, fake_B, cycled_B)
 
         # update Gs
         # cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
-        cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
+        cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A_cropped, fake_A, cycled_A, real_B_cropped, fake_B, cycled_B)
 
         self.loss_dict = {
             'loss_D1': float(loss_D1),

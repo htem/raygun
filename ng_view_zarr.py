@@ -65,4 +65,4 @@ if __name__ == "__main__":
     # print(*sys.argv)
     viewer = ng_view_zarr(*sys.argv[1:])
     while True:
-        x = 1
+        continue
