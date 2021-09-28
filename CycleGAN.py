@@ -38,14 +38,14 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             model_name='CycleGun',
             model_path='./models/',
             side_length=32,# in dataset A sized voxels at output layer - actual used ROI for network input will be bigger for valid padding
-            gnet_depth=4, # number of layers in unets (i.e. generators)
+            gnet_depth=3, # number of layers in unets (i.e. generators)
             dnet_depth=3, # number of layers in Discriminator networks
             g_downsample_factor=2,
             d_downsample_factor=2,
-            g_conv_padding='valid',
+            g_conv_padding='same', # CURRENTLY NOT IMPLEMENTED FOR 'VALID' PADDING
             d_conv_padding='valid',
-            g_num_fmaps=32,
-            d_num_fmaps=32,
+            g_num_fmaps=4,
+            d_num_fmaps=4,
             g_fmap_inc_factor=2,
             d_fmap_inc_factor=2,
             g_constant_upsample=True,
@@ -142,15 +142,15 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.col_dict = {'REAL':0, 'FAKE':1, 'CYCL':2}#, 'MASK':3}
         fig, axes = plt.subplots(2, len(self.col_dict), figsize=(30*2, 30*len(self.col_dict)))
         for array, value in batch.items():
-            if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
-                label = array.identifier
-                c = self.col_dict[label[:4]]
-                r = (int('_B' in label) + int('FAKE' in label)) % 2
-                img = value.data[i].squeeze()
-                mid = img.shape[0] // 2 # TODO: assumes 3D volume
-                data = img[mid]
-                axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
-                axes[r, c].set_title(label)
+            # if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
+            label = array.identifier
+            c = self.col_dict[label[:4]]
+            r = (int('_B' in label) + int('FAKE' in label)) % 2
+            img = value.data[i].squeeze()
+            mid = img.shape[0] // 2 # TODO: assumes 3D volume
+            data = img[mid]
+            axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
+            axes[r, c].set_title(label)
     
     # @torch.no_grad()
     # def get_validation_loss(self):
@@ -169,10 +169,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
     def batch_tBoard_write(self, i=0):
         for array in self.arrays:
-            if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
-                img = self.batch[array].data[i].squeeze()
-                mid = img.shape[0] // 2 # TODO: assumes 3D volume
-                self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
+            # if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
+            img = self.batch[array].data[i].squeeze()
+            mid = img.shape[0] // 2 # TODO: assumes 3D volume
+            self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
         # TODO:
         # validation_loss = self.get_validation_loss()
         # self.trainer.summary_writer.add_scalar('validation_loss', validation_loss, self.trainer.iteration)
@@ -197,6 +197,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         return None, 0
     
     def setup_networks(self):
+        devices = range(torch.cuda.device_count()) # requires cuda
+        i = 0
         #For netG1:
         unet = UNet(
                 in_channels=1,
@@ -210,7 +212,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.netG1 = torch.nn.Sequential(
                             unet,
                             ConvPass(self.g_num_fmaps, 1, [(1,)*3], activation=None),
-                            torch.nn.Sigmoid())
+                            torch.nn.Sigmoid())#.to(devices[i % torch.cuda.device_count()])
+        i += 1
         init_weights(self.netG1, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
 
         #For netG2:
@@ -226,7 +229,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.netG2 = torch.nn.Sequential(
                             unet,
                             ConvPass(self.g_num_fmaps, 1, [(1,)*3], activation=None),
-                            torch.nn.Sigmoid())
+                            torch.nn.Sigmoid())#.to(devices[i % torch.cuda.device_count()])
+        i += 1
         init_weights(self.netG2, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
 
         #For netD1:
@@ -237,7 +241,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                         norm_layer=norm_layer,
                                         downsampling_kw=self.d_downsample_factor, 
                                         kw=self.d_kernel_size,
-                                 )
+                                 )#.to(devices[i % torch.cuda.device_count()])
+        i += 1
         init_weights(self.netD1, init_type='normal')
 
         #For netD2:
@@ -248,7 +253,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                         norm_layer=norm_layer,
                                         downsampling_kw=self.d_downsample_factor, 
                                         kw=self.d_kernel_size,
-                                 )
+                                 )#.to(devices[i % torch.cuda.device_count()])
+        i += 1
         init_weights(self.netD2, init_type='normal')
 
     def setup_model(self):
@@ -269,12 +275,12 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def build_pipeline_parts(self):        
         # declare arrays to use in the pipelines
         self.array_names = ['real_A', 
-                            'real_A_cropped', 
+                            # 'real_A_cropped', 
                             # 'mask_A', 
                             'fake_A', 
                             'cycled_A', 
                             'real_B', 
-                            'real_B_cropped', 
+                            # 'real_B_cropped', 
                             # 'mask_B', 
                             'fake_B', 
                             'cycled_B']#, 'gradients_G1', 'gradients_G2']
@@ -293,19 +299,19 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         
         if not self.AB_voxel_ratio == 1:
             self.real_A_src = gp.ArrayKey('REAL_A_SRC')
-            self.real_A_cropped_src = gp.ArrayKey('REAL_A_CROPPED_SRC')
+            # self.real_A_cropped_src = gp.ArrayKey('REAL_A_CROPPED_SRC')
             # self.mask_A_src = gp.ArrayKey('MASK_A_SRC')
             if self.AB_voxel_ratio < 1:
                 self.resample = gp.DownSample(self.real_A_src, self.AB_voxel_ratio, self.real_A)
-                self.resample += gp.DownSample(self.real_A_cropped_src, self.AB_voxel_ratio, self.real_A_cropped)
+                # self.resample += gp.DownSample(self.real_A_cropped_src, self.AB_voxel_ratio, self.real_A_cropped)
                 # self.resample += gp.DownSample(self.mask_A_src, self.AB_voxel_ratio, self.mask_A)
             if self.AB_voxel_ratio > 1:
                 self.resample = gp.UpSample(self.real_A_src, self.AB_voxel_ratio, self.real_A)
-                self.resample += gp.UpSample(self.real_A_cropped_src, self.AB_voxel_ratio, self.real_A_cropped)
+                # self.resample += gp.UpSample(self.real_A_cropped_src, self.AB_voxel_ratio, self.real_A_cropped)
                 # self.resample += gp.UpSample(self.mask_A_src, self.AB_voxel_ratio, self.mask_A)
         else:            
             self.real_A_src = self.real_A
-            self.real_A_cropped_src = self.real_A_cropped
+            # self.real_A_cropped_src = self.real_A_cropped
             # self.mask_A_src = self.mask_A
             self.resample = None
 
@@ -313,11 +319,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.source_A = gp.ZarrSource(    # add the data source
             self.src_A,  # the zarr container
             {   self.real_A_src: self.A_name,
-                self.real_A_cropped_src: self.A_name,
+                # self.real_A_cropped_src: self.A_name,
                 # self.mask_A_src: self.mask_A_name,
                 },  # which dataset to associate to the array key
             {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size * self.AB_voxel_ratio),
-                self.real_A_cropped_src: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size * self.AB_voxel_ratio),
+                # self.real_A_cropped_src: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size * self.AB_voxel_ratio),
                 # self.mask_A_src: gp.ArraySpec(interpolatable=False), #TODO: Determine whether to include voxel_size
                 }  # meta-information
         )
@@ -325,11 +331,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.source_B = gp.ZarrSource(    # add the data source
             self.src_B,  # the zarr container
             {   self.real_B: self.B_name,
-                self.real_B_cropped: self.B_name,
+                # self.real_B_cropped: self.B_name,
                 # self.mask_B: self.mask_B_name,
                 },  # which dataset to associate to the array key
             {   self.real_B: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size),
-                self.real_B_cropped: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size),
+                # self.real_B_cropped: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size),
                 # self.mask_B: gp.ArraySpec(interpolatable=False), #TODO: Determine whether to include voxel_size
                 }  # meta-information
         )
@@ -386,20 +392,22 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 3: self.cycled_A
                             },
                             loss_inputs = {
-                                'real_A_cropped': self.real_A_cropped,
-                                'fake_A': self.fake_A,
-                                'cycled_A': self.cycled_A,
-                                'real_B_cropped': self.real_B_cropped,
-                                'fake_B': self.fake_B,
-                                'cycled_B': self.cycled_B,
+                                # 'real_A_cropped': self.real_A_cropped,
+                                # 'real_A': self.real_A,
+                                # 'fake_A': self.fake_A,
+                                # 'cycled_A': self.cycled_A,
+                                # # 'real_B_cropped': self.real_B_cropped,
+                                # 'real_B': self.real_B,
+                                # 'fake_B': self.fake_B,
+                                # 'cycled_B': self.cycled_B,
                                 # 'mask_A': self.mask_A,
                                 # 'mask_B': self.mask_B
-                                # 0: self.real_A_cropped,
-                                # 1: self.fake_A,
-                                # 2: self.cycled_A,
-                                # 3: self.real_B_cropped,
-                                # 4: self.fake_B,
-                                # 5: self.cycled_B,
+                                0: self.real_A,
+                                1: self.fake_A,
+                                2: self.cycled_A,
+                                3: self.real_B,
+                                4: self.fake_B,
+                                5: self.cycled_B,
                             },
                             log_dir=self.tensorboard_path,
                             log_every=self.log_every,
@@ -409,7 +417,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         #make initial pipe section for A: TODO: Make min_masked part of config
         # self.pipe_A = self.source_A + gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.normalize_real_A + self.normalize_real_A_cropped + gp.SimpleAugment()
-        self.pipe_A = self.source_A + gp.RandomLocation() + self.resample + self.normalize_real_A + self.normalize_real_A_cropped# + gp.SimpleAugment()
+        self.pipe_A = self.source_A + gp.RandomLocation() + self.resample + self.normalize_real_A# + self.normalize_real_A_cropped
+        # self.pipe_A += gp.SimpleAugment()
         # self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
         #     # control_point_spacing=(64, 64),
         #     # control_point_spacing=(48*30, 48*30, 48*30),
@@ -419,13 +428,14 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #     subsample=4,
         #     )
         # add "channel" dimensions
-        self.pipe_A += gp.Unsqueeze([self.real_A, self.real_A_cropped]) #MAY NEED TO ADD MASK TO LIST
+        self.pipe_A += gp.Unsqueeze([self.real_A])#, self.real_A_cropped]) #MAY NEED TO ADD MASK TO LIST
         # add "batch" dimensions
-        self.pipe_A += gp.Unsqueeze([self.real_A, self.real_A_cropped]) #MAY NEED TO ADD MASK TO LIST
+        self.pipe_A += gp.Unsqueeze([self.real_A])#, self.real_A_cropped]) #MAY NEED TO ADD MASK TO LIST
 
         #make initial pipe section for B: TODO: Make min_masked part of config
         # self.pipe_B = self.source_B + gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B + self.normalize_real_B_cropped + gp.SimpleAugment()
-        self.pipe_B = self.source_B + gp.RandomLocation() + self.normalize_real_B + self.normalize_real_B_cropped# + gp.SimpleAugment()
+        self.pipe_B = self.source_B + gp.RandomLocation() + self.normalize_real_B# + self.normalize_real_B_cropped
+        # self.pipe_B += gp.SimpleAugment()
         # self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
         #     # control_point_spacing=(64, 64),
         #     # control_point_spacing=(48*30, 48*30, 48*30),
@@ -435,35 +445,67 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #     subsample=4,
         #     )
         # add "channel" dimensions
-        self.pipe_B += gp.Unsqueeze([self.real_B, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
+        self.pipe_B += gp.Unsqueeze([self.real_B])#, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
         # add "batch" dimensions
-        self.pipe_B += gp.Unsqueeze([self.real_B, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
+        self.pipe_B += gp.Unsqueeze([self.real_B])#, self.real_B_cropped]) #MAY NEED TO ADD MASK TO LIST
 
         # assemble pipeline
         self.training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
         self.training_pipeline += self.cache
         self.training_pipeline += self.trainer
-        self.training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
-        self.training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
+        self.training_pipeline += gp.Squeeze([self.real_A, 
+                                            # self.real_A_cropped, 
+                                            self.fake_A, 
+                                            self.cycled_A, 
+                                            self.real_B, 
+                                            # self.real_B_cropped, 
+                                            self.fake_B, 
+                                            self.cycled_B
+                                            ], axis=0)
+        self.training_pipeline += gp.Squeeze([self.real_A, 
+                                            # self.real_A_cropped, 
+                                            self.fake_A, 
+                                            self.cycled_A, 
+                                            self.real_B, 
+                                            # self.real_B_cropped, 
+                                            self.fake_B, 
+                                            self.cycled_B
+                                            ], axis=0)
         self.training_pipeline += self.performance
 
         self.test_training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
         self.test_training_pipeline += self.trainer
-        self.test_training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
-        self.test_training_pipeline += gp.Squeeze([self.real_A, self.real_A_cropped, self.fake_A, self.cycled_A, self.real_B, self.real_B_cropped, self.fake_B, self.cycled_B], axis=0)
+        self.test_training_pipeline += gp.Squeeze([self.real_A, 
+                                            # self.real_A_cropped, 
+                                            self.fake_A, 
+                                            self.cycled_A, 
+                                            self.real_B, 
+                                            # self.real_B_cropped, 
+                                            self.fake_B, 
+                                            self.cycled_B
+                                            ], axis=0)
+        self.test_training_pipeline += gp.Squeeze([self.real_A, 
+                                            # self.real_A_cropped, 
+                                            self.fake_A, 
+                                            self.cycled_A, 
+                                            self.real_B, 
+                                            # self.real_B_cropped, 
+                                            self.fake_B, 
+                                            self.cycled_B
+                                            ], axis=0)
     
         # create request
         self.train_request = gp.BatchRequest()
         for array in self.arrays:
             if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier):
-                self.train_request.add(array, self.voxel_size*self.AB_voxel_ratio*self.side_length, self.voxel_size)
+                self.train_request.add(array, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
             else:
-                self.train_request.add(array, self.voxel_size*self.AB_voxel_ratio*self.context_side_length, self.voxel_size)
+                self.train_request.add(array, self.voxel_size*self.context_side_length*self.AB_voxel_ratio, self.voxel_size)
 
 
     def gen_context_side_length(self):
         # figure out proper ROI padding for context for the UNet generators
-        if self.g_conv_padding == 'valid':
+        if self.g_conv_padding == 'valid': #DEPRACATED!
             self.context_side_length = 2 * np.sum([(self.g_conv_passes * (self.g_kernel_size - 1)) * (2 ** level) for level in np.arange(self.gnet_depth - 1)]) + (self.g_conv_passes * (self.g_kernel_size - 1)) * (2 ** (self.gnet_depth - 1)) + (self.g_conv_passes * (self.g_kernel_size - 1)) + self.side_length
         else:
             self.context_side_length = self.side_length
@@ -673,7 +715,7 @@ class CycleGAN_Loss(torch.nn.Module):
         loss_G += self.gan_loss(pred_cycled, True)
 
         # calculate gradients
-        loss_G.backward()
+        loss_G.backward(retain_graph=True)
         return loss_G
 
     def backward_Gs(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
@@ -695,7 +737,7 @@ class CycleGAN_Loss(torch.nn.Module):
         #return losses
         return cycle_loss, loss_G1, loss_G2
 
-    def forward(self, real_A_cropped, fake_A, cycled_A, real_B_cropped, fake_B, cycled_B):#s, mask_A, mask_B):
+    def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):#s, mask_A, mask_B):
 
         # real_A_mask = real_A * mask_A
         # cycled_A_mask = cycled_A * mask_A
@@ -706,12 +748,14 @@ class CycleGAN_Loss(torch.nn.Module):
 
         # # update Ds
         # loss_D1, loss_D2 = self.backward_Ds(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
-        loss_D1, loss_D2 = self.backward_Ds(real_A_cropped, fake_A, cycled_A, real_B_cropped, fake_B, cycled_B)
+        loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
 
         # update Gs
         # cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
-        cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A_cropped, fake_A, cycled_A, real_B_cropped, fake_B, cycled_B)
-
+        cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
+        
+        # torch.cuda.empty_cache()
+        
         self.loss_dict = {
             'loss_D1': float(loss_D1),
             'loss_D2': float(loss_D2),

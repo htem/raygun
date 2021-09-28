@@ -9,10 +9,10 @@ total_roi = daisy.Roi((0,0,0), np.array(volume_size)*np.array(voxel_size))
 in_file_path = '/n/groups/htem/ESRF_id16a/LTP/cb_FN_lobX_feb2021/volraw/'
 out_file_path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/'
 # out_file_path = in_file_path
-src_name = 'CBm_FN_lobX_90nm_tile3_twopass_rec_quarterAngle.vol'
-out_name = 'CBm_FN_lobX_90nm_tile3_twopass_rec_.n5'
+src_name = 'CBm_FN_lobX_90nm_tile2_rec_db9_twopass_quarterAngle.vol'
+out_name = 'CBm_FN_lobX_90nm_tile2_rec_db9_twopass_full_.n5'
 ds_name = 'volumes/quarterAngle'
-dtype_in = np.float32
+dtype_in = float#np.float32
 dtype_out = np.uint8
 
 print(f'Opening a zarr volume')
