@@ -541,7 +541,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     self.batch_tBoard_write()
         return self.batch
         
-    def test_prediction(self, in_type='A'):
+    def test_prediction(self, in_type='A', side_length=None):
         #set model into evaluation mode
         self.model.eval()
         # model_outputs = {
@@ -550,6 +550,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #     2: self.fake_A,
         #     3: self.cycled_A}
 
+        if side_length is not None:
+            self.side_length = side_length
+            self.gen_context_side_length()
+            
         if in_type is 'A':
             pipe = self.pipe_A
             input_dict = {'real_A': self.real_A}
