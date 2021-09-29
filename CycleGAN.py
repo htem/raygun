@@ -510,7 +510,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 self.train_request.add(array, self.voxel_size*self.context_side_length*self.AB_voxel_ratio, self.voxel_size)
 
 
-    def gen_context_side_length(self):
+    def gen_context_side_length(self):#TODO: REMOVE ANY TRACE OF SUPPORT FOR 'VALID' PADDING
         # figure out proper ROI padding for context for the UNet generators
         if self.g_conv_padding == 'valid': #DEPRACATED!
             self.context_side_length = 2 * np.sum([(self.g_conv_passes * (self.g_kernel_size - 1)) * (2 ** level) for level in np.arange(self.gnet_depth - 1)]) + (self.g_conv_passes * (self.g_kernel_size - 1)) * (2 ** (self.gnet_depth - 1)) + (self.g_conv_passes * (self.g_kernel_size - 1)) + self.side_length
@@ -537,14 +537,16 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     self.batch_tBoard_write()
         return self.batch
         
-    def test_prediction(self, n=1):
+    def test_prediction(self, in_type='A'):
         #set model into evaluation mode
         self.model.eval()
 
-        unsqueeze = gp.Unsqueeze([self.raw])
-        stack = gp.Stack(n)
+        if in_type is 'A':
+            pipe = self.pipe_A
+        else:
+            pipe = self.pipe_B
 
-        self.predict = gp.torch.Predict(self.model,
+        pipe += gp.torch.Predict(self.model,
                                 inputs = {'input': self.raw},
                                 outputs = {0: self.prediction},
                                 checkpoint = self.checkpoint
