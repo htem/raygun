@@ -639,11 +639,20 @@ class CycleGAN_Model(torch.nn.Module):
         self.netG2 = netG2
         self.netD2= netD2
 
-    def forward(self, real_A, real_B):
-        fake_B = self.netG1(real_A)
-        cycled_A = self.netG2(fake_B)
-        fake_A = self.netG2(real_B)
-        cycled_B = self.netG1(fake_A)
+    def forward(self, real_A=None, real_B=None):
+        if real_A is not None: #allow calling for single direction pass (i.e. prediction)
+            fake_B = self.netG1(real_A)
+            cycled_A = self.netG2(fake_B)
+        else:
+            fake_B = None
+            cycled_A = None
+
+        if real_B is not None:
+            fake_A = self.netG2(real_B)
+            cycled_B = self.netG1(fake_A)
+        else:
+            fake_A = None
+            cycled_B = None
 
         return fake_B, cycled_B, fake_A, cycled_A
 
