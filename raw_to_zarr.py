@@ -12,7 +12,7 @@ out_file_path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_t
 src_name = 'CBm_FN_lobX_90nm_tile2_rec_db9_twopass_quarterAngle.vol'
 out_name = 'CBm_FN_lobX_90nm_tile2_rec_db9_twopass_full_.n5'
 ds_name = 'volumes/quarterAngle'
-dtype_in = float#np.float32
+dtype_in = np.float32
 dtype_out = np.uint8
 
 print(f'Opening a zarr volume')

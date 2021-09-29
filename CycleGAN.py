@@ -204,8 +204,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         return None, 0
     
     def setup_networks(self):
-        devices = range(torch.cuda.device_count()) # requires cuda
-        i = 0
+        # devices = range(torch.cuda.device_count()) # requires cuda
+        # i = 0
         #For netG1:
         unet = UNet(
                 in_channels=1,
@@ -220,7 +220,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                             unet,
                             ConvPass(self.g_num_fmaps, 1, [(1,)*3], activation=None),
                             torch.nn.Sigmoid())#.to(devices[i % torch.cuda.device_count()])
-        i += 1
+        # i += 1
         init_weights(self.netG1, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
 
         #For netG2:
@@ -237,7 +237,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                             unet,
                             ConvPass(self.g_num_fmaps, 1, [(1,)*3], activation=None),
                             torch.nn.Sigmoid())#.to(devices[i % torch.cuda.device_count()])
-        i += 1
+        # i += 1
         init_weights(self.netG2, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
 
         #For netD1:
@@ -249,7 +249,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                         downsampling_kw=self.d_downsample_factor, 
                                         kw=self.d_kernel_size,
                                  )#.to(devices[i % torch.cuda.device_count()])
-        i += 1
+        # i += 1
         init_weights(self.netD1, init_type='normal')
 
         #For netD2:
@@ -261,7 +261,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                         downsampling_kw=self.d_downsample_factor, 
                                         kw=self.d_kernel_size,
                                  )#.to(devices[i % torch.cuda.device_count()])
-        i += 1
+        # i += 1
         init_weights(self.netD2, init_type='normal')
 
     def setup_model(self):
