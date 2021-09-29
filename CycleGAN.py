@@ -553,7 +553,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if side_length is not None:
             self.side_length = side_length
             self.gen_context_side_length()
-            
+
         if in_type is 'A':
             pipe = self.pipe_A
             input_dict = {'real_A': self.real_A}
@@ -593,62 +593,93 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.batch_show()
         return self.batch
 
-    def render_full(self):
+    def render_full(self, in_type='A', side_length=None):
+        #CYCLED CURRENTLY SAVED IN UPSAMPLED FORM (i.e. not original voxel size)
         #set model into evaluation mode
         self.model.eval()
+        # model_outputs = {
+        #     0: self.fake_B,
+        #     1: self.cycled_B,
+        #     2: self.fake_A,
+        #     3: self.cycled_A}
 
-        unsqueeze = gp.Unsqueeze([self.raw])
-        squeeze_1 = gp.Squeeze([self.prediction])
-        squeeze_2 = gp.Squeeze([self.prediction])
-
-        # set prediction spec
-        context = self.voxel_size * (self.context_side_length - self.side_length) // 2
-        if self.source.spec is None:
-            data_file = zarr.open(self.src)
-            pred_spec = self.source._Hdf5LikeSource__read_spec(self.raw, data_file, self.raw_name).copy()
+        if side_length is not None:
+            self.side_length = side_length
+            self.gen_context_side_length()
+            
+        if in_type is 'A':
+            pipe = self.pipe_A
+            input_dict = {'real_A': self.real_A}
+            output_dict = { 0: self.fake_B,
+                            3: self.cycled_A
+                }
+            out_path = self.A_out_path
+            real = self.real_A
+            fake = self.fake_B
+            cycled = self.cycled_A
+            normalize_fake = self.normalize_fake_B
+            normalize_cycled = self.normalize_cycled_A
         else:
-            pred_spec = self.source.spec[self.raw].copy()        
-        pred_spec.roi.grow(-context, -context)
-        pred_spec.dtype = self.normalize_pred.dtype
+            pipe = self.pipe_B            
+            input_dict = {'real_B': self.real_B}
+            output_dict = { 2: self.fake_A,
+                            1: self.cycled_B
+                }
+            out_path = self.B_out_path
+            real = self.real_B
+            fake = self.fake_A
+            cycled = self.cycled_B
+            normalize_fake = self.normalize_fake_A
+            normalize_cycled = self.normalize_cycled_B
 
-        self.predict = gp.torch.Predict(self.model,
-                                inputs = {'input': self.raw},
-                                outputs = {0: self.prediction},
+
+        # set prediction spec 
+        pred_spec = gp.ArraySpec(voxel_size=self.voxel_size)
+        # context = self.voxel_size * (self.context_side_length - self.side_length) // 2
+        # if self.source.spec is None:
+        #     data_file = zarr.open(self.src)
+        #     pred_spec = self.source._Hdf5LikeSource__read_spec(self.raw, data_file, self.raw_name).copy()
+        # else:
+        #     pred_spec = self.source.spec[self.raw].copy()        
+        # pred_spec.roi.grow(-context, -context)
+        # pred_spec.dtype = self.normalize_pred.dtype
+
+        pipe += gp.torch.Predict(self.model,
+                                inputs = input_dict,
+                                outputs = output_dict,
                                 checkpoint = self.checkpoint,
-                                array_specs = {self.prediction: pred_spec}
+                                array_specs = {fake: pred_spec.copy(), cycled: pred_spec.copy()}
                                 )
 
-        scan_request = gp.BatchRequest()
-        scan_request.add(self.prediction, self.voxel_size*self.side_length)
-        scan_request.add(self.raw, self.voxel_size*self.context_side_length)
-        scan = gp.Scan(scan_request, num_workers=self.num_workers)#os.cpu_count())
+        pipe += gp.Squeeze([real, fake, cycled], axis=0)
+        pipe += gp.Squeeze([real, fake, cycled], axis=0)
 
-        destination = gp.ZarrWrite(
+        pipe += normalize_fake + normalize_cycled
+
+        pipe += gp.ZarrWrite(
                         dataset_names = {
-                            self.prediction: self.model_name
+                            fake: self.model_name+'_enFAKE',
+                            cycled: self.model_name+'_enCYCLED'
                             },
-                        output_filename = self.out_path,
-                        dataset_dtypes = {self.prediction: pred_spec.dtype}
+                        output_filename = out_path,
+                        # dataset_dtypes = {fake: pred_spec.dtype}
                         )
+        
+        scan_request = gp.BatchRequest()
+        scan_request.add(real, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
+        scan_request.add(fake, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
+        scan_request.add(cycled, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
 
-        renderer = (self.source + 
-                    self.normalize_raw +  
-                    unsqueeze +
-                    self.stack +
-                    self.predict +
-                    squeeze_1 +
-                    squeeze_2 +
-                    self.normalize_pred +
-                    destination +
-                    scan +
-                    self.performance)
+        pipe += gp.Scan(scan_request, num_workers=self.num_workers)#os.cpu_count())
+
+        pipe += self.performance
 
         request = gp.BatchRequest()
 
-        print('Full rendering pipeline declared. Building...')
-        with gp.build(renderer):
+        print(f'Full rendering pipeline declared for input type {in_type}. Building...')
+        with gp.build(pipe):
             print('Starting full volume render...')
-            renderer.request_batch(request)
+            pipe.request_batch(request)
             print('Finished.')
 
 
