@@ -1,6 +1,8 @@
 import numpy as np
 import daisy
 
+TODO: DeprecationWarning
+
 #TODO: Make callable function
 # --- Parameters and paths --- #
 volume_size = [3216, 3216, 3216]  # In voxels, xyz order
