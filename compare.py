@@ -3,6 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import os
 import zarr
+import daisy
 from skimage import metrics as skimet
 import pandas as pd
 from datetime import datetime
@@ -12,6 +13,8 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.Logger('Compare', 'INFO')
 
+from noise2gun import *
+
 class Compare():
     def __init__(self, 
                 src_path, # 'path/to/data.zarr/volumes'
@@ -20,10 +23,13 @@ class Compare():
                 out_path=None,
                 batch_size=1,
                 metric_list=None,
-                vizualize=False
+                vizualize=False,
+                mask_name='compare_mask',
+                make_mask=False
     ):
         self.src_path = src_path
         self.gt_name = gt_name
+        self.mask_name = mask_name
         if ds_names is None:
             data = zarr.open(self.src_path)
             self.ds_names = [key for key in data.keys() if key!=self.gt_name]
@@ -42,6 +48,48 @@ class Compare():
         self.vizualize = vizualize
         self.make_pipes()        
         self.batch = None
+        if make_mask:
+            self.make_compare_mask(self.mask_name)
+
+
+    def get_crop_roi(self, pad=None):
+        if pad is None:
+            n2g = Noise2Gun('', gp.Coordinate((30,30,30)))
+            pad = (n2g.context_side_length - n2g.side_length) // 2
+        
+        crop_roi = None
+        for array, specs in self.source.array_specs.items():
+            ds = self.source.datasets[array]
+            d = daisy.open_ds(self.src_path.rstrip('/volumes'), 'volumes/'+ds)
+            crop = gp.Coordinate(pad * d.voxel_size)
+            spec = specs
+            roi = daisy.Roi(d.roi.get_offset(), d.roi.get_shape())
+            if crop_roi is None:
+                crop_roi = roi.grow(-crop, -crop)
+            else:
+                crop_roi.intersect(roi.grow(-crop, -crop))
+            # spec.roi = roi.grow(-crop, -crop)
+            voxel_size = d.voxel_size
+            # spec.dtype = d.dtype
+            # self.source.array_specs[array] = spec
+        return crop_roi, voxel_size
+    
+    
+    def make_compare_mask(self, mask_name='compare_mask', force=False):
+        roi, voxel_size = self.get_crop_roi()
+        out = daisy.prepare_ds(
+            self.src_path.rstrip('/volumes'), 
+            'volumes/'+mask_name,
+            roi,
+            voxel_size,
+            np.uint8,
+            compressor={'id': 'zlib', 'level': 3},
+            delete=force
+            )
+        out[roi] = 1
+        self.mask_ds = mask_name
+        self.ds_names.append(mask_name)
+        self.make_pipes()
 
 
     def make_pipes(self):
@@ -51,7 +99,8 @@ class Compare():
         for ds in self.ds_names:
             setattr(self, ds, gp.ArrayKey(ds.upper()))
             self.array_dict[getattr(self, ds)] = ds
-            self.normalizers += gp.Normalize(getattr(self, ds))
+            if ds is not self.mask_name:
+                self.normalizers += gp.Normalize(getattr(self, ds))
         
         # setup data source
         self.source = gp.ZarrSource(
@@ -86,7 +135,7 @@ class Compare():
         datas = [gt_data]
         labels = [self.array_dict[self.gt]]
         for array, name in self.array_dict.items():
-            if array is not self.gt:
+            if array is not self.gt and name is not self.mask_name:
                 labels.append(name)
                 if mid:
                     datas.append(batch[array].data[i].squeeze()[mid])
@@ -125,7 +174,7 @@ class Compare():
         results_dict = {}
         gt_data = self.batch[self.gt].data
         for array, name in self.array_dict.items():
-            if array is not self.gt:
+            if array is not self.gt and name is not self.mask_name:
                 this_data = self.batch[array].data
                 these_results = {}
                 for metric in self.metric_list:
