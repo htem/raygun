@@ -292,10 +292,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             setattr(self, array, gp.ArrayKey(array.upper())) # add ArrayKeys to object
             self.arrays.append(getattr(self, array))
             if 'mask' not in array:            
-                setattr(self, 'normalize_'+array, gp.Normalize(getattr(self, array)))#add normalizations, if appropriate
-        
-        # automatically generate some config variables
-        self.gen_context_side_length()
+                setattr(self, 'normalize_'+array, gp.Normalize(getattr(self, array)))#add normalizations, if appropriate        
         
         if not self.AB_voxel_ratio == 1:
             self.real_A_src = gp.ArrayKey('REAL_A_SRC')
@@ -381,20 +378,20 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
 
     def build_training_pipeline(self):
-        # # add augmentations
-        # self.simple_augment = gp.SimpleAugment()
-        # self.elastic_augment = gp.ElasticAugment(
-        #     control_point_spacing=(48, 48, 48),
-        #     jitter_sigma=(5.0, 5.0, 5.0),
-        #     rotation_interval=(0, math.pi/2),
-        #     subsample=4,
-        #     )
-        # # pipeline += gp.IntensityAugment(
-        # #     source,
-        # #     scale_min=0.8,
-        # #     scale_max=1.2,
-        # #     shift_min=-0.2,
-        # #     shift_max=0.2)
+        # add augmentations
+        # augmentations = gp.SimpleAugment()
+        augmentations = gp.ElasticAugment(
+            control_point_spacing=(48, 48, 48),
+            jitter_sigma=(5.0, 5.0, 5.0)*self.AB_voxel_ratio,
+            rotation_interval=(0, math.pi/4),
+            subsample=4
+            )
+        # pipeline += gp.IntensityAugment(
+        #     source,
+        #     scale_min=0.8,
+        #     scale_max=1.2,
+        #     shift_min=-0.2,
+        #     shift_max=0.2)
 
         # create a train node using our model, loss, and optimizer
         self.trainer = gp.torch.Train(
@@ -427,6 +424,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # assemble pipeline
         self.training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
+        # self.training_pipeline += augmentations
         self.training_pipeline += self.cache
         self.training_pipeline += self.trainer
         self.training_pipeline += gp.Squeeze([self.real_A, 
@@ -446,6 +444,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.training_pipeline += self.performance
 
         self.test_training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
+        # self.test_training_pipeline += augmentations
         self.test_training_pipeline += self.trainer
         self.test_training_pipeline += gp.Squeeze([self.real_A, 
                                             self.fake_A, 
@@ -465,18 +464,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # create request
         self.train_request = gp.BatchRequest()
         for array in self.arrays:
-            if ('cropped'.upper() in array.identifier) or ('real'.upper() not in array.identifier): #remove cropped/'valid' padding vestigials
-                self.train_request.add(array, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
-            else:
-                self.train_request.add(array, self.voxel_size*self.context_side_length*self.AB_voxel_ratio, self.voxel_size)
-
-
-    def gen_context_side_length(self):#TODO: REMOVE ANY TRACE OF SUPPORT FOR 'VALID' PADDING
-        # figure out proper ROI padding for context for the UNet generators
-        if self.g_conv_padding == 'valid': #DEPRACATED!
-            self.context_side_length = 2 * np.sum([(self.g_conv_passes * (self.g_kernel_size - 1)) * (2 ** level) for level in np.arange(self.gnet_depth - 1)]) + (self.g_conv_passes * (self.g_kernel_size - 1)) * (2 ** (self.gnet_depth - 1)) + (self.g_conv_passes * (self.g_kernel_size - 1)) + self.side_length
-        else:
-            self.context_side_length = self.side_length
+            self.train_request.add(array, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
+            
 
     def test_train(self):
         if self.test_training_pipeline is None:
@@ -509,7 +498,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         if side_length is not None:
             self.side_length = side_length
-            self.gen_context_side_length()
 
         if in_type is 'A':
             pipe = self.pipe_A
@@ -550,7 +538,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.batch_show()
         return self.batch
 
-    def render_full(self, in_type='A', side_length=None):
+    def render_full(self, in_type='A', side_length=None, cycle=False):
         #CYCLED CURRENTLY SAVED IN UPSAMPLED FORM (i.e. not original voxel size)
         #set model into evaluation mode
         self.model.eval()
@@ -562,10 +550,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         if side_length is not None:
             self.side_length = side_length
-            self.gen_context_side_length()
             
         if in_type is 'A':
-            pipe = self.pipe_A
             input_dict = {'real_A': self.real_A}
             output_dict = { 0: self.fake_B,
                             3: self.cycled_A
@@ -574,6 +560,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             real = self.real_A
             fake = self.fake_B
             cycled = self.cycled_A
+            normalize_real = self.normalize_real_A
             normalize_fake = self.normalize_fake_B
             normalize_cycled = self.normalize_cycled_A
             source = self.source_A
@@ -589,12 +576,14 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             real = self.real_B
             fake = self.fake_A
             cycled = self.cycled_B
+            normalize_real = self.normalize_real_B
             normalize_fake = self.normalize_fake_A
             normalize_cycled = self.normalize_cycled_B
-            source = self.source_A
-            src_path = self.src_A
-            real_name = self.A_name
-
+            source = self.source_B
+            src_path = self.src_B
+            real_name = self.B_name
+        
+        pipe = source + self.resample + normalize_real + gp.Unsqueeze([real]) + gp.Unsqueeze([real])
 
         # set prediction spec 
         if source.spec is None:
@@ -604,34 +593,44 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             pred_spec = source.spec[real].copy()        
         pred_spec.voxel_size = self.voxel_size
         pred_spec.dtype = normalize_fake.dtype
+        
+        
+        scan_request = gp.BatchRequest()
+        scan_request.add(real, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
+        scan_request.add(fake, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
+
+        dataset_names = {fake: 'volumes/'+self.model_name+'_enFAKE'}
+        array_specs = {fake: pred_spec.copy()}
+        if cycle:
+            dataset_names[cycled] = 'volumes/'+self.model_name+'_enCYCLED'
+            array_specs[cycled] = pred_spec.copy()
+            scan_request.add(cycled, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
 
         pipe += gp.torch.Predict(self.model,
                                 inputs = input_dict,
                                 outputs = output_dict,
                                 checkpoint = self.checkpoint,
-                                array_specs = {fake: pred_spec.copy(), cycled: pred_spec.copy()}
+                                array_specs = array_specs
                                 )
 
-        pipe += gp.Squeeze([real, fake, cycled], axis=0)
-        pipe += gp.Squeeze([real, fake, cycled], axis=0)
-
-        pipe += normalize_fake + normalize_cycled
-
+        if cycle:
+            pipe += gp.Squeeze([real, fake, cycled], axis=0)
+            pipe += gp.Squeeze([real, fake, cycled], axis=0)
+            pipe += normalize_fake + normalize_cycled
+        else:
+            pipe += gp.Squeeze([real, fake], axis=0)
+            pipe += gp.Squeeze([real, fake], axis=0)
+            pipe += normalize_fake
+            self.model.cycle = False
+        
         pipe += gp.ZarrWrite(
-                        dataset_names = {
-                            fake: self.model_name+'_enFAKE',
-                            cycled: self.model_name+'_enCYCLED'
-                            },
+                        dataset_names = dataset_names,
                         output_filename = out_path,
                         # dataset_dtypes = {fake: pred_spec.dtype}
-                        )
-        
-        scan_request = gp.BatchRequest()
-        scan_request.add(real, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
-        scan_request.add(fake, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
-        scan_request.add(cycled, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
+                        )        
         
         #TODO: MAKE PARALLEL PROCESSING WORK
+        # pipe += gp.PreCache()
         pipe += gp.Scan(scan_request)#, num_workers=self.num_workers)#os.cpu_count())
 
         pipe += self.performance
@@ -651,19 +650,26 @@ class CycleGAN_Model(torch.nn.Module):
         self.netG1 = netG1
         self.netD1 = netD1
         self.netG2 = netG2
-        self.netD2= netD2
+        self.netD2 = netD2
+        self.cycle = True
 
     def forward(self, real_A=None, real_B=None):
         if real_A is not None: #allow calling for single direction pass (i.e. prediction)
             fake_B = self.netG1(real_A)
-            cycled_A = self.netG2(fake_B)
+            if self.cycle:
+                cycled_A = self.netG2(fake_B)
+            else:
+                cycled_A = None
         else:
             fake_B = None
             cycled_A = None
 
         if real_B is not None:
             fake_A = self.netG2(real_B)
-            cycled_B = self.netG1(fake_A)
+            if self.cycle:
+                cycled_B = self.netG1(fake_A)
+            else:
+                cycled_B = None
         else:
             fake_A = None
             cycled_B = None

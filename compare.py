@@ -86,8 +86,8 @@ class Compare():
         datas = [gt_data]
         labels = [self.array_dict[self.gt]]
         for array, name in self.array_dict.items():
-            labels.append(name)
             if array is not self.gt:
+                labels.append(name)
                 if mid:
                     datas.append(batch[array].data[i].squeeze()[mid])
                 else:
@@ -104,6 +104,10 @@ class Compare():
         for i, (data, label) in enumerate(zip(datas, labels)):
             axes[i].imshow(data, cmap='gray', vmin=0, vmax=1)
             axes[i].set_title(label)
+        # self.results.plot.bar()
+        fig, axs = plt.subplots(1, len(self.metric_list), sharey=True, figsize=(len(self.metric_list)*3, len(self.results.columns)//2))
+        for ax, metric in zip(axs, self.metric_list):
+            self.results.loc[metric].plot.barh(ax=ax, title=metric)
 
 
     def patch_compare(self, patch_size=gp.Coordinate((64,64,64))):
@@ -113,7 +117,7 @@ class Compare():
         
         request = gp.BatchRequest()
         for array in self.array_dict:
-            request.add(array, self.voxel_sizes[array] * patch_size)
+            request.add(array, self.voxel_sizes[array] * patch_size, voxel_size=self.voxel_sizes[array])
         
         with gp.build(pipeline):
             self.batch = pipeline.request_batch(request)
@@ -131,7 +135,6 @@ class Compare():
         
         if self.vizualize:
             self.batch_show()
-            self.results.plot.bar()
         
         print(self.results)
         return self.results, self.batch
