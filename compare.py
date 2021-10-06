@@ -19,17 +19,19 @@ class Compare():
     def __init__(self, 
                 src_path, # 'path/to/data.zarr/volumes'
                 gt_name='gt', # 'gt_dataset_name'
+                mask_name='compare_mask',
+                norm_name='train', # name of dataset to normalize to
                 ds_names=None, # ['dataset_1_name', 'dataset_2_name', ...]
                 out_path=None,
                 batch_size=1,
                 metric_list=None,
                 vizualize=False,
-                mask_name='compare_mask',
                 make_mask=False
     ):
         self.src_path = src_path
         self.gt_name = gt_name
         self.mask_name = mask_name
+        self.norm_name = norm_name
         if ds_names is None:
             data = zarr.open(self.src_path)
             self.ds_names = [key for key in data.keys() if key!=self.gt_name]
@@ -87,12 +89,13 @@ class Compare():
             delete=force
             )
         out[roi] = 1
-        self.mask_ds = mask_name
+        # self.mask = gp.ArrayKey(mask_name.upper())
         self.ds_names.append(mask_name)
         self.make_pipes()
 
 
     def make_pipes(self):
+        self.mask = None
         self.gt = gp.ArrayKey('GT')
         self.array_dict = {self.gt: self.gt_name}
         self.normalizers = gp.Normalize(self.gt)
@@ -101,6 +104,8 @@ class Compare():
             self.array_dict[getattr(self, ds)] = ds
             if ds is not self.mask_name:
                 self.normalizers += gp.Normalize(getattr(self, ds))
+            else:
+                self.mask = getattr(self, ds)
         
         # setup data source
         self.source = gp.ZarrSource(
@@ -135,7 +140,7 @@ class Compare():
         datas = [gt_data]
         labels = [self.array_dict[self.gt]]
         for array, name in self.array_dict.items():
-            if array is not self.gt and name is not self.mask_name:
+            if array is not self.gt and array is not self.mask:
                 labels.append(name)
                 if mid:
                     datas.append(batch[array].data[i].squeeze()[mid])
@@ -153,11 +158,34 @@ class Compare():
         for i, (data, label) in enumerate(zip(datas, labels)):
             axes[i].imshow(data, cmap='gray', vmin=0, vmax=1)
             axes[i].set_title(label)
-        # self.results.plot.bar()
-        fig, axs = plt.subplots(1, len(self.metric_list), sharey=True, figsize=(len(self.metric_list)*3, len(self.results.columns)//2))
-        for ax, metric in zip(axs, self.metric_list):
-            self.results.loc[metric].plot.barh(ax=ax, title=metric)
+        self.plot_results()
+        
 
+    def plot_results(self, results=None, metric_list=None):
+        if results is None:
+            results = self.results
+        if metric_list is None:
+            metric_list = self.metric_list
+        # results.plot.bar()
+        fig, axs = plt.subplots(1, len(metric_list), sharey=True, figsize=(len(metric_list)*3, len(results.columns)//2))
+        for ax, metric in zip(axs, metric_list):
+            results.loc[metric].plot.barh(ax=ax, title=metric)
+
+
+    def plot_norm_results(self, norm_name=None, results=None, metric_list=None):
+        if norm_name is None:
+            norm_name = self.norm_name
+        if results is None:
+            results = self.results
+        if metric_list is None:
+            metric_list = self.metric_list
+        
+        drop_list = [norm_name]
+        if self.mask_name in self.ds_names and self.mask_name is not norm_name:
+            drop_list.append(self.mask_name)
+
+        norm_results = results.divide(getattr(results, norm_name), axis='rows').drop(drop_list, axis=1) - 1
+        self.plot_results(norm_results)
 
     def patch_compare(self, patch_size=gp.Coordinate((64,64,64))):
         pipeline =  (self.source + 
@@ -208,7 +236,7 @@ class Compare():
         self.results = self.comparator.get_results()
         
         if self.vizualize:
-            self.results.plot.bar()
+            self.plot_results()
         
         print(self.results)
         if self.out_path is not None:
