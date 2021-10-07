@@ -1,8 +1,5 @@
 # !conda activate n2v
-import numpy as np
 from matplotlib import pyplot as plt
-from numpy.lib.utils import source
-# from numpy.lib.utils import source
 import torch
 import glob
 import re
@@ -15,13 +12,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.Logger('CycleGAN', 'INFO')
 
 import math
-import sys
 import functools
 from tqdm import tqdm
 
 torch.backends.cudnn.benchmark = True
 
-from tri_utils import NLayerDiscriminator3D, GANLoss, init_weights, UnetGenerator3D
+from tri_utils import NLayerDiscriminator, NLayerDiscriminator3D, GANLoss, init_weights
 
 class CycleGAN(): #TODO: Just pass config file or dictionary
     def __init__(self,
@@ -141,8 +137,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 img = value.data[i].squeeze()
             else:
                 img = value.data.squeeze()
-            mid = img.shape[0] // 2 # TODO: assumes 3D volume
-            data = img[mid]
+            if len(img.shape) == 3:
+                mid = img.shape[0] // 2 # for 3D volume
+                data = img[mid]
+            else:
+                data = img
             if rows == 1:
                 axes[c].imshow(data, cmap='gray', vmin=0, vmax=1)
                 axes[c].set_title(label)                
@@ -171,8 +170,12 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 img = self.batch[array].data[i].squeeze()
             else:
                 img = self.batch[array].data.squeeze()
-            mid = img.shape[0] // 2 # TODO: assumes 3D volume
-            self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
+            if len(img.shape) == 3:
+                mid = img.shape[0] // 2 # for 3D volume
+                data = img[mid]
+            else:
+                data = img
+            self.trainer.summary_writer.add_image(array.identifier, data, global_step=self.trainer.iteration, dataformats='HW')
         # TODO:
         # validation_loss = self.get_validation_loss()
         # self.trainer.summary_writer.add_scalar('validation_loss', validation_loss, self.trainer.iteration)
@@ -204,7 +207,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 in_channels=1,
                 num_fmaps=self.g_num_fmaps,
                 fmap_inc_factor=self.g_fmap_inc_factor,
-                downsample_factors=[(self.g_downsample_factor,)*3,] * (self.gnet_depth - 1), #TODO: make work for arbitrary dimensionality
+                downsample_factors=[(self.g_downsample_factor,)*len(self.voxel_size),] * (self.gnet_depth - 1),
                 padding='same',
                 constant_upsample=self.g_constant_upsample,
                 voxel_size=self.voxel_size, # set for each dataset
@@ -213,7 +216,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 )
         self.netG1 = torch.nn.Sequential(
                             unet,
-                            ConvPass(self.g_num_fmaps, 1, [(1,)*3], activation=None),
+                            ConvPass(self.g_num_fmaps, 1, [(1,)*len(self.voxel_size)], activation=None, padding='same'), #switched padding to 'same' but was working with 'valid' somehow
                             torch.nn.Sigmoid())#.to(devices[i % torch.cuda.device_count()])
         # i += 1
         init_weights(self.netG1, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
@@ -223,7 +226,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 in_channels=1,
                 num_fmaps=self.g_num_fmaps,
                 fmap_inc_factor=self.g_fmap_inc_factor,
-                downsample_factors=[(self.g_downsample_factor,)*3,] * (self.gnet_depth - 1), #TODO: make work for arbitrary dimensionality
+                downsample_factors=[(self.g_downsample_factor,)*len(self.voxel_size),] * (self.gnet_depth - 1),
                 padding='same',
                 constant_upsample=self.g_constant_upsample,
                 voxel_size=self.voxel_size, # set for each dataset
@@ -232,14 +235,22 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 )        
         self.netG2 = torch.nn.Sequential(
                             unet,
-                            ConvPass(self.g_num_fmaps, 1, [(1,)*3], activation=None),
+                            ConvPass(self.g_num_fmaps, 1, [(1,)*len(self.voxel_size)], activation=None, padding='same'), #switched padding to 'same' but was working with 'valid' 
                             torch.nn.Sigmoid())#.to(devices[i % torch.cuda.device_count()])
         # i += 1
         init_weights(self.netG2, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
 
+        #For discriminators:
+        if len(self.voxel_size) == 3: #3D case
+            norm_instance = torch.nn.InstanceNorm3d
+            discriminator_maker = NLayerDiscriminator3D
+        elif len(self.voxel_size) == 2:
+            norm_instance = torch.nn.InstanceNorm2d
+            discriminator_maker = NLayerDiscriminator
+
         #For netD1:
-        norm_layer = functools.partial(torch.nn.InstanceNorm3d, affine=False, track_running_stats=False)
-        self.netD1 = NLayerDiscriminator3D(input_nc=1, 
+        norm_layer = functools.partial(norm_instance, affine=False, track_running_stats=False)
+        self.netD1 = discriminator_maker(input_nc=1, 
                                         ndf=self.d_num_fmaps, 
                                         n_layers=self.dnet_depth, 
                                         norm_layer=norm_layer,
@@ -250,8 +261,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         init_weights(self.netD1, init_type='normal')
 
         #For netD2:
-        norm_layer = functools.partial(torch.nn.InstanceNorm3d, affine=False, track_running_stats=False)
-        self.netD2 = NLayerDiscriminator3D(input_nc=1, 
+        norm_layer = functools.partial(norm_instance, affine=False, track_running_stats=False)
+        self.netD2 = discriminator_maker(input_nc=1, 
                                         ndf=self.d_num_fmaps, 
                                         n_layers=self.dnet_depth, 
                                         norm_layer=norm_layer,
