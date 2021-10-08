@@ -355,7 +355,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         
         #make initial pipe section for A: TODO: Make min_masked part of config
         self.pipe_A = self.source_A
-        # self.pipe_A += gp.SimpleAugment()
+        self.pipe_A += gp.SimpleAugment()
         self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             # control_point_spacing=(64, 64),
             # control_point_spacing=(48*30, 48*30, 48*30),
@@ -373,7 +373,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.pipe_A += gp.Unsqueeze([self.real_A])
 
         #make initial pipe section for B: TODO: Make min_masked part of config
-        self.pipe_B = self.source_B         # self.pipe_B += gp.SimpleAugment()
+        self.pipe_B = self.source_B         
+        self.pipe_B += gp.SimpleAugment()
         self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             # control_point_spacing=(64, 64),
             # control_point_spacing=(48*30, 48*30, 48*30),
