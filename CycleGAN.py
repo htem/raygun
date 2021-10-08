@@ -128,7 +128,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if not hasattr(self, 'col_dict'): 
             self.col_dict = {'REAL':0, 'FAKE':1, 'CYCL':2}#, 'MASK':3}
         rows = (self.real_A in batch.arrays) + (self.real_B in batch.arrays)        
-        fig, axes = plt.subplots(rows, len(self.col_dict), figsize=(30*rows, 30*len(self.col_dict)))
+        fig, axes = plt.subplots(rows, len(self.col_dict), figsize=(10*len(self.col_dict), 10*rows))
         for array, value in batch.items():
             label = array.identifier
             c = self.col_dict[label[:4]]
@@ -354,34 +354,37 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.setup_model()
         
         #make initial pipe section for A: TODO: Make min_masked part of config
-        # self.pipe_A = self.source_A + gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.normalize_real_A + gp.SimpleAugment()
-        self.pipe_A = self.source_A + gp.RandomLocation() + self.resample + self.normalize_real_A
+        self.pipe_A = self.source_A
         # self.pipe_A += gp.SimpleAugment()
-        # self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-        #     # control_point_spacing=(64, 64),
-        #     # control_point_spacing=(48*30, 48*30, 48*30),
-        #     control_point_spacing=(48, 48, 48),
-        #     jitter_sigma=(5.0, 5.0, 5.0),
-        #     rotation_interval=(0, math.pi/2),
-        #     subsample=4,
-        #     )
+        self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+            # control_point_spacing=(64, 64),
+            # control_point_spacing=(48*30, 48*30, 48*30),
+            # control_point_spacing=(48, 48, 48),
+            control_point_spacing=30,
+            jitter_sigma=(5.0,)*3, #made for 3D
+            rotation_interval=(0, math.pi/2),
+            subsample=4,
+            )
+        # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
+        self.pipe_A += gp.RandomLocation() + self.resample + self.normalize_real_A        
         # add "channel" dimensions
         self.pipe_A += gp.Unsqueeze([self.real_A])
         # add "batch" dimensions
         self.pipe_A += gp.Unsqueeze([self.real_A])
 
         #make initial pipe section for B: TODO: Make min_masked part of config
-        # self.pipe_B = self.source_B + gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B + gp.SimpleAugment()
-        self.pipe_B = self.source_B + gp.RandomLocation() + self.normalize_real_B
-        # self.pipe_B += gp.SimpleAugment()
-        # self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-        #     # control_point_spacing=(64, 64),
-        #     # control_point_spacing=(48*30, 48*30, 48*30),
-        #     control_point_spacing=(48, 48, 48),
-        #     jitter_sigma=(5.0, 5.0, 5.0),
-        #     rotation_interval=(0, math.pi/2),
-        #     subsample=4,
-        #     )
+        self.pipe_B = self.source_B         # self.pipe_B += gp.SimpleAugment()
+        self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+            # control_point_spacing=(64, 64),
+            # control_point_spacing=(48*30, 48*30, 48*30),
+            # control_point_spacing=(48, 48, 48),
+            control_point_spacing=30*self.AB_voxel_ratio,
+            jitter_sigma=(5.0*self.AB_voxel_ratio,)*3, #made for 3D
+            rotation_interval=(0, math.pi/2),
+            subsample=4,
+            )
+        # self.pipe_B += gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B
+        self.pipe_B += gp.RandomLocation() + self.normalize_real_B
         # add "channel" dimensions
         self.pipe_B += gp.Unsqueeze([self.real_B])
         # add "batch" dimensions
@@ -391,12 +394,12 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def build_training_pipeline(self):
         # add augmentations
         # augmentations = gp.SimpleAugment()
-        augmentations = gp.ElasticAugment(
-            control_point_spacing=(48, 48, 48),
-            jitter_sigma=(5.0, 5.0, 5.0)*self.AB_voxel_ratio,
-            rotation_interval=(0, math.pi/4),
-            subsample=4
-            )
+        # augmentations = gp.ElasticAugment(
+        #     control_point_spacing=(48, 48, 48),
+        #     jitter_sigma=(5.0, 5.0, 5.0)*self.AB_voxel_ratio,
+        #     rotation_interval=(0, math.pi/4),
+        #     subsample=4
+        #     )
         # pipeline += gp.IntensityAugment(
         #     source,
         #     scale_min=0.8,
@@ -511,7 +514,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.side_length = side_length
 
         if in_type is 'A':
-            pipe = self.pipe_A
+            pipe = self.source_A
+            # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
+            pipe += gp.RandomLocation() + self.resample + self.normalize_real_A        
+            pipe += gp.Unsqueeze([self.real_A])
+            pipe += gp.Unsqueeze([self.real_A])
             input_dict = {'real_A': self.real_A}
             output_dict = { 0: self.fake_B,
                             3: self.cycled_A
@@ -520,7 +527,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             fake = self.fake_B
             cycled = self.cycled_A
         else:
-            pipe = self.pipe_B            
+            pipe = self.source_B
+            # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
+            pipe += gp.RandomLocation() + self.normalize_real_B
+            pipe += gp.Unsqueeze([self.real_B])
+            pipe += gp.Unsqueeze([self.real_B])        
             input_dict = {'real_B': self.real_B}
             output_dict = { 2: self.fake_A,
                             1: self.cycled_B
