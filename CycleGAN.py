@@ -356,15 +356,16 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #make initial pipe section for A: TODO: Make min_masked part of config
         self.pipe_A = self.source_A
         self.pipe_A += gp.SimpleAugment()
-        self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            # control_point_spacing=(64, 64),
-            # control_point_spacing=(48*30, 48*30, 48*30),
-            # control_point_spacing=(48, 48, 48),
-            control_point_spacing=30,
-            jitter_sigma=(5.0,)*3, #made for 3D
-            rotation_interval=(0, math.pi/2),
-            subsample=4,
-            )
+        # self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+        #     # control_point_spacing=(64, 64),
+        #     # control_point_spacing=(48*30, 48*30, 48*30),
+        #     # control_point_spacing=(48, 48, 48),
+        #     control_point_spacing=30,
+        #     jitter_sigma=(5.0,)*3, #made for 3D
+        #     rotation_interval=(0, math.pi/2),
+        #     subsample=4,
+        #     )
+
         # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
         self.pipe_A += gp.RandomLocation() + self.resample + self.normalize_real_A        
         # add "channel" dimensions
@@ -375,15 +376,16 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #make initial pipe section for B: TODO: Make min_masked part of config
         self.pipe_B = self.source_B         
         self.pipe_B += gp.SimpleAugment()
-        self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            # control_point_spacing=(64, 64),
-            # control_point_spacing=(48*30, 48*30, 48*30),
-            # control_point_spacing=(48, 48, 48),
-            control_point_spacing=30*self.AB_voxel_ratio,
-            jitter_sigma=(5.0*self.AB_voxel_ratio,)*3, #made for 3D
-            rotation_interval=(0, math.pi/2),
-            subsample=4,
-            )
+        # self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+        #     # control_point_spacing=(64, 64),
+        #     # control_point_spacing=(48*30, 48*30, 48*30),
+        #     # control_point_spacing=(48, 48, 48),
+        #     control_point_spacing=30*self.AB_voxel_ratio,
+        #     jitter_sigma=(5.0*self.AB_voxel_ratio,)*3, #made for 3D
+        #     rotation_interval=(0, math.pi/2),
+        #     subsample=4,
+        #     )
+        
         # self.pipe_B += gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B
         self.pipe_B += gp.RandomLocation() + self.normalize_real_B
         # add "channel" dimensions
