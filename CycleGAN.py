@@ -356,18 +356,19 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #make initial pipe section for A: TODO: Make min_masked part of config
         self.pipe_A = self.source_A
         self.pipe_A += gp.SimpleAugment()
-        # self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-        #     # control_point_spacing=(64, 64),
-        #     # control_point_spacing=(48*30, 48*30, 48*30),
-        #     # control_point_spacing=(48, 48, 48),
-        #     control_point_spacing=30,
-        #     jitter_sigma=(5.0,)*3, #made for 3D
-        #     rotation_interval=(0, math.pi/2),
-        #     subsample=4,
-        #     )
 
         # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
-        self.pipe_A += gp.RandomLocation() + self.resample + self.normalize_real_A        
+        self.pipe_A += gp.RandomLocation()
+        self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+            # control_point_spacing=(64, 64),
+            # control_point_spacing=(48*30, 48*30, 48*30),
+            # control_point_spacing=(48, 48, 48),
+            control_point_spacing=30,
+            jitter_sigma=(5.0,)*3, #made for 3D
+            rotation_interval=(0, math.pi/2),
+            subsample=4,
+            )
+        self.pipe_A += self.resample + self.normalize_real_A        
         # add "channel" dimensions
         self.pipe_A += gp.Unsqueeze([self.real_A])
         # add "batch" dimensions
@@ -376,18 +377,19 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #make initial pipe section for B: TODO: Make min_masked part of config
         self.pipe_B = self.source_B         
         self.pipe_B += gp.SimpleAugment()
-        # self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-        #     # control_point_spacing=(64, 64),
-        #     # control_point_spacing=(48*30, 48*30, 48*30),
-        #     # control_point_spacing=(48, 48, 48),
-        #     control_point_spacing=30*self.AB_voxel_ratio,
-        #     jitter_sigma=(5.0*self.AB_voxel_ratio,)*3, #made for 3D
-        #     rotation_interval=(0, math.pi/2),
-        #     subsample=4,
-        #     )
         
         # self.pipe_B += gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B
-        self.pipe_B += gp.RandomLocation() + self.normalize_real_B
+        self.pipe_B += gp.RandomLocation() 
+        self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+            # control_point_spacing=(64, 64),
+            # control_point_spacing=(48*30, 48*30, 48*30),
+            # control_point_spacing=(48, 48, 48),
+            control_point_spacing=30*self.AB_voxel_ratio,
+            jitter_sigma=(5.0*self.AB_voxel_ratio,)*3, #made for 3D
+            rotation_interval=(0, math.pi/2),
+            subsample=4,
+            )
+        self.pipe_B += self.normalize_real_B
         # add "channel" dimensions
         self.pipe_B += gp.Unsqueeze([self.real_B])
         # add "batch" dimensions
@@ -458,6 +460,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                             self.fake_B, 
                                             self.cycled_B
                                             ], axis=0)
+        self.training_pipeline += self.normalize_fake_B + self.normalize_cycled_A
+        self.training_pipeline += self.normalize_fake_A + self.normalize_cycled_B
         self.training_pipeline += self.performance
 
         self.test_training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
@@ -477,7 +481,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                             self.fake_B, 
                                             self.cycled_B
                                             ], axis=0)
-    
+        self.test_training_pipeline += self.normalize_fake_B + self.normalize_cycled_A
+        self.test_training_pipeline += self.normalize_fake_A + self.normalize_cycled_B
+
         # create request
         self.train_request = gp.BatchRequest()
         for array in self.arrays:
@@ -529,6 +535,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             real = self.real_A
             fake = self.fake_B
             cycled = self.cycled_A
+            normalize_fake = self.normalize_fake_B
+            normalize_cycled = self.normalize_cycled_A
         else:
             pipe = self.source_B
             # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
@@ -542,6 +550,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             real = self.real_B
             fake = self.fake_A
             cycled = self.cycled_B
+            normalize_fake = self.normalize_fake_A
+            normalize_cycled = self.normalize_cycled_B
 
         pipe += gp.torch.Predict(self.model,
                                 inputs = input_dict,
@@ -551,6 +561,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         pipe += gp.Squeeze([real, fake, cycled], axis=0)
         pipe += gp.Squeeze([real, fake, cycled], axis=0)
+        pipe += normalize_fake + normalize_cycled
 
         request = gp.BatchRequest()
         request.add(real, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)

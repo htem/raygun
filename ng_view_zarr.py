@@ -12,7 +12,9 @@ def ng_view_zarr(src, layers=None): #src should be zarr data file (i.e. "/path/t
         src = src[:-1]
 
     if layers is None:        
-        zarr_file = zarr.open(src+'/volumes')
+        zarr_file = zarr.open(src)
+        if 'volumes' in zarr_file.group_keys():
+            zarr_file = zarr_file['volumes']
         layers = [array for array in zarr_file.array_keys()]
     
     viewer = make_ng_viewer(unsynced=True)
@@ -21,6 +23,7 @@ def ng_view_zarr(src, layers=None): #src should be zarr data file (i.e. "/path/t
         for layer in layers:
             daisy_array = daisy.open_ds(src, 'volumes/'+layer)            
             add_layer(s, daisy_array, layer)
+            print(f'Showing layer {layer}')
         # xyz
         # s.navigation.position.voxelCoordinates = (63*1024, 180*1024, 1129)
 
