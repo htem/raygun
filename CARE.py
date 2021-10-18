@@ -40,6 +40,7 @@ class CARE():
             ):
             self.src = src
             self.voxel_size = voxel_size
+            self.ndims = sum(voxel_size == np.min(voxel_size))
             self.gt_name = gt_name
             self.raw_name = raw_name
             if out_path is None:

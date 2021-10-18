@@ -44,6 +44,7 @@ class Noise2Gun():
             ):
             self.train_source = train_source
             self.voxel_size = voxel_size
+            self.ndims = sum(voxel_size == np.min(voxel_size))
             self.src_name = src_name
             if out_path is None:
                 self.out_path = self.train_source
@@ -153,8 +154,10 @@ class Noise2Gun():
                 img = self.batch[array].crop(self.batch[self.crops[array]].spec.roi).data[i].squeeze()
             else:
                 img = self.batch[array].data[i].squeeze()
-            mid = img.shape[0] // 2 # assumes 3D volume
-            self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
+            if len(img.shape) == 3:
+                mid = img.shape[0] // 2
+                img = img[mid]
+            self.trainer.summary_writer.add_image(array.identifier, img, global_step=self.trainer.iteration, dataformats='HW')
 
     def _get_latest_checkpoint(self):
         basename = self.model_path + self.model_name
@@ -218,7 +221,7 @@ class Noise2Gun():
                 in_channels=1,
                 num_fmaps=self.num_fmaps,
                 fmap_inc_factor=self.fmap_inc_factor,
-                downsample_factors=[(self.downsample_factor,)*3,] * (self.unet_depth - 1),
+                downsample_factors=[(self.downsample_factor,)*self.ndims,] * (self.unet_depth - 1), 
                 padding=self.conv_padding,
                 constant_upsample=self.constant_upsample,
                 voxel_size=self.voxel_size # set for each dataset
@@ -226,7 +229,7 @@ class Noise2Gun():
 
         self.model = torch.nn.Sequential(
                             self.unet,
-                            ConvPass(self.num_fmaps, 1, [(1, 1, 1)], activation=None),
+                            ConvPass(self.num_fmaps, 1, [(1,)*self.ndims], activation=None), 
                             torch.nn.Sigmoid())        
 
     def build_training_pipeline(self):
@@ -239,7 +242,7 @@ class Noise2Gun():
                                     self.hot, 
                                     plate_size=self.side_length,
                                     perc_hotPixels=self.perc_hotPixels, 
-                                    ndims=3) # assumes volumes
+                                    ndims=self.ndims)
 
         # prepare tensors for UNet
         unsqueeze = gp.Unsqueeze([self.hot, self.mask, self.raw]) # context dependent so not added to object
@@ -275,10 +278,10 @@ class Noise2Gun():
 
         # create request
         self.train_request = gp.BatchRequest()
-        self.train_request.add(self.raw, self.voxel_size*self.side_length)
-        self.train_request.add(self.mask, self.voxel_size*self.side_length)
-        self.train_request.add(self.prediction, self.voxel_size*self.side_length)
-        self.train_request.add(self.hot, self.voxel_size*self.context_side_length)
+        self.train_request.add(self.raw, self.voxel_size*self.side_length)#TODO: FIX ASSUMING ISOTROPY
+        self.train_request.add(self.mask, self.voxel_size*self.side_length)#TODO: FIX ASSUMING ISOTROPY
+        self.train_request.add(self.prediction, self.voxel_size*self.side_length)#TODO: FIX ASSUMING ISOTROPY
+        self.train_request.add(self.hot, self.voxel_size*self.context_side_length)#TODO: FIX ASSUMING ISOTROPY
 
         # assemble pipeline
         self.training_pipeline = (self.source +
@@ -301,6 +304,14 @@ class Noise2Gun():
             self.context_side_length = 2 * np.sum([(self.conv_passes * (self.kernel_size - 1)) * (2 ** level) for level in np.arange(self.unet_depth - 1)]) + (self.conv_passes * (self.kernel_size - 1)) * (2 ** (self.unet_depth - 1)) + (self.conv_passes * (self.kernel_size - 1)) + self.side_length
         else:
             self.context_side_length = self.side_length
+        
+        context_list = [self.context_side_length,] * self.ndims
+        base_list = [self.side_length,] * self.ndims
+        if self.ndims == 2 and len(self.voxel_size) > 2:
+            context_list.append(1)
+            base_list.append(1)
+        self.context_extent = self.voxel_size * gp.Coordinate(context_list)
+        self.base_extent = self.voxel_size * gp.Coordinate(base_list)
 
     def test_train(self): 
         if self.training_pipeline is None:
@@ -336,8 +347,8 @@ class Noise2Gun():
                                 )
 
         request = gp.BatchRequest()
-        request.add(self.prediction, self.voxel_size*self.side_length)
-        request.add(self.raw, self.voxel_size*self.context_side_length)
+        request.add(self.prediction, self.base_extent)
+        request.add(self.raw, self.context_extent)
 
         predicter = (self.source + 
                     self.normalize_raw + 
@@ -364,7 +375,7 @@ class Noise2Gun():
         squeeze_2 = gp.Squeeze([self.prediction])
 
         # set prediction spec
-        context = self.voxel_size * (self.context_side_length - self.side_length) // 2
+        context = (self.context_extent - self.base_extent) // 2
         if self.source.spec is None:
             data_file = zarr.open(self.train_source)
             pred_spec = self.source._Hdf5LikeSource__read_spec(self.raw, data_file, self.src_name).copy()
@@ -381,8 +392,8 @@ class Noise2Gun():
                                 )
 
         scan_request = gp.BatchRequest()
-        scan_request.add(self.prediction, self.voxel_size*self.side_length)
-        scan_request.add(self.raw, self.voxel_size*self.context_side_length)
+        scan_request.add(self.prediction, self.base_extent)
+        scan_request.add(self.raw, self.context_extent)
         scan = gp.Scan(scan_request, num_workers=self.batch_size)#os.cpu_count())
 
         destination = gp.ZarrWrite(

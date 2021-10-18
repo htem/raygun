@@ -92,7 +92,6 @@ class BoilerPlate(gp.BatchFilter):
         for i, coord in enumerate(coords):
             this_coord = coord + self.pad_width
             mask[this_coord] = True 
-            #mask[coord] = True #TODO: FIX WHOLE MASK BEING SET TRUE...
             hot[this_coord] = hot_pixels[i]
         return mask, hot
 
