@@ -14,6 +14,7 @@ logger = logging.Logger('CycleGAN', 'INFO')
 import math
 import functools
 from tqdm import tqdm
+import numpy as np
 
 torch.backends.cudnn.benchmark = True
 
@@ -59,6 +60,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.src_A = src_A
             self.src_B = src_B
             self.voxel_size = gp.Coordinate(voxel_size)
+            self.ndims = sum(voxel_size == np.min(voxel_size))
             self.AB_voxel_ratio = AB_voxel_ratio
             self.A_name = A_name
             self.B_name = B_name
@@ -343,9 +345,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # get performance stats
         self.performance = gp.PrintProfilingStats(every=self.log_every)
 
-        # stack for batches
-        # self.stack = gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
-
         # setup a cache
         self.cache = gp.PreCache(num_workers=self.num_workers)#os.cpu_count())
 
@@ -360,9 +359,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
         self.pipe_A += gp.RandomLocation()
         self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            # control_point_spacing=(64, 64),
-            # control_point_spacing=(48*30, 48*30, 48*30),
-            # control_point_spacing=(48, 48, 48),
             control_point_spacing=30,
             jitter_sigma=(5.0,)*3, #made for 3D
             rotation_interval=(0, math.pi/2),
@@ -372,18 +368,16 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # add "channel" dimensions
         self.pipe_A += gp.Unsqueeze([self.real_A])
         # add "batch" dimensions
-        self.pipe_A += gp.Unsqueeze([self.real_A])
+        self.pipe_A += gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
+        # self.pipe_A += gp.Unsqueeze([self.real_A])
 
-        #make initial pipe section for B: TODO: Make min_masked part of config
+        #make initial pipe section for B: 
         self.pipe_B = self.source_B         
         self.pipe_B += gp.SimpleAugment()
         
         # self.pipe_B += gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B
         self.pipe_B += gp.RandomLocation() 
         self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            # control_point_spacing=(64, 64),
-            # control_point_spacing=(48*30, 48*30, 48*30),
-            # control_point_spacing=(48, 48, 48),
             control_point_spacing=30*self.AB_voxel_ratio,
             jitter_sigma=(5.0*self.AB_voxel_ratio,)*3, #made for 3D
             rotation_interval=(0, math.pi/2),
@@ -393,25 +387,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # add "channel" dimensions
         self.pipe_B += gp.Unsqueeze([self.real_B])
         # add "batch" dimensions
-        self.pipe_B += gp.Unsqueeze([self.real_B])
+        self.pipe_B += gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
+        # self.pipe_B += gp.Unsqueeze([self.real_B])
 
 
     def build_training_pipeline(self):
-        # add augmentations
-        # augmentations = gp.SimpleAugment()
-        # augmentations = gp.ElasticAugment(
-        #     control_point_spacing=(48, 48, 48),
-        #     jitter_sigma=(5.0, 5.0, 5.0)*self.AB_voxel_ratio,
-        #     rotation_interval=(0, math.pi/4),
-        #     subsample=4
-        #     )
-        # pipeline += gp.IntensityAugment(
-        #     source,
-        #     scale_min=0.8,
-        #     scale_max=1.2,
-        #     shift_min=-0.2,
-        #     shift_max=0.2)
-
         # create a train node using our model, loss, and optimizer
         self.trainer = gp.torch.Train(
                             self.model,
@@ -778,13 +758,13 @@ class CycleGAN_Loss(torch.nn.Module):
     def backward_G(self, Dnet, fake, cycled, cycle_loss):
         """Calculate GAN and L1 loss for the generator"""
         # Include L1 loss for forward and reverse cycle consistency
-        loss_G = cycle_loss.clone() #TODO: verify, maybe should be detach() instead?
+        loss_G = cycle_loss.clone()
 
         # First, G(A) should fake the discriminator
         pred_fake = Dnet(fake)
         loss_G += self.gan_loss(pred_fake, True)
 
-        # Second, G(F(B)) should also fake the discriminator TODO: VERIFY THIS (maybe unnecessary)
+        # Second, G(F(B)) should also fake the discriminator 
         pred_cycled = Dnet(cycled)
         loss_G += self.gan_loss(pred_cycled, True)
 
@@ -827,8 +807,6 @@ class CycleGAN_Loss(torch.nn.Module):
         # update Gs
         # cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
         cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
-        
-        # torch.cuda.empty_cache()
         
         self.loss_dict = {
             'loss_D1': float(loss_D1),
