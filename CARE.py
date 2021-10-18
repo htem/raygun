@@ -216,7 +216,7 @@ class CARE():
                 downsample_factors=[(self.downsample_factor,)*self.ndims,] * (self.unet_depth - 1), 
                 padding=self.conv_padding,
                 constant_upsample=self.constant_upsample,
-                voxel_size=self.voxel_size # set for each dataset
+                voxel_size=self.voxel_size[:self.ndims] # set for each dataset
                 )
 
         self.model = torch.nn.Sequential(
@@ -227,6 +227,7 @@ class CARE():
     def build_training_pipeline(self):
         # add transpositions/reflections
         self.simple_augment = gp.SimpleAugment()
+        #TODO: Add elastic augment
 
         # prepare tensors for UNet
         unsqueeze = gp.Unsqueeze([self.raw, self.gt]) # context dependent so not added to object
@@ -261,9 +262,9 @@ class CARE():
 
         # create request
         self.train_request = gp.BatchRequest()
-        self.train_request.add(self.raw, self.voxel_size*self.context_side_length)
-        self.train_request.add(self.gt, self.voxel_size*self.side_length)
-        self.train_request.add(self.prediction, self.voxel_size*self.side_length)
+        self.train_request.add(self.raw, self.context_extent)
+        self.train_request.add(self.gt, self.base_extent)
+        self.train_request.add(self.prediction, self.base_extent)
 
         # assemble pipeline
         self.training_pipeline = (self.source +
@@ -286,6 +287,14 @@ class CARE():
             self.context_side_length = 2 * np.sum([(self.conv_passes * (self.kernel_size - 1)) * (2 ** level) for level in np.arange(self.unet_depth - 1)]) + (self.conv_passes * (self.kernel_size - 1)) * (2 ** (self.unet_depth - 1)) + (self.conv_passes * (self.kernel_size - 1)) + self.side_length
         else:
             self.context_side_length = self.side_length
+
+        context_list = [self.context_side_length,] * self.ndims
+        base_list = [self.side_length,] * self.ndims
+        if self.ndims == 2 and len(self.voxel_size) > 2:
+            context_list.append(1)
+            base_list.append(1)
+        self.context_extent = self.voxel_size * gp.Coordinate(context_list)
+        self.base_extent = self.voxel_size * gp.Coordinate(base_list)
 
     def test_train(self):
         if self.training_pipeline is None:
@@ -321,9 +330,9 @@ class CARE():
                                 )
 
         request = gp.BatchRequest()
-        request.add(self.prediction, self.voxel_size*self.side_length)
-        request.add(self.gt, self.voxel_size*self.side_length)
-        request.add(self.raw, self.voxel_size*self.context_side_length)
+        request.add(self.prediction, self.base_extent)
+        request.add(self.gt, self.base_extent)
+        request.add(self.raw, self.context_extent)
 
         predicter = (self.source + 
                     self.normalize_raw + 
@@ -349,7 +358,7 @@ class CARE():
         squeeze_2 = gp.Squeeze([self.prediction])
 
         # set prediction spec
-        context = self.voxel_size * (self.context_side_length - self.side_length) // 2
+        context = (self.context_extent - self.base_extent) // 2
         if self.source.spec is None:
             data_file = zarr.open(self.src)
             pred_spec = self.source._Hdf5LikeSource__read_spec(self.raw, data_file, self.raw_name).copy()
@@ -366,9 +375,9 @@ class CARE():
                                 )
 
         scan_request = gp.BatchRequest()
-        scan_request.add(self.prediction, self.voxel_size*self.side_length)
-        scan_request.add(self.raw, self.voxel_size*self.context_side_length)
-        scan = gp.Scan(scan_request, num_workers=self.batch_size)#os.cpu_count())
+        scan_request.add(self.prediction, self.base_extent)
+        scan_request.add(self.raw, self.context_extent)
+        scan = gp.Scan(scan_request, num_workers=self.batch_size)#os.cpu_count()) #TODO: Add num workers
 
         destination = gp.ZarrWrite(
                         dataset_names = {
