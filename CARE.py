@@ -141,9 +141,11 @@ class CARE():
             if array in self.crops.keys():
                 img = self.batch[array].crop(self.batch[self.crops[array]].spec.roi).data[i].squeeze()
             else:
-                img = self.batch[array].data[i].squeeze()
-            mid = img.shape[0] // 2 # TODO: assumes 3D volume
-            self.trainer.summary_writer.add_image(array.identifier, img[mid], global_step=self.trainer.iteration, dataformats='HW')
+                img = self.batch[array].data[i].squeeze()                
+            if len(img.shape) == 3:
+                mid = img.shape[0] // 2
+                img = img[mid]
+            self.trainer.summary_writer.add_image(array.identifier, img, global_step=self.trainer.iteration, dataformats='HW')
 
     def _get_latest_checkpoint(self):
         basename = self.model_path + self.model_name
@@ -211,7 +213,7 @@ class CARE():
                 in_channels=1,
                 num_fmaps=self.num_fmaps,
                 fmap_inc_factor=self.fmap_inc_factor,
-                downsample_factors=[(self.downsample_factor,)*3,] * (self.unet_depth - 1),
+                downsample_factors=[(self.downsample_factor,)*self.ndims,] * (self.unet_depth - 1), 
                 padding=self.conv_padding,
                 constant_upsample=self.constant_upsample,
                 voxel_size=self.voxel_size # set for each dataset
@@ -219,7 +221,7 @@ class CARE():
 
         self.model = torch.nn.Sequential(
                             self.unet,
-                            ConvPass(self.num_fmaps, 1, [(1, 1, 1)], activation=None),
+                            ConvPass(self.num_fmaps, 1, [(1,)*self.ndims], activation=None), 
                             torch.nn.Sigmoid())        
 
     def build_training_pipeline(self):

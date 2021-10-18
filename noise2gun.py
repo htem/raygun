@@ -224,7 +224,7 @@ class Noise2Gun():
                 downsample_factors=[(self.downsample_factor,)*self.ndims,] * (self.unet_depth - 1), 
                 padding=self.conv_padding,
                 constant_upsample=self.constant_upsample,
-                voxel_size=self.voxel_size # set for each dataset
+                voxel_size=self.voxel_size[:self.ndims] # set for each dataset
                 )
 
         self.model = torch.nn.Sequential(
@@ -235,6 +235,7 @@ class Noise2Gun():
     def build_training_pipeline(self):
         # add transpositions/reflections
         self.simple_augment = gp.SimpleAugment()
+        #TODO: Add elastic augment
 
         # add pixel heater
         self.boilerPlate = BoilerPlate(self.raw, 
@@ -278,10 +279,10 @@ class Noise2Gun():
 
         # create request
         self.train_request = gp.BatchRequest()
-        self.train_request.add(self.raw, self.voxel_size*self.side_length)#TODO: FIX ASSUMING ISOTROPY
-        self.train_request.add(self.mask, self.voxel_size*self.side_length)#TODO: FIX ASSUMING ISOTROPY
-        self.train_request.add(self.prediction, self.voxel_size*self.side_length)#TODO: FIX ASSUMING ISOTROPY
-        self.train_request.add(self.hot, self.voxel_size*self.context_side_length)#TODO: FIX ASSUMING ISOTROPY
+        self.train_request.add(self.raw, self.base_extent)
+        self.train_request.add(self.mask, self.base_extent)
+        self.train_request.add(self.prediction, self.base_extent)
+        self.train_request.add(self.hot, self.context_extent)
 
         # assemble pipeline
         self.training_pipeline = (self.source +
