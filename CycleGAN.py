@@ -6,7 +6,12 @@ import re
 import zarr
 
 from funlib.learn.torch.models import UNet, ConvPass
-import gunpowder as gp
+# import gunpowder as gp
+
+import sys #TODO: REMOVE AFTER DEV
+sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
+from gunpowder import gunpowder as gp
+
 import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.Logger('CycleGAN', 'INFO')
@@ -24,8 +29,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def __init__(self,
             src_A, #EXPECTS ZARR VOLUME
             src_B,
-            voxel_size, # voxel size of src_B (for each dimension)
-            AB_voxel_ratio=1, #determines whether to add up/downsampling node (always rendered to B's voxel_size), (int or tuple of ints)
+            A_voxel_size, # voxel size of src_A (for each dimension)
+            B_voxel_size, # voxel size of src_B (for each dimension)
+            common_voxel_size=None, # voxel size to resample A and B into for training
+            ndims=None,
             A_name='raw',
             B_name='raw',
             # mask_A_name='mask', # expects mask to be in same place as real zarr
@@ -55,13 +62,21 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             save_every=2000,
             tensorboard_path='./tensorboard/',
             verbose=True,
-            checkpoint=None # Used for prediction/rendering, training always starts from latest
+            checkpoint=None, # Used for prediction/rendering, training always starts from latest
+            interp_order=None
             ):
             self.src_A = src_A
             self.src_B = src_B
-            self.voxel_size = gp.Coordinate(voxel_size)
-            self.ndims = sum(voxel_size == np.min(voxel_size))
-            self.AB_voxel_ratio = AB_voxel_ratio
+            self.A_voxel_size = gp.Coordinate(A_voxel_size)
+            self.B_voxel_size = gp.Coordinate(B_voxel_size)
+            if common_voxel_size is None:
+                self.common_voxel_size = self.B_voxel_size
+            else:
+                self.common_voxel_size = gp.Coordinate(common_voxel_size)
+            if ndims is None:
+                self.ndims = sum(np.array(self.common_voxel_size) == np.min(self.common_voxel_size))            
+            else:
+                self.ndims = ndims
             self.A_name = A_name
             self.B_name = B_name
             # self.mask_A_name = mask_A_name
@@ -106,6 +121,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     self.checkpoint = None
             else:
                 self.checkpoint = checkpoint
+            self.interp_order = interp_order
             self.build_pipeline_parts()
             self.training_pipeline = None
             self.test_training_pipeline = None
@@ -200,7 +216,14 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             return checkpoint, iteration
 
         return None, 0
-    
+        
+    def get_extents(self, side_length=None):
+        if side_length is None:
+            side_length = self.side_length
+        extents = np.ones((len(self.common_voxel_size)))
+        extents[:self.ndims] = side_length
+        return gp.Coordinate(extents)
+
     def setup_networks(self):
         # devices = range(torch.cuda.device_count()) # requires cuda
         # i = 0
@@ -209,16 +232,16 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 in_channels=1,
                 num_fmaps=self.g_num_fmaps,
                 fmap_inc_factor=self.g_fmap_inc_factor,
-                downsample_factors=[(self.g_downsample_factor,)*len(self.voxel_size),] * (self.gnet_depth - 1),
+                downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
                 padding='same',
                 constant_upsample=self.g_constant_upsample,
-                voxel_size=self.voxel_size, # set for each dataset
+                voxel_size=self.B_voxel_size[:self.ndims],
                 kernel_size_down=self.g_kernel_size_down,
                 kernel_size_up=self.g_kernel_size_up
                 )
         self.netG1 = torch.nn.Sequential(
                             unet,
-                            ConvPass(self.g_num_fmaps, 1, [(1,)*len(self.voxel_size)], activation=None, padding='same'), #switched padding to 'same' but was working with 'valid' somehow
+                            ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding='same'), #switched padding to 'same' but was working with 'valid' somehow
                             torch.nn.Sigmoid())#.to(devices[i % torch.cuda.device_count()])
         # i += 1
         init_weights(self.netG1, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
@@ -228,25 +251,25 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 in_channels=1,
                 num_fmaps=self.g_num_fmaps,
                 fmap_inc_factor=self.g_fmap_inc_factor,
-                downsample_factors=[(self.g_downsample_factor,)*len(self.voxel_size),] * (self.gnet_depth - 1),
+                downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
                 padding='same',
                 constant_upsample=self.g_constant_upsample,
-                voxel_size=self.voxel_size, # set for each dataset
+                voxel_size=self.B_voxel_size[:self.ndims],
                 kernel_size_down=self.g_kernel_size_down,
                 kernel_size_up=self.g_kernel_size_up
                 )        
         self.netG2 = torch.nn.Sequential(
                             unet,
-                            ConvPass(self.g_num_fmaps, 1, [(1,)*len(self.voxel_size)], activation=None, padding='same'), #switched padding to 'same' but was working with 'valid' 
+                            ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding='same'), #switched padding to 'same' but was working with 'valid' 
                             torch.nn.Sigmoid())#.to(devices[i % torch.cuda.device_count()])
         # i += 1
         init_weights(self.netG2, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
 
         #For discriminators:
-        if len(self.voxel_size) == 3: #3D case
+        if self.ndims == 3: #3D case
             norm_instance = torch.nn.InstanceNorm3d
             discriminator_maker = NLayerDiscriminator3D
-        elif len(self.voxel_size) == 2:
+        elif self.ndims == 2:
             norm_instance = torch.nn.InstanceNorm2d
             discriminator_maker = NLayerDiscriminator
 
@@ -307,19 +330,17 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             if 'mask' not in array:            
                 setattr(self, 'normalize_'+array, gp.Normalize(getattr(self, array)))#add normalizations, if appropriate        
         
-        if not self.AB_voxel_ratio == 1:
+        #Setup sources and resampling nodes
+        # A:
+        if self.common_voxel_size != self.A_voxel_size:
             self.real_A_src = gp.ArrayKey('REAL_A_SRC')
             # self.mask_A_src = gp.ArrayKey('MASK_A_SRC')
-            if self.AB_voxel_ratio < 1:
-                self.resample = gp.DownSample(self.real_A_src, self.AB_voxel_ratio, self.real_A)
-                # self.resample += gp.DownSample(self.mask_A_src, self.AB_voxel_ratio, self.mask_A)
-            if self.AB_voxel_ratio > 1:
-                self.resample = gp.UpSample(self.real_A_src, self.AB_voxel_ratio, self.real_A)
-                # self.resample += gp.UpSample(self.mask_A_src, self.AB_voxel_ratio, self.mask_A)
+            self.resample_A = gp.Resample(self.real_A_src, self.common_voxel_size, self.real_A, interp_order=self.interp_order)
+            # self.resample_A += gp.Resample(self.mask_A_src, self.common_voxel_size, self.mask_A, interp_order=self.interp_order)
         else:            
             self.real_A_src = self.real_A
             # self.mask_A_src = self.mask_A
-            self.resample = None
+            self.resample_A = None
 
         # setup data sources
         self.source_A = gp.ZarrSource(    # add the data source
@@ -327,18 +348,29 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             {   self.real_A_src: self.A_name,
                 # self.mask_A_src: self.mask_A_name,
                 },  # which dataset to associate to the array key
-            {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size * self.AB_voxel_ratio),
+            {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=self.A_voxel_size),
                 # self.mask_A_src: gp.ArraySpec(interpolatable=False), 
                 }  # meta-information
         )
 
+        # B:
+        if self.common_voxel_size != self.A_voxel_size:
+            self.real_B_src = gp.ArrayKey('REAL_B_SRC')
+            # self.mask_B_src = gp.ArrayKey('MASK_B_SRC')
+            self.resample_B = gp.Resample(self.real_B_src, self.common_voxel_size, self.real_B, interp_order=self.interp_order)
+            # self.resample_B += gp.Resample(self.mask_B_src, self.common_voxel_size, self.mask_B, interp_order=self.interp_order)
+        else:            
+            self.real_B_src = self.real_B
+            # self.mask_B_src = self.mask_B
+            self.resample_B = None
+
         self.source_B = gp.ZarrSource(    # add the data source
             self.src_B,  # the zarr container
-            {   self.real_B: self.B_name,
-                # self.mask_B: self.mask_B_name,
+            {   self.real_B_src: self.B_name,
+                # self.mask_B_src: self.mask_B_name,
                 },  # which dataset to associate to the array key
-            {   self.real_B: gp.ArraySpec(interpolatable=True, voxel_size=self.voxel_size),
-                # self.mask_B: gp.ArraySpec(interpolatable=False),
+            {   self.real_B_src: gp.ArraySpec(interpolatable=True, voxel_size=self.B_voxel_size),
+                # self.mask_B_src: gp.ArraySpec(interpolatable=False),
                 }  # meta-information
         )
 
@@ -358,13 +390,18 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
         self.pipe_A += gp.RandomLocation()
+        self.pipe_A += self.resample_A
+        self.pipe_A += self.normalize_real_A    
         self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             control_point_spacing=30,
-            jitter_sigma=(5.0,)*3, #made for 3D
+            jitter_sigma=(5.0,)*self.ndims,
             rotation_interval=(0, math.pi/2),
             subsample=4,
             )
-        self.pipe_A += self.resample + self.normalize_real_A        
+
+        if self.ndims < len(self.common_voxel_size): # take out "z" dimension of unnecessary
+            self.pipe_A += gp.Squeeze([self.real_A], axis=2)    
+
         # add "channel" dimensions
         self.pipe_A += gp.Unsqueeze([self.real_A])
         # add "batch" dimensions
@@ -372,24 +409,28 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # self.pipe_A += gp.Unsqueeze([self.real_A])
 
         #make initial pipe section for B: 
-        self.pipe_B = self.source_B         
+        self.pipe_B = self.source_B 
         self.pipe_B += gp.SimpleAugment()
         
         # self.pipe_B += gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B
         self.pipe_B += gp.RandomLocation() 
+        self.pipe_B += self.resample_B
+        self.pipe_B += self.normalize_real_B
         self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            control_point_spacing=30*self.AB_voxel_ratio,
-            jitter_sigma=(5.0*self.AB_voxel_ratio,)*3, #made for 3D
+            control_point_spacing=30,
+            jitter_sigma=(5.0,)*self.ndims,
             rotation_interval=(0, math.pi/2),
             subsample=4,
             )
-        self.pipe_B += self.normalize_real_B
+        
+        if self.ndims < len(self.common_voxel_size):# take out "z" dimension of unnecessary
+            self.pipe_B += gp.Squeeze([self.real_B], axis=2)        
+
         # add "channel" dimensions
         self.pipe_B += gp.Unsqueeze([self.real_B])
         # add "batch" dimensions
         self.pipe_B += gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
         # self.pipe_B += gp.Unsqueeze([self.real_B])
-
 
     def build_training_pipeline(self):
         # create a train node using our model, loss, and optimizer
@@ -466,10 +507,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # create request
         self.train_request = gp.BatchRequest()
+        extents = self.get_extents()
         for array in self.arrays:
-            self.train_request.add(array, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
+            self.train_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
             
-
     def test_train(self):
         if self.test_training_pipeline is None:
             self.build_training_pipeline()
@@ -499,13 +540,12 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #     2: self.fake_A,
         #     3: self.cycled_A}
 
-        if side_length is not None:
-            self.side_length = side_length
-
         if in_type is 'A':
             pipe = self.source_A
             # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
-            pipe += gp.RandomLocation() + self.resample + self.normalize_real_A        
+            pipe += gp.RandomLocation() + self.resample_A + self.normalize_real_A       
+            if self.ndims < len(self.common_voxel_size):# take out "z" dimension of unnecessary
+                pipe += gp.Squeeze([self.real_A], axis=2)      
             pipe += gp.Unsqueeze([self.real_A])
             pipe += gp.Unsqueeze([self.real_A])
             input_dict = {'real_A': self.real_A}
@@ -520,7 +560,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             pipe = self.source_B
             # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
-            pipe += gp.RandomLocation() + self.normalize_real_B
+            pipe += gp.RandomLocation() + self.resample_B + self.normalize_real_B
+            if self.ndims < len(self.common_voxel_size):# take out "z" dimension of unnecessary
+                pipe += gp.Squeeze([self.real_B], axis=2)  
             pipe += gp.Unsqueeze([self.real_B])
             pipe += gp.Unsqueeze([self.real_B])        
             input_dict = {'real_B': self.real_B}
@@ -543,10 +585,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         pipe += gp.Squeeze([real, fake, cycled], axis=0)
         pipe += normalize_fake + normalize_cycled
 
+        extents = self.get_extents(side_length=side_length)        
         request = gp.BatchRequest()
-        request.add(real, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
-        request.add(fake, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
-        request.add(cycled, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
+        request.add(real, self.common_voxel_size * extents, self.common_voxel_size)
+        request.add(fake, self.common_voxel_size * extents, self.common_voxel_size)
+        request.add(cycled, self.common_voxel_size * extents, self.common_voxel_size)
 
         with gp.build(pipe):
             self.batch = pipe.request_batch(request)
@@ -563,10 +606,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #     1: self.cycled_B,
         #     2: self.fake_A,
         #     3: self.cycled_A}
-
-        if side_length is not None:
-            self.side_length = side_length
-            
+  
         if in_type is 'A':
             input_dict = {'real_A': self.real_A}
             output_dict = { 0: self.fake_B,
@@ -582,8 +622,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             source = self.source_A
             src_path = self.src_A
             real_name = self.A_name
+            resample = self.resample_A
         else:
-            pipe = self.pipe_B            
             input_dict = {'real_B': self.real_B}
             output_dict = { 2: self.fake_A,
                             1: self.cycled_B
@@ -598,8 +638,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             source = self.source_B
             src_path = self.src_B
             real_name = self.B_name
+            resample = self.resample_B
+        if self.ndims < len(self.common_voxel_size):# take out "z" dimension of unnecessary
+            squeeze = gp.Squeeze([real], axis=2)  
+        else:
+            squeeze = None
         
-        pipe = source + self.resample + normalize_real + gp.Unsqueeze([real]) + gp.Unsqueeze([real])
+        pipe = source + resample + normalize_real + squeeze + gp.Unsqueeze([real]) + gp.Unsqueeze([real])
 
         # set prediction spec 
         if source.spec is None:
@@ -607,26 +652,27 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             pred_spec = source._Hdf5LikeSource__read_spec(real, data_file, real_name).copy()
         else:
             pred_spec = source.spec[real].copy()        
-        pred_spec.voxel_size = self.voxel_size
+        pred_spec.voxel_size = self.common_voxel_size
         pred_spec.dtype = normalize_fake.dtype
         
-        
+        extents = self.get_extents(side_length=side_length)       
         scan_request = gp.BatchRequest()
-        scan_request.add(real, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
-        scan_request.add(fake, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
+        scan_request.add(real, self.common_voxel_size * extents, self.common_voxel_size)
+        scan_request.add(fake, self.common_voxel_size * extents, self.common_voxel_size)
 
         dataset_names = {fake: 'volumes/'+self.model_name+'_enFAKE'}
         array_specs = {fake: pred_spec.copy()}
         if cycle:
             dataset_names[cycled] = 'volumes/'+self.model_name+'_enCYCLED'
             array_specs[cycled] = pred_spec.copy()
-            scan_request.add(cycled, self.voxel_size*self.side_length*self.AB_voxel_ratio, self.voxel_size)
+            scan_request.add(cycled, self.common_voxel_size * extents, self.common_voxel_size)
 
         pipe += gp.torch.Predict(self.model,
                                 inputs = input_dict,
                                 outputs = output_dict,
                                 checkpoint = self.checkpoint,
-                                array_specs = array_specs
+                                array_specs = array_specs, 
+                                spawn_subprocess=True
                                 )
 
         if cycle:
@@ -639,6 +685,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             pipe += normalize_fake
             self.model.cycle = False
         
+        # TODO: ADD CROP
+        # TODO: ADD EXPLICIT DECLARATION OF NEW ZARR (chuck size, compression, etc.)
+
         pipe += gp.ZarrWrite(
                         dataset_names = dataset_names,
                         output_filename = out_path,
@@ -646,8 +695,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                         )        
         
         #TODO: MAKE PARALLEL PROCESSING WORK
-        # pipe += gp.PreCache()
-        pipe += gp.Scan(scan_request)#, num_workers=self.num_workers)#os.cpu_count())
+        pipe += self.cache
+        pipe += gp.Scan(scan_request, num_workers=self.num_workers)#os.cpu_count())
 
         pipe += self.performance
 
