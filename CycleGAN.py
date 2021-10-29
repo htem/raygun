@@ -4,6 +4,7 @@ import torch
 import glob
 import re
 import zarr
+import daisy
 
 from funlib.learn.torch.models import UNet, ConvPass
 # import gunpowder as gp
@@ -223,6 +224,37 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         extents = np.ones((len(self.common_voxel_size)))
         extents[:self.ndims] = side_length
         return gp.Coordinate(extents)
+
+    def get_valid_padding(self):
+        # figure out proper ROI padding for context
+        downsample_factors = [(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1)
+        kernel_size_down = self.g_kernel_size_down #<- length of list determines number of conv passes in level
+        kernel_size_up = self.g_kernel_size_up
+
+        num_levels = len(downsample_factors) + 1
+        if kernel_size_down is None:
+            kernel_size_down = [[(3, 3, 3), (3, 3, 3)]]*num_levels
+        if kernel_size_up is None:
+            kernel_size_up = [[(3, 3, 3), (3, 3, 3)]]*(num_levels - 1)
+
+        level_pads = []
+        #going down
+        for level in np.arange(self.gnet_depth - 1):
+            level_pads.append(np.sum(np.array(kernel_size_down[level]) - 1, axis=0) * (self.g_downsample_factor ** level))
+
+        #bottom level
+        level_pads.append(np.sum(np.array(kernel_size_down[-1]) - 1, axis=0) * (self.g_downsample_factor ** (self.gnet_depth - 1)))
+
+        #coming up
+        for level in np.arange(self.gnet_depth - 1)[::-1]:
+            level_pads.append(np.sum(np.array(kernel_size_up[level]) - 1, axis=0) * (self.g_downsample_factor ** level))
+
+        return gp.Coordinate(np.sum(level_pads, axis=0)) // 2 # in voxels per edge
+
+    def get_crop_roi(self, extents):        
+        crop_roi = gp.Roi((0,)*self.ndims, self.common_voxel_size * extents)
+        padding = self.get_valid_padding()
+        return crop_roi.grow(-padding, -padding)
 
     def setup_networks(self):
         # devices = range(torch.cuda.device_count()) # requires cuda
@@ -674,27 +706,59 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 array_specs = array_specs, 
                                 spawn_subprocess=True
                                 )
+        
+        #Get ROI for crop
+        crop_roi = self.get_crop_roi(extents)
 
         if cycle:
-            pipe += gp.Squeeze([real, fake, cycled], axis=0)
-            pipe += gp.Squeeze([real, fake, cycled], axis=0)
+            # pipe += gp.Squeeze([real, fake, cycled], axis=0)
+            # pipe += gp.Squeeze([real, fake, cycled], axis=0)
+            pipe += gp.Squeeze([fake, cycled], axis=0)
+            pipe += gp.Squeeze([fake, cycled], axis=0)
             pipe += normalize_fake + normalize_cycled
+            pipe += gp.Crop(fake, roi=crop_roi)
+            pipe += gp.Crop(cycled, roi=crop_roi)
+            pipe += gp.AsType(fake, np.uint8)
+            pipe += gp.AsType(cycled, np.uint8)
         else:
-            pipe += gp.Squeeze([real, fake], axis=0)
-            pipe += gp.Squeeze([real, fake], axis=0)
+            # pipe += gp.Squeeze([real, fake], axis=0)
+            # pipe += gp.Squeeze([real, fake], axis=0)
+            pipe += gp.Squeeze([fake], axis=0)
+            pipe += gp.Squeeze([fake], axis=0)
             pipe += normalize_fake
+            pipe += gp.Crop(fake, roi=crop_roi)
+            pipe += gp.AsType(fake, np.uint8)
             self.model.cycle = False
         
-        # TODO: ADD CROP
-        # TODO: ADD EXPLICIT DECLARATION OF NEW ZARR (chuck size, compression, etc.)
+        #Declare new array to write to
+        if not hasattr(self, 'compressor'):
+            self.compressor = {  'id': 'blosc', 
+                'clevel': 3,
+                'cname': 'blosclz',
+                'blocksize': 64
+                }
+        
+        source_ds = daisy.open_ds(src_path, real_name)
+        total_roi = source_ds.data_roi
+        write_size = self.common_voxel_size * extents
+        for name in dataset_names.values():
+            daisy.prepare_ds(
+                out_path,
+                name,
+                total_roi,
+                daisy.Coordinate(self.common_voxel_size),
+                np.uint8,
+                write_size=write_size,
+                num_channels=1,
+                compressor=self.compressor)
 
         pipe += gp.ZarrWrite(
                         dataset_names = dataset_names,
                         output_filename = out_path,
+                        compression_type = self.compressor
                         # dataset_dtypes = {fake: pred_spec.dtype}
                         )        
         
-        #TODO: MAKE PARALLEL PROCESSING WORK
         pipe += self.cache
         pipe += gp.Scan(scan_request, num_workers=self.num_workers)#os.cpu_count())
 

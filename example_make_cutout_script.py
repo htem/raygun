@@ -10,7 +10,7 @@ destination_ds = 'volumes/raw'
 offset = [2800, 520000, 744000] #IN WORLD UNITS (z,y,x)
 shape = [44080, 96480, 96480] #IN WORLD UNITS (z,y,x)
 
-#default options
+#default options (shouldn't need to change)
 chunk_size = 64
 num_channels = 1
 compressor = {  'id': 'blosc', 
@@ -20,12 +20,17 @@ compressor = {  'id': 'blosc',
                 }
 num_workers = 30
 
+
+#===============================================BELOW RUNS TASK
+
+
 #Load data
 source = daisy.open_ds(source_file, source_ds)
 
 #Prepare new dataset
 total_roi = daisy.Roi(offset, shape)
 write_size = source.voxel_size * chunk_size
+chunk_roi = daisy.Roi([0,]*len(offset), write_size)
 destination = daisy.prepare_ds(
         destination_file,
         destination_ds,
@@ -33,14 +38,18 @@ destination = daisy.prepare_ds(
         source.voxel_size,
         source.dtype,
         write_size=write_size,
+        write_roi=chunk_roi,
         num_channels=num_channels,
         compressor=compressor)
 
 #Prepare saving function/variables
-def save_chunk(read_roi, write_roi):
-    destination.__setitem__(write_roi, source.__getitem__(read_roi))
-
-chunk_roi = daisy.Roi([0,]*len(offset), write_size)
+def save_chunk(block:daisy.Roi):
+    try:
+        destination.__setitem__(block.write_roi, source.__getitem__(block.read_roi))
+        return 0 # success
+    except:
+        return 1 # error
+        
 
 #Write data to new dataset
 success = daisy.run_blockwise(
@@ -51,7 +60,7 @@ success = daisy.run_blockwise(
             read_write_conflict=False,
             fit='shrink',
             num_workers=num_workers,
-            max_retries=3)
+            max_retries=2)
 
 if success:
     print(f'{total_roi} from {source_file}/{source_ds} written to {destination_file}/{destination_ds}')
