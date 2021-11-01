@@ -152,7 +152,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             label = array.identifier
             c = self.col_dict[label[:4]]
             r = (int('_B' in label) + int('FAKE' in label)) % 2
-            if len(value.data.shape) > 3:
+            if len(value.data.shape) > 3: # pick one from the batch
                 img = value.data[i].squeeze()
             else:
                 img = value.data.squeeze()
@@ -418,11 +418,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         
         #make initial pipe section for A: TODO: Make min_masked part of config
         self.pipe_A = self.source_A
-        self.pipe_A += gp.SimpleAugment()
 
         # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
         self.pipe_A += gp.RandomLocation()
         self.pipe_A += self.resample_A
+        self.pipe_A += gp.SimpleAugment()
         self.pipe_A += self.normalize_real_A    
         self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             control_point_spacing=30,
@@ -442,11 +442,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         #make initial pipe section for B: 
         self.pipe_B = self.source_B 
-        self.pipe_B += gp.SimpleAugment()
         
         # self.pipe_B += gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B
         self.pipe_B += gp.RandomLocation() 
         self.pipe_B += self.resample_B
+        self.pipe_B += gp.SimpleAugment()
         self.pipe_B += self.normalize_real_B
         self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             control_point_spacing=30,
@@ -505,8 +505,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                             self.real_B, 
                                             self.fake_B, 
                                             self.cycled_B
-                                            ], axis=0)
-        self.training_pipeline += gp.Squeeze([self.real_A, 
+                                            ], axis=1) # remove channel dimension for grayscale
+        if self.batch_size == 1:
+            self.training_pipeline += gp.Squeeze([self.real_A, 
                                             self.fake_A, 
                                             self.cycled_A, 
                                             self.real_B, 
@@ -526,8 +527,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                             self.real_B, 
                                             self.fake_B, 
                                             self.cycled_B
-                                            ], axis=0)
-        self.test_training_pipeline += gp.Squeeze([self.real_A, 
+                                            ], axis=1) # remove channel dimension for grayscale
+        if self.batch_size == 1:
+            self.test_training_pipeline += gp.Squeeze([self.real_A, 
                                             self.fake_A, 
                                             self.cycled_A, 
                                             self.real_B, 
