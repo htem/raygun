@@ -5,6 +5,7 @@ import glob
 import re
 import zarr
 import daisy
+import os
 
 import gunpowder as gp
 
@@ -58,6 +59,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             batch_size=1,
             num_workers=11,
             cache_size=50,
+            spawn_subprocess=False,
             g_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             d_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             log_every=100,
@@ -109,6 +111,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.batch_size = batch_size
             self.cache_size = cache_size
             self.num_workers = num_workers
+            self.spawn_subprocess = spawn_subprocess            
             self.g_init_learning_rate = g_init_learning_rate
             self.d_init_learning_rate = d_init_learning_rate
             self.log_every = log_every
@@ -131,7 +134,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
     def set_device(self, id=0):
         self.device_id = id
-        torch.cuda.set_device(id)   
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(id)
     
     def set_verbose(self, verbose=True):
         self.verbose = verbose
@@ -259,8 +262,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         return crop_roi.grow(-padding, -padding)
 
     def setup_networks(self):
-        # devices = range(torch.cuda.device_count()) # requires cuda
-        # i = 0
         #For netG1:
         unet = UNet(
                 in_channels=1,
@@ -276,8 +277,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.netG1 = torch.nn.Sequential(
                             unet,
                             ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding='same'), #switched padding to 'same' but was working with 'valid' somehow
-                            torch.nn.Sigmoid())#.to(devices[i % torch.cuda.device_count()])
-        # i += 1
+                            torch.nn.Sigmoid())
+                            
         init_weights(self.netG1, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
 
         #For netG2:
@@ -295,8 +296,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.netG2 = torch.nn.Sequential(
                             unet,
                             ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding='same'), #switched padding to 'same' but was working with 'valid' 
-                            torch.nn.Sigmoid())#.to(devices[i % torch.cuda.device_count()])
-        # i += 1
+                            torch.nn.Sigmoid())
+                            
         init_weights(self.netG2, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
 
         #For discriminators:
@@ -315,8 +316,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                         norm_layer=norm_layer,
                                         downsampling_kw=self.d_downsample_factor, 
                                         kw=self.d_kernel_size,
-                                 )#.to(devices[i % torch.cuda.device_count()])
-        # i += 1
+                                 )
+                                 
         init_weights(self.netD1, init_type='normal')
 
         #For netD2:
@@ -327,8 +328,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                         norm_layer=norm_layer,
                                         downsampling_kw=self.d_downsample_factor, 
                                         kw=self.d_kernel_size,
-                                 )#.to(devices[i % torch.cuda.device_count()])
-        # i += 1
+                                 )
+                                 
         init_weights(self.netD2, init_type='normal')
 
     def setup_model(self):
@@ -431,9 +432,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.pipe_A += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
         self.pipe_A += self.normalize_real_A    
         self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            control_point_spacing=30,
-            jitter_sigma=(5.0,)*self.ndims,
-            rotation_interval=(0, math.pi/4),
+            control_point_spacing=60,
+            # control_point_spacing=30,
+            jitter_sigma=(10.0,)*self.ndims,
+            # jitter_sigma=(5.0,)*self.ndims,
+            rotation_interval=(0, math.pi/32),
             # rotation_interval=(0, math.pi/2),
             subsample=4,
             spatial_dims=self.ndims
@@ -455,9 +458,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.pipe_B += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
         self.pipe_B += self.normalize_real_B
         self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            control_point_spacing=30,
-            jitter_sigma=(5.0,)*self.ndims,
-            rotation_interval=(0, math.pi/4),
+            control_point_spacing=60,
+            # control_point_spacing=30,
+            jitter_sigma=(10.0,)*self.ndims,
+            # jitter_sigma=(5.0,)*self.ndims,
+            rotation_interval=(0, math.pi/32),
             # rotation_interval=(0, math.pi/2),
             subsample=4,
             spatial_dims=self.ndims
@@ -496,7 +501,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                             log_dir=self.tensorboard_path,
                             log_every=self.log_every,
                             checkpoint_basename=self.model_path+self.model_name,
-                            save_every=self.save_every
+                            save_every=self.save_every,
+                            spawn_subprocess=self.spawn_subprocess
                             )
 
         # assemble pipeline
@@ -716,7 +722,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 outputs = output_dict,
                                 checkpoint = self.checkpoint,
                                 array_specs = array_specs, 
-                                spawn_subprocess=True
+                                spawn_subprocess=self.spawn_subprocess
                                 )
         
         #Get ROI for crop
