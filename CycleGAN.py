@@ -6,7 +6,6 @@ import re
 import zarr
 import daisy
 
-from funlib.learn.torch.models import UNet, ConvPass
 # import gunpowder as gp
 
 import sys #TODO: REMOVE AFTER DEV
@@ -24,6 +23,7 @@ import numpy as np
 
 torch.backends.cudnn.benchmark = True
 
+from unet import UNet, ConvPass
 from tri_utils import NLayerDiscriminator, NLayerDiscriminator3D, GANLoss, init_weights
 
 class CycleGAN(): #TODO: Just pass config file or dictionary
@@ -222,7 +222,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if side_length is None:
             side_length = self.side_length
         extents = np.ones((len(self.common_voxel_size)))
-        extents[:self.ndims] = side_length
+        extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
 
     def get_valid_padding(self):
@@ -415,6 +415,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # define our network model for training
         self.setup_networks()        
         self.setup_model()
+
+        #define axes for mirroring and transpositions
+        augment_axes = list(np.arange(3)[-self.ndims:])
         
         #make initial pipe section for A: TODO: Make min_masked part of config
         self.pipe_A = self.source_A
@@ -422,23 +425,25 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
         self.pipe_A += gp.RandomLocation()
         self.pipe_A += self.resample_A
-        self.pipe_A += gp.SimpleAugment()
+
+        # if self.ndims < len(self.common_voxel_size): # take out "z" dimension if unnecessary
+        #     self.pipe_A += gp.Squeeze([self.real_A], axis=0)
+
+        self.pipe_A += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
         self.pipe_A += self.normalize_real_A    
         self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             control_point_spacing=30,
             jitter_sigma=(5.0,)*self.ndims,
             rotation_interval=(0, math.pi/2),
             subsample=4,
+            spatial_dims=self.ndims
             )
 
-        if self.ndims < len(self.common_voxel_size): # take out "z" dimension of unnecessary
-            self.pipe_A += gp.Squeeze([self.real_A], axis=2)    
-
-        # add "channel" dimensions
-        self.pipe_A += gp.Unsqueeze([self.real_A])
+        # add "channel" dimensions if neccessary, else use z dimension as channel
+        if self.ndims == len(self.common_voxel_size):
+            self.pipe_A += gp.Unsqueeze([self.real_A])
         # add "batch" dimensions
-        self.pipe_A += gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
-        # self.pipe_A += gp.Unsqueeze([self.real_A])
+        self.pipe_A += gp.Stack(self.batch_size)
 
         #make initial pipe section for B: 
         self.pipe_B = self.source_B 
@@ -446,23 +451,25 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # self.pipe_B += gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B
         self.pipe_B += gp.RandomLocation() 
         self.pipe_B += self.resample_B
-        self.pipe_B += gp.SimpleAugment()
+
+        # if self.ndims < len(self.common_voxel_size):# take out "z" dimension of unnecessary
+        #     self.pipe_B += gp.Squeeze([self.real_B], axis=0)
+
+        self.pipe_B += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
         self.pipe_B += self.normalize_real_B
         self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             control_point_spacing=30,
             jitter_sigma=(5.0,)*self.ndims,
             rotation_interval=(0, math.pi/2),
             subsample=4,
+            spatial_dims=self.ndims
             )
         
-        if self.ndims < len(self.common_voxel_size):# take out "z" dimension of unnecessary
-            self.pipe_B += gp.Squeeze([self.real_B], axis=2)        
-
-        # add "channel" dimensions
-        self.pipe_B += gp.Unsqueeze([self.real_B])
+        # add "channel" dimensions if neccessary, else use z dimension as channel
+        if self.ndims == len(self.common_voxel_size):
+            self.pipe_B += gp.Unsqueeze([self.real_B])
         # add "batch" dimensions
-        self.pipe_B += gp.Stack(self.batch_size) # TODO: Determine if removing increases speed
-        # self.pipe_B += gp.Unsqueeze([self.real_B])
+        self.pipe_B += gp.Stack(self.batch_size) 
 
     def build_training_pipeline(self):
         # create a train node using our model, loss, and optimizer
@@ -499,7 +506,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # self.training_pipeline += augmentations
         self.training_pipeline += self.cache
         self.training_pipeline += self.trainer
-        self.training_pipeline += gp.Squeeze([self.real_A, 
+        # remove "channel" dimensions if neccessary
+        if self.ndims == len(self.common_voxel_size):
+            self.training_pipeline += gp.Squeeze([self.real_A, 
                                             self.fake_A, 
                                             self.cycled_A, 
                                             self.real_B, 
@@ -520,8 +529,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         self.test_training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
         # self.test_training_pipeline += augmentations
-        self.test_training_pipeline += self.trainer
-        self.test_training_pipeline += gp.Squeeze([self.real_A, 
+        self.test_training_pipeline += self.trainer        
+        # remove "channel" dimensions if neccessary
+        if self.ndims == len(self.common_voxel_size):
+            self.test_training_pipeline += gp.Squeeze([self.real_A, 
                                             self.fake_A, 
                                             self.cycled_A, 
                                             self.real_B, 

@@ -7,7 +7,8 @@ import glob
 import re
 import zarr
 
-from funlib.learn.torch.models import UNet, ConvPass
+from unet import UNet, ConvPass
+# from funlib.learn.torch.models import UNet, ConvPass
 import gunpowder as gp
 import logging
 logging.basicConfig(level=logging.INFO)
