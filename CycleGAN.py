@@ -57,6 +57,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             num_epochs=10000,
             batch_size=1,
             num_workers=11,
+            cache_size=50,
             g_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             d_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             log_every=100,
@@ -106,6 +107,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.d_kernel_size = d_kernel_size 
             self.num_epochs = num_epochs
             self.batch_size = batch_size
+            self.cache_size = cache_size
             self.num_workers = num_workers
             self.g_init_learning_rate = g_init_learning_rate
             self.d_init_learning_rate = d_init_learning_rate
@@ -410,7 +412,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.performance = gp.PrintProfilingStats(every=self.log_every)
 
         # setup a cache
-        self.cache = gp.PreCache(num_workers=self.num_workers)#os.cpu_count())
+        self.cache = gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)#os.cpu_count())
 
         # define our network model for training
         self.setup_networks()        
@@ -776,7 +778,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                         )        
         
         pipe += self.cache
-        pipe += gp.Scan(scan_request, num_workers=self.num_workers)#os.cpu_count())
+        pipe += gp.Scan(scan_request, num_workers=self.num_workers, cache_size=self.cache_size)#os.cpu_count())
 
         pipe += self.performance
 
