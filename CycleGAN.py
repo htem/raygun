@@ -6,11 +6,11 @@ import re
 import zarr
 import daisy
 
-# import gunpowder as gp
+import gunpowder as gp
 
-import sys #TODO: REMOVE AFTER DEV
-sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
-from gunpowder import gunpowder as gp
+# import sys #TODO: REMOVE AFTER DEV
+# sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
+# from gunpowder import gunpowder as gp
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -426,15 +426,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.pipe_A += gp.RandomLocation()
         self.pipe_A += self.resample_A
 
-        # if self.ndims < len(self.common_voxel_size): # take out "z" dimension if unnecessary
-        #     self.pipe_A += gp.Squeeze([self.real_A], axis=0)
-
         self.pipe_A += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
         self.pipe_A += self.normalize_real_A    
         self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             control_point_spacing=30,
             jitter_sigma=(5.0,)*self.ndims,
-            rotation_interval=(0, math.pi/2),
+            rotation_interval=(0, math.pi/4),
+            # rotation_interval=(0, math.pi/2),
             subsample=4,
             spatial_dims=self.ndims
             )
@@ -452,15 +450,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.pipe_B += gp.RandomLocation() 
         self.pipe_B += self.resample_B
 
-        # if self.ndims < len(self.common_voxel_size):# take out "z" dimension of unnecessary
-        #     self.pipe_B += gp.Squeeze([self.real_B], axis=0)
-
         self.pipe_B += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
         self.pipe_B += self.normalize_real_B
         self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             control_point_spacing=30,
             jitter_sigma=(5.0,)*self.ndims,
-            rotation_interval=(0, math.pi/2),
+            rotation_interval=(0, math.pi/4),
+            # rotation_interval=(0, math.pi/2),
             subsample=4,
             spatial_dims=self.ndims
             )
@@ -589,10 +585,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             pipe = self.source_A
             # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
             pipe += gp.RandomLocation() + self.resample_A + self.normalize_real_A       
-            if self.ndims < len(self.common_voxel_size):# take out "z" dimension of unnecessary
-                pipe += gp.Squeeze([self.real_A], axis=2)      
-            pipe += gp.Unsqueeze([self.real_A])
-            pipe += gp.Unsqueeze([self.real_A])
+            # add "channel" dimensions if neccessary, else use z dimension as channel
+            if self.ndims == len(self.common_voxel_size):
+                pipe += gp.Unsqueeze([self.real_A])
+            pipe += gp.Unsqueeze([self.real_A]) # add batch dimension
             input_dict = {'real_A': self.real_A}
             output_dict = { 0: self.fake_B,
                             3: self.cycled_A
@@ -605,11 +601,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             pipe = self.source_B
             # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
-            pipe += gp.RandomLocation() + self.resample_B + self.normalize_real_B
-            if self.ndims < len(self.common_voxel_size):# take out "z" dimension of unnecessary
-                pipe += gp.Squeeze([self.real_B], axis=2)  
-            pipe += gp.Unsqueeze([self.real_B])
-            pipe += gp.Unsqueeze([self.real_B])        
+            pipe += gp.RandomLocation() + self.resample_B + self.normalize_real_B            
+            # add "channel" dimensions if neccessary, else use z dimension as channel
+            if self.ndims == len(self.common_voxel_size):
+                pipe += gp.Unsqueeze([self.real_B])
+            pipe += gp.Unsqueeze([self.real_B]) # add batch dimension    
             input_dict = {'real_B': self.real_B}
             output_dict = { 2: self.fake_A,
                             1: self.cycled_B
@@ -626,8 +622,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 checkpoint = self.checkpoint
                                 )
 
-        pipe += gp.Squeeze([real, fake, cycled], axis=0)
-        pipe += gp.Squeeze([real, fake, cycled], axis=0)
+        # remove "channel" dimensions if neccessary
+        if self.ndims == len(self.common_voxel_size):
+            pipe += gp.Squeeze([real, fake, cycled], axis=1)
+        pipe += gp.Squeeze([real, fake, cycled], axis=0) # remove batch dimension
         pipe += normalize_fake + normalize_cycled
 
         extents = self.get_extents(side_length=side_length)        
@@ -684,12 +682,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             src_path = self.src_B
             real_name = self.B_name
             resample = self.resample_B
-        if self.ndims < len(self.common_voxel_size):# take out "z" dimension of unnecessary
-            squeeze = gp.Squeeze([real], axis=2)  
-        else:
-            squeeze = None
         
-        pipe = source + resample + normalize_real + squeeze + gp.Unsqueeze([real]) + gp.Unsqueeze([real])
+        pipe = source + resample + normalize_real + gp.Unsqueeze([real])
+        # add "channel" dimension if neccessary, else use z dimension as channel
+        if self.ndims == len(self.common_voxel_size):
+            pipe += gp.Unsqueeze([real])
 
         # set prediction spec 
         if source.spec is None:
@@ -726,7 +723,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if cycle:
             # pipe += gp.Squeeze([real, fake, cycled], axis=0)
             # pipe += gp.Squeeze([real, fake, cycled], axis=0)
-            pipe += gp.Squeeze([fake, cycled], axis=0)
+
+            # remove "channel" dimensions if neccessary
+            if self.ndims == len(self.common_voxel_size):
+                pipe += gp.Squeeze([fake, cycled], axis=1)
             pipe += gp.Squeeze([fake, cycled], axis=0)
             pipe += normalize_fake + normalize_cycled
             pipe += gp.Crop(fake, roi=crop_roi)
@@ -736,7 +736,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             # pipe += gp.Squeeze([real, fake], axis=0)
             # pipe += gp.Squeeze([real, fake], axis=0)
-            pipe += gp.Squeeze([fake], axis=0)
+
+            # remove "channel" dimensions if neccessary
+            if self.ndims == len(self.common_voxel_size):
+                pipe += gp.Squeeze([fake], axis=1)
             pipe += gp.Squeeze([fake], axis=0)
             pipe += normalize_fake
             pipe += gp.Crop(fake, roi=crop_roi)
