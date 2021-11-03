@@ -432,11 +432,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.pipe_A += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
         self.pipe_A += self.normalize_real_A    
         self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            control_point_spacing=60,
+            control_point_spacing=self.side_length//2,
             # control_point_spacing=30,
             jitter_sigma=(10.0,)*self.ndims,
             # jitter_sigma=(5.0,)*self.ndims,
-            rotation_interval=(0, math.pi/32),
+            rotation_interval=(0, math.pi/8),
             # rotation_interval=(0, math.pi/2),
             subsample=4,
             spatial_dims=self.ndims
@@ -458,11 +458,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.pipe_B += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
         self.pipe_B += self.normalize_real_B
         self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            control_point_spacing=60,
+            control_point_spacing=self.side_length//2,
             # control_point_spacing=30,
             jitter_sigma=(10.0,)*self.ndims,
             # jitter_sigma=(5.0,)*self.ndims,
-            rotation_interval=(0, math.pi/32),
+            rotation_interval=(0, math.pi/8),
             # rotation_interval=(0, math.pi/2),
             subsample=4,
             spatial_dims=self.ndims
