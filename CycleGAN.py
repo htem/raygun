@@ -62,6 +62,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             spawn_subprocess=False,
             g_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             d_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
+            l1_lambda=100,
             log_every=100,
             save_every=2000,
             tensorboard_path='./tensorboard/',
@@ -114,6 +115,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.spawn_subprocess = spawn_subprocess            
             self.g_init_learning_rate = g_init_learning_rate
             self.d_init_learning_rate = d_init_learning_rate
+            self.l1_lambda = l1_lambda
             self.log_every = log_every
             self.save_every = save_every
             self.tensorboard_path = tensorboard_path
@@ -189,6 +191,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     #     return validation_loss
 
     def batch_tBoard_write(self, i=0):
+        n_iter = self.trainer.iteration
+        for key, loss in self.loss.loss_dict.values():
+            self.trainer.summary_writer.add_scalar(key.replace('_', '/'), loss, n_iter)
         for array in self.arrays:
             if len(self.batch[array].data.shape) > 3: # pull out batch dimension if necessary
                 img = self.batch[array].data[i].squeeze()
@@ -199,7 +204,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 data = img[mid]
             else:
                 data = img
-            self.trainer.summary_writer.add_image(array.identifier, data, global_step=self.trainer.iteration, dataformats='HW')
+            self.trainer.summary_writer.add_image(array.identifier, data, global_step=n_iter, dataformats='HW')
         # TODO:
         # validation_loss = self.get_validation_loss()
         # self.trainer.summary_writer.add_scalar('validation_loss', validation_loss, self.trainer.iteration)
@@ -270,7 +275,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
                 padding='same',
                 constant_upsample=self.g_constant_upsample,
-                voxel_size=self.B_voxel_size[:self.ndims],
+                voxel_size=self.common_voxel_size[-self.ndims:],
                 kernel_size_down=self.g_kernel_size_down,
                 kernel_size_up=self.g_kernel_size_up
                 )
@@ -289,7 +294,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
                 padding='same',
                 constant_upsample=self.g_constant_upsample,
-                voxel_size=self.B_voxel_size[:self.ndims],
+                voxel_size=self.common_voxel_size[-self.ndims:],
                 kernel_size_down=self.g_kernel_size_down,
                 kernel_size_up=self.g_kernel_size_up
                 )        
@@ -345,7 +350,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         self.l1_loss = torch.nn.L1Loss()
         self.gan_loss = GANLoss(gan_mode='lsgan')
-        self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2) #TODO: add l1_lambda=### to config
+        self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.l1_lambda)
 
     def build_pipeline_parts(self):        
         # declare arrays to use in the pipelines
@@ -858,6 +863,7 @@ class CycleGAN_Loss(torch.nn.Module):
         self.optimizer_D2 = optimizer_D2
         self.optimizer_G2 = optimizer_G2
         self.l1_lambda = l1_lambda
+        self.loss_dict = {}
 
     def backward_D(self, Dnet, real, fake, cycled):
         # Real
@@ -893,17 +899,17 @@ class CycleGAN_Loss(torch.nn.Module):
         return loss_D1, loss_D2
 
     def backward_G(self, Dnet, fake, cycled, cycle_loss):
-        """Calculate GAN and L1 loss for the generator"""
-        # Include L1 loss for forward and reverse cycle consistency
-        loss_G = cycle_loss.clone()
-
+        """Calculate GAN and L1 loss for the generator"""        
         # First, G(A) should fake the discriminator
         pred_fake = Dnet(fake)
-        loss_G += self.gan_loss(pred_fake, True)
+        gan_loss_fake = self.gan_loss(pred_fake, True)
 
         # Second, G(F(B)) should also fake the discriminator 
         pred_cycled = Dnet(cycled)
-        loss_G += self.gan_loss(pred_cycled, True)
+        gan_loss_cycle = self.gan_loss(pred_cycled, True)
+        
+        # Include L1 loss for forward and reverse cycle consistency
+        loss_G = cycle_loss + gan_loss_fake + gan_loss_cycle
 
         # calculate gradients
         loss_G.backward(retain_graph=True)
@@ -915,14 +921,18 @@ class CycleGAN_Loss(torch.nn.Module):
         self.optimizer_G2.zero_grad()        # set G's gradients to zero
 
         #get cycle loss for both directions (i.e. real == cycled, a.k.a. real_A == netG2(netG1(real_A)) for A and B)
-        cycle_loss = self.l1_lambda * (self.l1_loss(real_A, cycled_A) + self.l1_loss(real_B, cycled_B))
+        l1_loss_A = self.l1_loss(real_A.clone(), cycled_A.clone())
+        l1_loss_B = self.l1_loss(real_B.clone(), cycled_B.clone())
+        cycle_loss = self.l1_lambda * (l1_loss_A + l1_loss_B)
 
         #Then G1 first
-        loss_G1 = self.backward_G(self.netD1, fake_B, cycled_B, cycle_loss)                   # calculate gradient for G
-        self.optimizer_G1.step()             # udpate G's weights
+        loss_G1 = self.backward_G(self.netD1, fake_B, cycled_B.clone(), cycle_loss.clone())                   # calculate gradient for G
 
         #Then G2
-        loss_G2 = self.backward_G(self.netD2, fake_A, cycled_A, cycle_loss)                   # calculate gradient for G
+        loss_G2 = self.backward_G(self.netD2, fake_A, cycled_A.clone(), cycle_loss.clone())                   # calculate gradient for G
+        
+        #Step optimizers
+        self.optimizer_G1.step()             # udpate G's weights
         self.optimizer_G2.step()             # udpate G's weights
 
         #return losses
@@ -946,11 +956,11 @@ class CycleGAN_Loss(torch.nn.Module):
         cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
         
         self.loss_dict = {
-            'loss_D1': float(loss_D1),
-            'loss_D2': float(loss_D2),
-            'loss_cycle': float(cycle_loss),
-            'loss_G1': float(loss_G1),
-            'loss_G2': float(loss_G2),
+            'Loss_D1': float(loss_D1),
+            'Loss_D2': float(loss_D2),
+            'Loss_cycle': float(cycle_loss),
+            'Loss_G1': float(loss_G1),
+            'Loss_G2': float(loss_G2),
         }
 
         total_loss = loss_D1 + loss_D2 + cycle_loss + loss_G1 + loss_G2

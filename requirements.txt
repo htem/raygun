@@ -1,0 +1,20 @@
+daisy @ git+https://github.com/funkelab/daisy.git@c4203951c4f5cbcf34dcce799ce5da49a922efbe
+funlib.learn.torch @ git+https://github.com/funkelab/funlib.learn.torch.git@636813e60d48379d078b5458e40bdf23269631b3
+funlib.math @ git+https://github.com/funkelab/funlib.math.git@0c623f71c083d33184cac40ef7b1b995216be8ef
+gunpowder @ file:///n/groups/htem/users/jlr54/gunpowder
+matplotlib
+neuroglancer==2.22
+numcodecs==0.9.1
+numpy==1.21.2
+opencv-python
+pandas
+Pillow
+pymongo==3.12.0
+scikit-image==0.18.3
+scipy==1.7.1
+tensorboard
+tensorboardX
+torch
+torchvision
+tqdm
+zarr
