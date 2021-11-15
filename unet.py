@@ -44,7 +44,8 @@ class ConvPass(torch.nn.Module):
                         in_channels,
                         out_channels,
                         kernel_size,
-                        padding=pad
+                        padding=pad, 
+                        # padding_mode='circular'
                         ))
             except KeyError:
                 raise RuntimeError("%dD convolution not implemented" % self.dims)

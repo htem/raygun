@@ -192,8 +192,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
     def batch_tBoard_write(self, i=0):
         n_iter = self.trainer.iteration
-        for key, loss in self.loss.loss_dict.values():
-            self.trainer.summary_writer.add_scalar(key.replace('_', '/'), loss, n_iter)
+        for key, loss in self.loss.loss_dict.items():
+            # self.trainer.summary_writer.add_scalar(key.replace('_', '/'), loss, n_iter)
+            self.trainer.summary_writer.add_scalar(key, loss, n_iter)
         for array in self.arrays:
             if len(self.batch[array].data.shape) > 3: # pull out batch dimension if necessary
                 img = self.batch[array].data[i].squeeze()
@@ -261,7 +262,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         return gp.Coordinate(np.sum(level_pads, axis=0)) // 2 # in voxels per edge
 
-    def get_crop_roi(self, extents):        
+    def get_crop_roi(self, extents=None):
+        if extents is None:
+            extents = self.get_extents()       
         crop_roi = gp.Roi((0,)*self.ndims, self.common_voxel_size * extents)
         padding = self.get_valid_padding()
         return crop_roi.grow(-padding, -padding)
@@ -350,7 +353,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         self.l1_loss = torch.nn.L1Loss()
         self.gan_loss = GANLoss(gan_mode='lsgan')
-        self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.l1_lambda)
+        self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.l1_lambda, self.get_valid_padding())
 
     def build_pipeline_parts(self):        
         # declare arrays to use in the pipelines
@@ -849,7 +852,19 @@ class CycleGAN_Optimizer(torch.nn.Module):
 
 
 class CycleGAN_Loss(torch.nn.Module):
-    def __init__(self, l1_loss, gan_loss, netD1, netG1, netD2, netG2, optimizer_D1, optimizer_G1, optimizer_D2, optimizer_G2, l1_lambda=100
+    def __init__(self, 
+                l1_loss, 
+                gan_loss, 
+                netD1, 
+                netG1, 
+                netD2, 
+                netG2, 
+                optimizer_D1, 
+                optimizer_G1, 
+                optimizer_D2, 
+                optimizer_G2, 
+                l1_lambda=100, 
+                padding=None
                  ):
         super(CycleGAN_Loss, self).__init__()
         self.l1_loss = l1_loss
@@ -863,6 +878,12 @@ class CycleGAN_Loss(torch.nn.Module):
         self.optimizer_D2 = optimizer_D2
         self.optimizer_G2 = optimizer_G2
         self.l1_lambda = l1_lambda
+        self.padding=padding
+        if not self.padding is None:
+            inds = [...]
+            for pad in self.padding:
+                inds.append(slice(pad, -pad))
+        self.pad_inds = tuple(inds)
         self.loss_dict = {}
 
     def backward_D(self, Dnet, real, fake, cycled):
@@ -878,7 +899,7 @@ class CycleGAN_Loss(torch.nn.Module):
         pred_cycled = Dnet(cycled.detach())
         loss_D_cycled = self.gan_loss(pred_cycled, False)
 
-        loss_D = (loss_D_real + loss_D_fake + loss_D_cycled) / 3
+        loss_D = loss_D_real + loss_D_fake + loss_D_cycled
         loss_D.backward()
         return loss_D
 
@@ -946,6 +967,14 @@ class CycleGAN_Loss(torch.nn.Module):
         # real_B_mask = real_B * mask_B
         # cycled_B_mask = cycled_B * mask_B
         # fake_B_mask = fake_B * mask_A
+        
+        if not self.padding is None:
+            real_A = real_A[self.pad_inds]
+            fake_A = fake_A[self.pad_inds]
+            cycled_A = cycled_A[self.pad_inds]
+            real_B = real_B[self.pad_inds]
+            fake_B = fake_B[self.pad_inds]
+            cycled_B = cycled_B[self.pad_inds]
 
         # # update Ds
         # loss_D1, loss_D2 = self.backward_Ds(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
