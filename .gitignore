@@ -3,3 +3,4 @@ events.out.tfevents.*
 .vscode*
 __pycache__*
 *.zarr
+*Task*.config
