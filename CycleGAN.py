@@ -24,7 +24,8 @@ import numpy as np
 
 torch.backends.cudnn.benchmark = True
 
-from unet import UNet, ConvPass
+from funlib.learn.torch.models.unet import UNet, ConvPass
+# from unet import UNet, ConvPass
 from tri_utils import NLayerDiscriminator, NLayerDiscriminator3D, GANLoss, init_weights
 from CycleGAN_LossFunctions import *
 
