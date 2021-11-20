@@ -7,11 +7,11 @@ import zarr
 import daisy
 import os
 
-import gunpowder as gp
+# import gunpowder as gp
 
-# import sys #TODO: REMOVE AFTER DEV
-# sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
-# from gunpowder import gunpowder as gp
+import sys #TODO: REMOVE AFTER DEV
+sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
+from gunpowder import gunpowder as gp
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -24,8 +24,8 @@ import numpy as np
 
 torch.backends.cudnn.benchmark = True
 
-from funlib.learn.torch.models.unet import UNet, ConvPass
-# from unet import UNet, ConvPass
+# from funlib.learn.torch.models.unet import UNet, ConvPass
+from unet import UNet, ConvPass
 from tri_utils import NLayerDiscriminator, NLayerDiscriminator3D, GANLoss, init_weights
 from CycleGAN_LossFunctions import *
 
@@ -65,6 +65,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             g_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             d_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             l1_lambda=100,
+            identity_lambda=100,
             log_every=100,
             save_every=2000,
             tensorboard_path='./tensorboard/',
@@ -72,7 +73,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             checkpoint=None, # Used for prediction/rendering, training always starts from latest
             interp_order=None,
             crop_loss=True,
-            loss_style='cycle' # supports 'cycle' or 'split'
+            loss_style='cycle', # supports 'cycle' or 'split'
+            min_coefvar=None,
             ):
             self.src_A = src_A
             self.src_B = src_B
@@ -120,6 +122,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.g_init_learning_rate = g_init_learning_rate
             self.d_init_learning_rate = d_init_learning_rate
             self.l1_lambda = l1_lambda
+            self.identity_lambda = identity_lambda
             self.log_every = log_every
             self.save_every = save_every
             self.tensorboard_path = tensorboard_path
@@ -136,6 +139,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.interp_order = interp_order
             self.crop_loss = crop_loss
             self.loss_style = loss_style
+            self.min_coefvar = min_coefvar
             self.build_pipeline_parts()
             self.training_pipeline = None
             self.test_training_pipeline = None
@@ -367,9 +371,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.l1_loss = torch.nn.SmoothL1Loss() # switched from torch.nn.L1Loss()
         self.gan_loss = GANLoss(gan_mode='lsgan')
         if self.loss_style.lower()=='cycle':
-            self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.l1_lambda, padding)
+            self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.l1_lambda, self.identity_lambda, padding)
         elif self.loss_style.lower()=='split':
-            self.loss = SplitGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.l1_lambda, padding)
+            self.loss = SplitGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.l1_lambda, self.identity_lambda, padding)
         else:
             print("Unexpected Loss Style. Accepted options are 'cycle' or 'split'")
             raise
@@ -415,6 +419,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 }  # meta-information
         )
 
+        if self.min_coefvar is True:
+            self.reject_A = gp.RejectEmpty(self.real_A_src)
+        elif self.min_coefvar: # for cases in which it is specified (i.e. non-default threshold)
+            self.reject_A = gp.RejectEmpty(self.real_A_src, min_coefvar=self.min_coefvar)
+        else:
+            self.reject_A = None
+
         # B:
         if self.common_voxel_size != self.A_voxel_size:
             self.real_B_src = gp.ArrayKey('REAL_B_SRC')
@@ -436,6 +447,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 }  # meta-information
         )
 
+        if self.min_coefvar is True:
+            self.reject_B = gp.RejectEmpty(self.real_B_src)
+        elif self.min_coefvar: # for cases in which it is specified (i.e. non-default threshold)
+            self.reject_B = gp.RejectEmpty(self.real_B_src, min_coefvar=self.min_coefvar)
+        else:
+            self.reject_B = None
+
         # get performance stats
         self.performance = gp.PrintProfilingStats(every=self.log_every)
 
@@ -454,6 +472,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
         self.pipe_A += gp.RandomLocation()
+        self.pipe_A += self.reject_A
         self.pipe_A += self.resample_A
 
         self.pipe_A += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
@@ -480,6 +499,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         
         # self.pipe_B += gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B
         self.pipe_B += gp.RandomLocation() 
+        self.pipe_B += self.reject_B
         self.pipe_B += self.resample_B
 
         self.pipe_B += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)

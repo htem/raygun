@@ -18,6 +18,7 @@ class CycleGAN_Loss(torch.nn.Module):
                 optimizer_D2, 
                 optimizer_G2, 
                 l1_lambda=100, 
+                identity_lambda=0,
                 padding=None
                  ):
         super(CycleGAN_Loss, self).__init__()
@@ -32,6 +33,7 @@ class CycleGAN_Loss(torch.nn.Module):
         self.optimizer_D2 = optimizer_D2
         self.optimizer_G2 = optimizer_G2
         self.l1_lambda = l1_lambda
+        self.identity_lambda = identity_lambda
         self.padding=padding
         if not self.padding is None:
             inds = [...]
@@ -79,7 +81,7 @@ class CycleGAN_Loss(torch.nn.Module):
         #return losses
         return loss_D1, loss_D2
 
-    def backward_G(self, Dnet, fake, cycled, cycle_loss):
+    def backward_G(self, Dnet, fake, cycled, cycle_loss, identity_loss=None):
         """Calculate GAN and L1 loss for the generator"""        
         # First, G(A) should fake the discriminator
         pred_fake = Dnet(fake)
@@ -90,7 +92,7 @@ class CycleGAN_Loss(torch.nn.Module):
         gan_loss_cycle = self.gan_loss(pred_cycled, True)
         
         # Include L1 loss for forward and reverse cycle consistency
-        loss_G = cycle_loss + gan_loss_fake + gan_loss_cycle
+        loss_G = cycle_loss + gan_loss_fake + gan_loss_cycle + identity_loss
 
         # calculate gradients
         loss_G.backward(retain_graph=True)
@@ -106,11 +108,19 @@ class CycleGAN_Loss(torch.nn.Module):
         l1_loss_B = self.l1_loss(real_B.clone(), cycled_B.clone())
         cycle_loss = self.l1_lambda * (l1_loss_A + l1_loss_B)
 
+        #get identity loss (i.e. ||G_A(B) - B|| for G_A(A) --> B) if applicable
+        if self.identity_lambda > 0:
+            identity_loss_B = self.l1_loss(real_B.clone(), self.netG1(real_B.clone()))#TODO: add ability to have unique loss function for identity
+            identity_loss_A = self.l1_loss(real_A.clone(), self.netG2(real_A.clone()))
+        else:
+            identity_loss_B = None
+            identity_loss_A = None
+
         #Then G1 first
-        loss_G1 = self.backward_G(self.netD1, fake_B, cycled_B.clone(), cycle_loss.clone())                   # calculate gradient for G
+        loss_G1 = self.backward_G(self.netD1, fake_B, cycled_B.clone(), cycle_loss.clone(), identity_loss_B)                   # calculate gradient for G
 
         #Then G2
-        loss_G2 = self.backward_G(self.netD2, fake_A, cycled_A.clone(), cycle_loss.clone())                   # calculate gradient for G
+        loss_G2 = self.backward_G(self.netD2, fake_A, cycled_A.clone(), cycle_loss.clone(), identity_loss_A)                   # calculate gradient for G
         
         #Step optimizers
         self.optimizer_G1.step()             # udpate G's weights
@@ -185,6 +195,7 @@ class SplitGAN_Loss(torch.nn.Module):
                 optimizer_D2, 
                 optimizer_G2, 
                 l1_lambda=100, 
+                identity_lambda=0,
                 padding=None
                  ):
         super(SplitGAN_Loss, self).__init__()
@@ -199,6 +210,7 @@ class SplitGAN_Loss(torch.nn.Module):
         self.optimizer_D2 = optimizer_D2
         self.optimizer_G2 = optimizer_G2
         self.l1_lambda = l1_lambda
+        self.identity_lambda = identity_lambda
         self.padding=padding
         if not self.padding is None:
             inds = [...]
@@ -245,7 +257,7 @@ class SplitGAN_Loss(torch.nn.Module):
         #return losses
         return loss_D1, loss_D2
 
-    def backward_G(self, Dnet, real, fake, cycled):
+    def backward_G(self, Gnet, Dnet, real, fake, cycled):
         """Calculate GAN and L1 loss for the generator"""        
         # First, G(A) should fake the discriminator
         pred_fake = Dnet(fake)
@@ -258,8 +270,14 @@ class SplitGAN_Loss(torch.nn.Module):
         # Include L1 loss for forward and reverse cycle consistency
         cycle_loss = self.l1_lambda * self.l1_loss(real, cycled)
         
+        #get identity loss (i.e. ||G_A(B) - B|| for G_A(A) --> B) if applicable
+        if self.identity_lambda > 0:
+            identity_loss = self.l1_loss(real, Gnet(real))#TODO: add ability to have unique loss function for identity
+        else:
+            identity_loss = None
+
         # Combine losses
-        loss_G = cycle_loss + gan_loss_fake + gan_loss_cycle
+        loss_G = cycle_loss + gan_loss_fake + gan_loss_cycle + identity_loss
 
         # calculate gradients
         loss_G.backward(retain_graph=True)
@@ -271,10 +289,10 @@ class SplitGAN_Loss(torch.nn.Module):
         self.optimizer_G2.zero_grad()        # set G's gradients to zero
 
         #G1 first
-        loss_G1 = self.backward_G(self.netD1, real_B, fake_B, cycled_B)                   # calculate gradient for G
+        loss_G1 = self.backward_G(self.netG1, self.netD1, real_B, fake_B, cycled_B)                   # calculate gradient for G
 
         #Then G2
-        loss_G2 = self.backward_G(self.netD2, real_A, fake_A, cycled_A)                   # calculate gradient for G
+        loss_G2 = self.backward_G(self.netG2, self.netD2, real_A, fake_A, cycled_A)                   # calculate gradient for G
 
         #Step optimizers
         self.optimizer_G1.step()             # udpate G1's weights

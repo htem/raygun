@@ -8,9 +8,9 @@ common_voxel_size=Coordinate((10,10,10))
 downsample_factor=2
 num_fmaps=24
 fmap_inc_factor=2
-constant_upsample=True
+constant_upsample=False
 ndims = 2
-n_conv_passes = 2
+n_conv_passes = 3
 gnet_depth = 5
 kernel_size = 7
 
