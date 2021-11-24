@@ -26,12 +26,16 @@ def bring_the_noise(src, pipeline, noise_order, noise_dict, noise_version=''):
             
             if noise =='downX' and noise_dict[noise]:
                 pipeline += gp.DownSample(this_array, (1, noise_dict[noise], noise_dict[noise]), new_array) # assumes zyx coordinates (and non-isometric)
+            if noise =='resample' and noise_dict[noise]:
+                pipeline += gp.Resample(this_array, noise_dict[noise], new_array) 
             elif noise =='gaussBlur' and noise_dict[noise]:
                 pipeline += GaussBlur(this_array, noise_dict[noise], new_array=new_array)
             elif noise =='gaussNoise' and noise_dict[noise]:
                 pipeline += Noiser(this_array, new_array=new_array, mode='gaussian', var=noise_dict[noise])
             elif noise =='poissNoise' and noise_dict[noise]:
                 pipeline += Noiser(this_array, new_array=new_array, mode='poisson')
+            elif noise =='noise' and noise_dict[noise]:
+                pipeline += Noiser(this_array, new_array=new_array, mode=noise_dict[noise])
             # elif noise =='deform' and noise_dict[noise]: # TODO: IMPLEMENT
             #     pipeline += ...
             

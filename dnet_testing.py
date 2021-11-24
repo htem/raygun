@@ -6,7 +6,7 @@ import functools
 import torch
 from tri_utils import NLayerDiscriminator, NLayerDiscriminator3D
 
-input_size = (1,1,240,240)
+input_size = (12,1,240,240)
 num_fmaps = 16
 dnet_depth = 5
 downsample_factor = 2

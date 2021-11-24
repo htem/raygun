@@ -25,6 +25,7 @@ import numpy as np
 torch.backends.cudnn.benchmark = True
 
 # from funlib.learn.torch.models.unet import UNet, ConvPass
+from residual_unet import ResidualUNet
 from unet import UNet, ConvPass
 from tri_utils import NLayerDiscriminator, NLayerDiscriminator3D, GANLoss, init_weights
 from CycleGAN_LossFunctions import *
@@ -75,6 +76,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             crop_loss=True,
             loss_style='cycle', # supports 'cycle' or 'split'
             min_coefvar=None,
+            residual_unet=False,
+            residual_blocks=False,
+            padding_unet='same',
             ):
             self.src_A = src_A
             self.src_B = src_B
@@ -140,6 +144,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.crop_loss = crop_loss
             self.loss_style = loss_style
             self.min_coefvar = min_coefvar
+            self.residual_unet = residual_unet
+            self.residual_blocks = residual_blocks
+            self.padding_unet = padding_unet
             self.build_pipeline_parts()
             self.training_pipeline = None
             self.test_training_pipeline = None
@@ -201,10 +208,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     #     return validation_loss
 
     def batch_tBoard_write(self, i=0):
-        n_iter = self.trainer.iteration
+        self.n_iter = self.trainer.iteration
         for key, loss in self.loss.loss_dict.items():
             # self.trainer.summary_writer.add_scalar(key.replace('_', '/'), loss, n_iter)
-            self.trainer.summary_writer.add_scalar(key, loss, n_iter)
+            self.trainer.summary_writer.add_scalar(key, loss, self.n_iter)
         # self.trainer.summary_writer.add_scalars('Loss', self.loss.loss_dict, n_iter)
 
         for array in self.arrays:
@@ -217,7 +224,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 data = img[mid]
             else:
                 data = img
-            self.trainer.summary_writer.add_image(array.identifier, data, global_step=n_iter, dataformats='HW')
+            self.trainer.summary_writer.add_image(array.identifier, data, global_step=self.n_iter, dataformats='HW')
         self.trainer.summary_writer.flush()
         # TODO:
         # validation_loss = self.get_validation_loss()
@@ -284,39 +291,75 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
     def setup_networks(self):
         #For netG1:
-        unet = UNet(
-                in_channels=1,
-                num_fmaps=self.g_num_fmaps,
-                fmap_inc_factor=self.g_fmap_inc_factor,
-                downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                padding='same',
-                constant_upsample=self.g_constant_upsample,
-                voxel_size=self.common_voxel_size[-self.ndims:],
-                kernel_size_down=self.g_kernel_size_down,
-                kernel_size_up=self.g_kernel_size_up
-                )
-        self.netG1 = torch.nn.Sequential(
-                            unet,
-                            ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding='same'), #switched padding to 'same' but was working with 'valid' somehow
-                            torch.nn.Sigmoid())
+        if self.residual_unet:
+            unet = ResidualUNet(
+                    in_channels=1,
+                    num_fmaps=self.g_num_fmaps,
+                    fmap_inc_factor=self.g_fmap_inc_factor,
+                    downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
+                    padding=self.padding_unet,
+                    constant_upsample=self.g_constant_upsample,
+                    voxel_size=self.common_voxel_size[-self.ndims:],
+                    kernel_size_down=self.g_kernel_size_down,
+                    kernel_size_up=self.g_kernel_size_up,
+                    residual=self.residual_blocks
+                    )
+            self.netG1 = torch.nn.Sequential(
+                                unet, 
+                                torch.nn.Sigmoid())
+        else:
+            unet = UNet(
+                    in_channels=1,
+                    num_fmaps=self.g_num_fmaps,
+                    fmap_inc_factor=self.g_fmap_inc_factor,
+                    downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
+                    padding=self.padding_unet,
+                    constant_upsample=self.g_constant_upsample,
+                    voxel_size=self.common_voxel_size[-self.ndims:],
+                    kernel_size_down=self.g_kernel_size_down,
+                    kernel_size_up=self.g_kernel_size_up,
+                    residual=self.residual_blocks
+                    )
+            self.netG1 = torch.nn.Sequential(
+                                unet,
+                                ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet, residual=self.residual_blocks), 
+                                torch.nn.Sigmoid())
                             
         init_weights(self.netG1, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
 
         #For netG2:
-        unet = UNet(
+        if self.residual_unet:
+            unet = ResidualUNet(
+                    in_channels=1,
+                    num_fmaps=self.g_num_fmaps,
+                    fmap_inc_factor=self.g_fmap_inc_factor,
+                    downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
+                    padding=self.padding_unet,
+                    constant_upsample=self.g_constant_upsample,
+                    voxel_size=self.common_voxel_size[-self.ndims:],
+                    kernel_size_down=self.g_kernel_size_down,
+                    kernel_size_up=self.g_kernel_size_up,
+                    residual=self.residual_blocks
+                    )
+            self.netG2 = torch.nn.Sequential(
+                                unet, 
+                                torch.nn.Sigmoid())
+        else:
+            unet = UNet(
                 in_channels=1,
                 num_fmaps=self.g_num_fmaps,
                 fmap_inc_factor=self.g_fmap_inc_factor,
                 downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                padding='same',
+                padding=self.padding_unet,
                 constant_upsample=self.g_constant_upsample,
                 voxel_size=self.common_voxel_size[-self.ndims:],
                 kernel_size_down=self.g_kernel_size_down,
-                kernel_size_up=self.g_kernel_size_up
+                kernel_size_up=self.g_kernel_size_up,
+                residual=self.residual_blocks
                 )        
-        self.netG2 = torch.nn.Sequential(
+            self.netG2 = torch.nn.Sequential(
                             unet,
-                            ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding='same'), #switched padding to 'same' but was working with 'valid' 
+                            ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet, residual=self.residual_blocks), 
                             torch.nn.Sigmoid())
                             
         init_weights(self.netG2, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
@@ -623,7 +666,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         with gp.build(self.training_pipeline):
             for i in tqdm(range(self.num_epochs)):
                 self.batch = self.training_pipeline.request_batch(self.train_request)
-                if i % self.log_every == 0:
+                if i % self.log_every == 0 and i != 0:
                     self.batch_tBoard_write()
         return self.batch
         

@@ -16,7 +16,7 @@ class ConvPass(torch.nn.Module):
             kernel_sizes,
             activation,
             padding='valid',
-            residual=False):
+            residual=True):
 
         super(ConvPass, self).__init__()
 
@@ -54,20 +54,12 @@ class ConvPass(torch.nn.Module):
                         padding=pad, 
                         # padding_mode='circular'
                         ))
-                if residual and i == 0:
-                    self.x_init_map = conv(
-                                in_channels,
-                                out_channels,
-                                np.ones(self.dims),
-                                padding=pad, 
-                                # padding_mode='circular'
-                                )
             except KeyError:
                 raise RuntimeError("%dD convolution not implemented" % self.dims)
 
             in_channels = out_channels
 
-            if activation is not None and not (residual and i == (len(kernel_sizes) - 1)):
+            if activation is not None and not (i == (len(kernel_sizes) - 1)): #omit activation from final layer to allow for residual addition
                 layers.append(activation())            
 
         self.conv_pass = torch.nn.Sequential(*layers)
@@ -76,11 +68,7 @@ class ConvPass(torch.nn.Module):
         if not self.residual:
             return self.conv_pass(x)
         else:
-            init_x = self.activation(self.x_init_map(x))
-            if self.activation is not None:
-                return self.activation(init_x + self.conv_pass(x))
-            else:
-                return init_x + self.conv_pass(x)
+            return x + self.conv_pass(x)
 
 
 class Downsample(torch.nn.Module):
@@ -230,7 +218,7 @@ class Upsample(torch.nn.Module):
 
         return x[slices]
 
-    def forward(self, f_left, g_out):
+    def forward(self, g_out):
 
         g_up = self.up(g_out)
 
@@ -242,12 +230,11 @@ class Upsample(torch.nn.Module):
         else:
             g_cropped = g_up
 
-        f_cropped = self.crop(f_left, g_cropped.size()[-self.dims:])
 
-        return torch.cat([f_cropped, g_cropped], dim=1)
+        return g_cropped
 
 
-class UNet(torch.nn.Module):
+class ResidualUNet(torch.nn.Module):
 
     def __init__(
             self,
@@ -260,30 +247,36 @@ class UNet(torch.nn.Module):
             activation='ReLU',
             fov=(1, 1, 1),
             voxel_size=(1, 1, 1),
-            num_fmaps_out=None,
             num_heads=1,
             constant_upsample=False,
             padding='valid',
-            residual=False):
-        '''Create a U-Net::
+            residual=True):
+        '''Create a Residual U-Net (with or without residual blocks)::
 
-            f_in --> f_left --------------------------->> f_right--> f_out
+             /------------------------------------------------------\
+            f_in --> f_left --------------------------->> f_right -(+)-> f_out
                         |                                   ^
-                        v                                   |
-                     g_in --> g_left ------->> g_right --> g_out
-                                 |               ^
-                                 v               |
-                                       ...
+                        |                                   |
+                        v  /--------------------------\     |
+                        g_in --> g_left -->> g_right -(+)-> g_out
+                                    |            ^
+                                    v            |
+                                        ...
 
         where each ``-->`` is a convolution pass, each `-->>` a crop, and down
         and up arrows are max-pooling and transposed convolutions,
-        respectively.
+        respectively. Additionally, ``/-------\`` connections indicate a residual 
+        skip connections between the inputs of one level on the down side and the 
+        output of the convolutional layers on the up flowing side, prior to activation.
+        At each level, a 1x1(x1) kernel convolution projects the input to the correct
+        dimensional feature space.
 
         The U-Net expects 3D or 4D tensors shaped like::
 
             ``(batch=1, channels, [length,] depth, height, width)``.
 
-        It will perform 4D convolutions as long as ``length`` is greater than 1. 
+        Only works for in_channels == out_channels.
+        It will perform 4D convolutions as long as ``length`` is greater than 1.
         As soon as ``length`` is 1 due to a valid convolution, the time dimension will be
         dropped and tensors with ``(b, c, z, y, x)`` will be use (and returned)
         from there on.
@@ -296,8 +289,7 @@ class UNet(torch.nn.Module):
 
             num_fmaps:
 
-                The number of feature maps in the first layer. By default, this is also the
-                number of output feature maps. Stored in the ``channels``
+                The number of feature maps in the first layer. Stored in the ``channels``
                 dimension.
 
             fmap_inc_factor:
@@ -342,12 +334,6 @@ class UNet(torch.nn.Module):
 
                 Size of a voxel in the input data, in physical units
 
-            num_fmaps_out (optional):
-
-                The number of feature maps in the output layer. By default, this is the same as the
-                number of feature maps of the input layer. Stored in the ``channels``
-                dimension.
-
             num_heads (optional):
 
                 Number of decoders. The resulting U-Net has one single encoder
@@ -365,17 +351,22 @@ class UNet(torch.nn.Module):
 
             residual (optional):
 
-                Whether to train convolutional layers to output residuals to add to inputs (as in ResNet) or to directly convolve input data to output. Either 'True' or 'False' (default).
+                Whether, at each level, to train convolutional layers to output residuals to add to level inputs (as in ResNet residual blocks) or to directly convolve input data to output. Either 'True' (default) or 'False'. Note: Skip connections between up and down paths are combined as residuals reqardless.
         '''
 
-        super(UNet, self).__init__()
+        super(ResidualUNet, self).__init__()
 
         self.ndims = len(downsample_factors[0])
         self.num_levels = len(downsample_factors) + 1
         self.num_heads = num_heads
         self.in_channels = in_channels
-        self.out_channels = num_fmaps_out if num_fmaps_out else num_fmaps
+        self.out_channels = in_channels
         self.residual = residual
+        self.padding = padding
+        if activation is not None:
+            self.activation = getattr(torch.nn, activation)()
+        else:
+            self.activation = None
         # default arguments
 
         if kernel_size_down is None:
@@ -403,12 +394,24 @@ class UNet(torch.nn.Module):
 
         # modules
 
-        # left convolutional passes
-        self.l_conv = nn.ModuleList([
+        # left projection convolutional passes
+        self.l_proj = nn.ModuleList([
             ConvPass(
                 in_channels
                 if level == 0
                 else num_fmaps*fmap_inc_factor**(level - 1),
+                num_fmaps*fmap_inc_factor**level,
+                [np.ones_like(kernel_size_down[level][0])],
+                activation=activation,
+                padding=padding,
+                residual=False)
+            for level in range(self.num_levels)
+        ])
+
+        # left convolutional passes
+        self.l_conv = nn.ModuleList([
+            ConvPass(
+                num_fmaps*fmap_inc_factor**level,
                 num_fmaps*fmap_inc_factor**level,
                 kernel_size_down[level],
                 activation=activation,
@@ -439,15 +442,27 @@ class UNet(torch.nn.Module):
             for _ in range(num_heads)
         ])
 
+        # right projection convolutional passes
+        self.r_proj = nn.ModuleList([
+            nn.ModuleList([
+                ConvPass(
+                    num_fmaps*fmap_inc_factor**(level + 1),
+                    num_fmaps*fmap_inc_factor**level,
+                    [np.ones_like(kernel_size_up[level][0])],
+                    activation=activation,
+                    padding=padding,
+                    residual=False)
+                for level in range(self.num_levels - 1)
+            ])
+            for _ in range(num_heads)
+        ])
+
         # right convolutional passes
         self.r_conv = nn.ModuleList([
             nn.ModuleList([
                 ConvPass(
-                    num_fmaps*fmap_inc_factor**level +
-                    num_fmaps*fmap_inc_factor**(level + 1),
-                    num_fmaps*fmap_inc_factor**level
-                    if num_fmaps_out is None or level != 0
-                    else num_fmaps_out,
+                    num_fmaps*fmap_inc_factor**level,
+                    num_fmaps*fmap_inc_factor**level,
                     kernel_size_up[level],
                     activation=activation,
                     padding=padding,
@@ -457,15 +472,30 @@ class UNet(torch.nn.Module):
             for _ in range(num_heads)
         ])
 
+        # right final projection convolutional passes
+        self.r_fin = nn.ModuleList([
+            ConvPass(
+                num_fmaps,
+                in_channels,
+                [np.ones_like(kernel_size_down[self.num_levels - 1][0])],
+                activation=None,
+                padding=padding,
+                residual=False)
+            for _ in range(num_heads)
+        ])
+
     def rec_forward(self, level, f_in):
 
         # index of level in layer arrays
         i = self.num_levels - level - 1
 
-        # convolve
-        f_left = self.l_conv[i](f_in)
+        # project to feature space
+        f_proj = self.l_proj[i](f_in)
 
-        # end of recursion
+        # convolve
+        f_left = self.l_conv[i](f_proj)
+
+        # end of recursion (bottom level)
         if level == 0:
 
             fs_out = [f_left]*self.num_heads
@@ -479,22 +509,45 @@ class UNet(torch.nn.Module):
             gs_out = self.rec_forward(level - 1, g_in)
 
             # up, concat, and crop
+            gs_cropped = [
+                self.r_up[h][i](gs_out[h])
+                for h in range(self.num_heads)
+            ]
+
             fs_right = [
-                self.r_up[h][i](f_left, gs_out[h])
+                self.r_proj[h][i](gs_cropped[h])
                 for h in range(self.num_heads)
             ]
 
             # convolve
-            fs_out = [
+            fs_mid = [
                 self.r_conv[h][i](fs_right[h])
                 for h in range(self.num_heads)
             ]
 
+            # add residuals to identity projections and activate
+            if self.padding.lower() == 'valid':
+                f_id_cropped = self.r_up[0][i].crop(f_proj, gs_cropped[0].size()[-self.r_up[0][i].dims:])
+            elif self.padding.lower() == 'same':
+                f_id_cropped = f_proj
+            
+            if self.activation is not None:
+                fs_out = [
+                    self.activation(fs_mid[h] + f_id_cropped)
+                    for h in range(self.num_heads)
+                ]
+            else:
+                fs_out = [
+                    fs_mid[h] + f_id_cropped
+                    for h in range(self.num_heads)
+                ]
+
         return fs_out
 
     def forward(self, x):
-
-        y = self.rec_forward(self.num_levels - 1, x)
+        
+        z = self.rec_forward(self.num_levels - 1, x)
+        y = [x + self.r_fin[h](z[h]) for h in range(self.num_heads)]
 
         if self.num_heads == 1:
             return y[0]

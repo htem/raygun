@@ -1,6 +1,8 @@
+from typing_extensions import final
 from unet import *    
 import torch
 from gunpowder import Coordinate
+import numpy as np
 
 input_size = (1,1,240,240)
 
@@ -39,4 +41,17 @@ netG1 = torch.nn.Sequential(
 test = netG1(torch.rand(*input_size))
 print(f'In shape: {input_size}')
 print(f'Out shape: {test.shape}')
+
+
+
+
+##########################################
+# for side_length in np.arange(240, 512):
+#     try:
+#         result_size = netG1(torch.rand(12,1,side_length,side_length)).shape
+#         print(f'Side length {side_length} successful on first pass, with result side length {result_size[-1]}.')
+#         final_size = netG1(torch.rand(12,1,result_size[-1],result_size[-1])).shape
+#         print(f'Side length {side_length} successful on both passes, with final side length {final_size[-1]}.')
+#     except:
+#         print(f'Side length {side_length} failed.')
 
