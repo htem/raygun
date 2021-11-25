@@ -225,10 +225,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             else:
                 data = img
             self.trainer.summary_writer.add_image(array.identifier, data, global_step=self.n_iter, dataformats='HW')
+
+        # self.trainer.summary_writer.add_image('netG1_layer1_gradients', self.netG1.unet.l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
+        # self.trainer.summary_writer.add_image('netG2_layer1_gradients', self.netG2.unet.l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
         self.trainer.summary_writer.flush()
-        # TODO:
-        # validation_loss = self.get_validation_loss()
-        # self.trainer.summary_writer.add_scalar('validation_loss', validation_loss, self.trainer.iteration)
 
     def _get_latest_checkpoint(self):
         basename = self.model_path + self.model_name
@@ -281,6 +281,50 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             level_pads.append(np.sum(np.array(kernel_size_up[level]) - 1, axis=0) * (self.g_downsample_factor ** level))
 
         return gp.Coordinate(np.sum(level_pads, axis=0)) // 2 # in voxels per edge
+
+    def find_min_valid_size(self):
+        if self.residual_unet:
+            net = ResidualUNet(
+                    in_channels=1,
+                    num_fmaps=self.g_num_fmaps,
+                    fmap_inc_factor=self.g_fmap_inc_factor,
+                    downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
+                    padding='valid',
+                    constant_upsample=self.g_constant_upsample,
+                    voxel_size=self.common_voxel_size[-self.ndims:],
+                    kernel_size_down=self.g_kernel_size_down,
+                    kernel_size_up=self.g_kernel_size_up,
+                    residual=self.residual_blocks
+                    )
+        else:
+            unet = UNet(
+                    in_channels=1,
+                    num_fmaps=self.g_num_fmaps,
+                    fmap_inc_factor=self.g_fmap_inc_factor,
+                    downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
+                    padding='valid',
+                    constant_upsample=self.g_constant_upsample,
+                    voxel_size=self.common_voxel_size[-self.ndims:],
+                    kernel_size_down=self.g_kernel_size_down,
+                    kernel_size_up=self.g_kernel_size_up,
+                    residual=self.residual_blocks
+                    )
+            net = torch.nn.Sequential(
+                                unet,
+                                ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding='valid', residual=self.residual_blocks))
+        success = False
+        side_length = 16 # sets 16x16(x16) as absolute minimum
+        print('Finding minimum valid input size. This will run until it finds a solution or breaks your computer. Good luck.')
+        while not success:
+            shape = (1,1) + (side_length,) * self.ndims
+            try:
+                result = net(torch.rand(*shape))
+                print(f'Side length {side_length} successful on first pass, with result side length {result.shape[-1]}.')
+                final_size = net(result).shape
+                print(f'Side length {side_length} successful on both passes, with final side length {final_size[-1]}.')
+                return side_length
+            except:
+                side_length += 1
 
     def get_crop_roi(self, extents=None):
         if extents is None:

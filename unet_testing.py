@@ -8,12 +8,13 @@ input_size = (1,1,240,240)
 
 common_voxel_size=Coordinate((10,10,10))
 downsample_factor=2
-num_fmaps=24
-fmap_inc_factor=2
-constant_upsample=False
+
+num_fmaps=16
+fmap_inc_factor=3
+constant_upsample=True
 ndims = 2
-n_conv_passes = 3
-gnet_depth = 5
+n_conv_passes = 2
+gnet_depth = 4
 kernel_size = 7
 
 
@@ -48,9 +49,9 @@ print(f'Out shape: {test.shape}')
 ##########################################
 # for side_length in np.arange(240, 512):
 #     try:
-#         result_size = netG1(torch.rand(12,1,side_length,side_length)).shape
+#         result_size = netG1(torch.rand(1,1,side_length,side_length)).shape
 #         print(f'Side length {side_length} successful on first pass, with result side length {result_size[-1]}.')
-#         final_size = netG1(torch.rand(12,1,result_size[-1],result_size[-1])).shape
+#         final_size = netG1(torch.rand(1,1,result_size[-1],result_size[-1])).shape
 #         print(f'Side length {side_length} successful on both passes, with final side length {final_size[-1]}.')
 #     except:
 #         print(f'Side length {side_length} failed.')

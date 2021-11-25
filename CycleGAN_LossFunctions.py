@@ -166,7 +166,7 @@ class CycleGAN_Loss(torch.nn.Module):
         # define dummy backward pass to disable Gunpowder's Train node loss.backward() call
         total_loss.backward = lambda: None
 
-        print(self.loss_dict)
+        logger.info(self.loss_dict)
         return total_loss
 
     def set_requires_grad(self, nets, requires_grad=False):
@@ -337,7 +337,7 @@ class SplitGAN_Loss(torch.nn.Module):
         # define dummy backward pass to disable Gunpowder's Train node loss.backward() call
         total_loss.backward = lambda: None
 
-        print(self.loss_dict)
+        logger.info(self.loss_dict)
         return total_loss
 
     def set_requires_grad(self, nets, requires_grad=False):
