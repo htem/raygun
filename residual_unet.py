@@ -26,6 +26,7 @@ class ConvPass(torch.nn.Module):
         else:
             self.activation = None
 
+        self.padding = padding
         self.residual = residual
 
         layers = []
@@ -64,11 +65,30 @@ class ConvPass(torch.nn.Module):
 
         self.conv_pass = torch.nn.Sequential(*layers)
 
+    def crop(self, x, shape):
+        '''Center-crop x to match spatial dimensions given by shape.'''
+
+        x_target_size = x.size()[:-self.dims] + shape
+
+        offset = tuple(
+            (a - b)//2
+            for a, b in zip(x.size(), x_target_size))
+
+        slices = tuple(
+            slice(o, o + s)
+            for o, s in zip(offset, x_target_size))
+
+        return x[slices]
+
     def forward(self, x):
         if not self.residual:
             return self.conv_pass(x)
         else:
-            return x + self.conv_pass(x)
+            if self.padding == 'valid':
+                res = self.conv_pass(x)
+                return self.crop(x, res.size()[-self.dims:]) + res
+            else:
+                return x + self.conv_pass(x)
 
 
 class Downsample(torch.nn.Module):
@@ -90,20 +110,21 @@ class Downsample(torch.nn.Module):
 
         self.down = pool(
             downsample_factor,
-            stride=downsample_factor)
+            stride=downsample_factor,
+            ceil_mode=True) #ceil_mode added to attempt to increase flexibility
 
     def forward(self, x):
-
-        for d in range(1, self.dims + 1):
-            if x.size()[-d] % self.downsample_factor[-d] != 0:
-                raise RuntimeError(
-                    "Can not downsample shape %s with factor %s, mismatch "
-                    "in spatial dimension %d" % (
-                        x.size(),
-                        self.downsample_factor,
-                        self.dims - d))
-
-        return self.down(x)
+        try:
+            return self.down(x)
+        except:
+            for d in range(1, self.dims + 1):
+                if x.size()[-d] % self.downsample_factor[-d] != 0:
+                    raise RuntimeError(
+                        "Can not downsample shape %s with factor %s, mismatch "
+                        "in spatial dimension %d" % (
+                            x.size(),
+                            self.downsample_factor,
+                            self.dims - d))
 
 
 class Upsample(torch.nn.Module):
@@ -484,6 +505,21 @@ class ResidualUNet(torch.nn.Module):
             for _ in range(num_heads)
         ])
 
+    def crop(self, x, shape):
+        '''Center-crop x to match spatial dimensions given by shape.'''
+
+        x_target_size = x.size()[:-self.dims] + shape
+
+        offset = tuple(
+            (a - b)//2
+            for a, b in zip(x.size(), x_target_size))
+
+        slices = tuple(
+            slice(o, o + s)
+            for o, s in zip(offset, x_target_size))
+
+        return x[slices]
+
     def rec_forward(self, level, f_in):
 
         # index of level in layer arrays
@@ -527,7 +563,7 @@ class ResidualUNet(torch.nn.Module):
 
             # add residuals to identity projections and activate
             if self.padding.lower() == 'valid':
-                f_id_cropped = self.r_up[0][i].crop(f_proj, gs_cropped[0].size()[-self.r_up[0][i].dims:])
+                f_id_cropped = self.crop(f_proj, fs_mid[0].size()[-self.dims:])
             elif self.padding.lower() == 'same':
                 f_id_cropped = f_proj
             
@@ -546,8 +582,9 @@ class ResidualUNet(torch.nn.Module):
 
     def forward(self, x):
         
-        z = self.rec_forward(self.num_levels - 1, x)
-        y = [x + self.r_fin[h](z[h]) for h in range(self.num_heads)]
+        z = [self.r_fin[h](self.rec_forward(self.num_levels - 1, x)[h]) for h in range(self.num_heads)]
+        x_cropped = [self.crop(x, z[h].size()[-self.dims:]) for h in range(self.num_heads)]
+        y = [x_cropped[h] + z[h] for h in range(self.num_heads)]
 
         if self.num_heads == 1:
             return y[0]

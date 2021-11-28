@@ -17,9 +17,10 @@ class CycleGAN_Loss(torch.nn.Module):
                 optimizer_G1, 
                 optimizer_D2, 
                 optimizer_G2, 
+                dims,
                 l1_lambda=100, 
                 identity_lambda=0,
-                padding=None
+                padding=None,
                  ):
         super(CycleGAN_Loss, self).__init__()
         self.l1_loss = l1_loss
@@ -35,7 +36,8 @@ class CycleGAN_Loss(torch.nn.Module):
         self.l1_lambda = l1_lambda
         self.identity_lambda = identity_lambda
         self.padding=padding
-        if not self.padding is None:
+        self.dims = dims
+        if (not self.padding is None) and (self.padding.lower() != 'valid'):
             inds = [...]
             for pad in self.padding:
                 inds.append(slice(pad, -pad))
@@ -47,6 +49,21 @@ class CycleGAN_Loss(torch.nn.Module):
             'Loss/G1': float(),
             'Loss/G2': float(),
         }
+
+    def crop(self, x, shape):
+        '''Center-crop x to match spatial dimensions given by shape.'''
+
+        x_target_size = x.size()[:-self.dims] + shape
+
+        offset = tuple(
+            (a - b)//2
+            for a, b in zip(x.size(), x_target_size))
+
+        slices = tuple(
+            slice(o, o + s)
+            for o, s in zip(offset, x_target_size))
+
+        return x[slices]
 
     def backward_D(self, Dnet, real, fake, cycled):
         # Real
@@ -104,14 +121,24 @@ class CycleGAN_Loss(torch.nn.Module):
         self.optimizer_G2.zero_grad()        # set G's gradients to zero
 
         #get cycle loss for both directions (i.e. real == cycled, a.k.a. real_A == netG2(netG1(real_A)) for A and B)
-        l1_loss_A = self.l1_loss(real_A, cycled_A)
-        l1_loss_B = self.l1_loss(real_B, cycled_B)
+        if self.padding is not None and self.padding.lower() == 'valid':
+            l1_loss_A = self.l1_loss(self.crop(real_A, cycled_A.size()[-self.dims:]), cycled_A)
+            l1_loss_B = self.l1_loss(self.crop(real_B, cycled_B.size()[-self.dims:]), cycled_B)
+        else:
+            l1_loss_A = self.l1_loss(real_A, cycled_A)
+            l1_loss_B = self.l1_loss(real_B, cycled_B)
         cycle_loss = self.l1_lambda * (l1_loss_A + l1_loss_B)
 
         #get identity loss (i.e. ||G_A(B) - B|| for G_A(A) --> B) if applicable
         if self.identity_lambda > 0:
-            identity_loss_B = self.l1_loss(real_B, self.netG1(real_B))#TODO: add ability to have unique loss function for identity
-            identity_loss_A = self.l1_loss(real_A, self.netG2(real_A))
+            identity_B = self.netG1(real_B)
+            identity_A = self.netG2(real_A)
+            if self.padding is not None and self.padding.lower() == 'valid':
+                identity_loss_B = self.l1_loss(self.crop(real_B, identity_B.size()[-self.dims:]), identity_B)#TODO: add ability to have unique loss function for identity
+                identity_loss_A = self.l1_loss(self.crop(real_A, identity_A.size()[-self.dims:]), identity_A)
+            else:
+                identity_loss_B = self.l1_loss(real_B, identity_B)#TODO: add ability to have unique loss function for identity
+                identity_loss_A = self.l1_loss(real_A, identity_A)
         else:
             identity_loss_B = None
             identity_loss_A = None
@@ -137,8 +164,7 @@ class CycleGAN_Loss(torch.nn.Module):
         # real_B_mask = real_B * mask_B
         # cycled_B_mask = cycled_B * mask_B
         # fake_B_mask = fake_B * mask_A
-        
-        if not self.padding is None:
+        if (not self.padding is None) and (self.padding.lower() != 'valid'):
             real_A = real_A[self.pad_inds]
             fake_A = fake_A[self.pad_inds]
             cycled_A = cycled_A[self.pad_inds]
@@ -194,6 +220,7 @@ class SplitGAN_Loss(torch.nn.Module):
                 optimizer_G1, 
                 optimizer_D2, 
                 optimizer_G2, 
+                dims,
                 l1_lambda=100, 
                 identity_lambda=0,
                 padding=None
@@ -212,7 +239,8 @@ class SplitGAN_Loss(torch.nn.Module):
         self.l1_lambda = l1_lambda
         self.identity_lambda = identity_lambda
         self.padding=padding
-        if not self.padding is None:
+        self.dims = dims
+        if (not self.padding is None) and (self.padding.lower() != 'valid'):
             inds = [...]
             for pad in self.padding:
                 inds.append(slice(pad, -pad))
@@ -224,6 +252,21 @@ class SplitGAN_Loss(torch.nn.Module):
             'Loss/G2': float(),
         }
 
+    def crop(self, x, shape):
+        '''Center-crop x to match spatial dimensions given by shape.'''
+
+        x_target_size = x.size()[:-self.dims] + shape
+
+        offset = tuple(
+            (a - b)//2
+            for a, b in zip(x.size(), x_target_size))
+
+        slices = tuple(
+            slice(o, o + s)
+            for o, s in zip(offset, x_target_size))
+
+        return x[slices]
+        
     def backward_D(self, Dnet, real, fake, cycled):
         # Real
         pred_real = Dnet(real)
@@ -268,11 +311,18 @@ class SplitGAN_Loss(torch.nn.Module):
         gan_loss_cycle = self.gan_loss(pred_cycled, True)
         
         # Include L1 loss for forward and reverse cycle consistency
-        cycle_loss = self.l1_lambda * self.l1_loss(real, cycled)
+        if self.padding is not None and self.padding.lower() == 'valid':
+            cycle_loss = self.l1_lambda * self.l1_loss(self.crop(real, cycled.size()[-self.dims:]), cycled)
+        else:
+            cycle_loss = self.l1_lambda * self.l1_loss(real, cycled)
         
         #get identity loss (i.e. ||G_A(B) - B|| for G_A(A) --> B) if applicable
         if self.identity_lambda > 0:
-            identity_loss = self.l1_loss(real, Gnet(real))#TODO: add ability to have unique loss function for identity
+            identity = Gnet(real)
+            if self.padding is not None and self.padding.lower() == 'valid':
+                identity_loss = self.l1_loss(self.crop(real, identity.size()[-self.dims:]), identity)
+            else:
+                identity_loss = self.l1_loss(real, identity)#TODO: add ability to have unique loss function for identity
         else:
             identity_loss = None
 
@@ -309,8 +359,7 @@ class SplitGAN_Loss(torch.nn.Module):
         # real_B_mask = real_B * mask_B
         # cycled_B_mask = cycled_B * mask_B
         # fake_B_mask = fake_B * mask_A
-        
-        if not self.padding is None:
+        if (not self.padding is None) and (self.padding.lower() != 'valid'):
             real_A = real_A[self.pad_inds]
             fake_A = fake_A[self.pad_inds]
             cycled_A = cycled_A[self.pad_inds]

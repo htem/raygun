@@ -58,7 +58,7 @@ class ConvPass(torch.nn.Module):
                     self.x_init_map = conv(
                                 in_channels,
                                 out_channels,
-                                np.ones(self.dims),
+                                np.ones(self.dims, dtype=int),
                                 padding=pad, 
                                 # padding_mode='circular'
                                 )
@@ -72,15 +72,34 @@ class ConvPass(torch.nn.Module):
 
         self.conv_pass = torch.nn.Sequential(*layers)
 
+    def crop(self, x, shape):
+        '''Center-crop x to match spatial dimensions given by shape.'''
+
+        x_target_size = x.size()[:-self.dims] + shape
+
+        offset = tuple(
+            (a - b)//2
+            for a, b in zip(x.size(), x_target_size))
+
+        slices = tuple(
+            slice(o, o + s)
+            for o, s in zip(offset, x_target_size))
+
+        return x[slices]
+
     def forward(self, x):
         if not self.residual:
             return self.conv_pass(x)
         else:
-            init_x = self.activation(self.x_init_map(x))
-            if self.activation is not None:
-                return self.activation(init_x + self.conv_pass(x))
+            res = self.conv_pass(x)
+            if self.padding.lower() == 'valid':
+                init_x = self.crop(self.x_init_map(x), res.size()[-self.dims:])
             else:
-                return init_x + self.conv_pass(x)
+                init_x = self.x_init_map(x)
+            if self.activation is not None:
+                return self.activation(self.activation(init_x) + res)
+            else:
+                return init_x + res
 
 
 class Downsample(torch.nn.Module):
@@ -102,20 +121,21 @@ class Downsample(torch.nn.Module):
 
         self.down = pool(
             downsample_factor,
-            stride=downsample_factor)
+            stride=downsample_factor,
+            ceil_mode=True) #ceil_mode added to attempt to increase flexibility
 
     def forward(self, x):
-
-        for d in range(1, self.dims + 1):
-            if x.size()[-d] % self.downsample_factor[-d] != 0:
-                raise RuntimeError(
-                    "Can not downsample shape %s with factor %s, mismatch "
-                    "in spatial dimension %d" % (
-                        x.size(),
-                        self.downsample_factor,
-                        self.dims - d))
-
-        return self.down(x)
+        try:
+            return self.down(x)
+        except:
+            for d in range(1, self.dims + 1):
+                if x.size()[-d] % self.downsample_factor[-d] != 0:
+                    raise RuntimeError(
+                        "Can not downsample shape %s with factor %s, mismatch "
+                        "in spatial dimension %d" % (
+                            x.size(),
+                            self.downsample_factor,
+                            self.dims - d))
 
 
 class Upsample(torch.nn.Module):

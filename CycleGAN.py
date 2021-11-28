@@ -73,7 +73,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             verbose=True,
             checkpoint=None, # Used for prediction/rendering, training always starts from latest
             interp_order=None,
-            crop_loss=True,
+            crop_roi=False,
             loss_style='cycle', # supports 'cycle' or 'split'
             min_coefvar=None,
             residual_unet=False,
@@ -141,7 +141,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             else:
                 self.checkpoint = checkpoint
             self.interp_order = interp_order
-            self.crop_loss = crop_loss
+            self.crop_roi = crop_roi
             self.loss_style = loss_style
             self.min_coefvar = min_coefvar
             self.residual_unet = residual_unet
@@ -208,26 +208,30 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     #     return validation_loss
 
     def batch_tBoard_write(self, i=0):
+        self.trainer.summary_writer.flush()
         self.n_iter = self.trainer.iteration
-        for key, loss in self.loss.loss_dict.items():
-            # self.trainer.summary_writer.add_scalar(key.replace('_', '/'), loss, n_iter)
-            self.trainer.summary_writer.add_scalar(key, loss, self.n_iter)
-        # self.trainer.summary_writer.add_scalars('Loss', self.loss.loss_dict, n_iter)
+        # for key, loss in self.loss.loss_dict.items():
+        #     # self.trainer.summary_writer.add_scalar(key.replace('_', '/'), loss, n_iter)
+        #     self.trainer.summary_writer.add_scalar(key, loss, self.n_iter)
+        # # self.trainer.summary_writer.add_scalars('Loss', self.loss.loss_dict, n_iter)
 
-        for array in self.arrays:
-            if len(self.batch[array].data.shape) > 3: # pull out batch dimension if necessary
-                img = self.batch[array].data[i].squeeze()
-            else:
-                img = self.batch[array].data.squeeze()
-            if len(img.shape) == 3:
-                mid = img.shape[0] // 2 # for 3D volume
-                data = img[mid]
-            else:
-                data = img
-            self.trainer.summary_writer.add_image(array.identifier, data, global_step=self.n_iter, dataformats='HW')
+        # for array in self.arrays:
+        #     if len(self.batch[array].data.shape) > 3: # pull out batch dimension if necessary
+        #         img = self.batch[array].data[i].squeeze()
+        #     else:
+        #         img = self.batch[array].data.squeeze()
+        #     if len(img.shape) == 3:
+        #         mid = img.shape[0] // 2 # for 3D volume
+        #         data = img[mid]
+        #     else:
+        #         data = img
+        #     self.trainer.summary_writer.add_image(array.identifier, data, global_step=self.n_iter, dataformats='HW')
 
-        # self.trainer.summary_writer.add_image('netG1_layer1_gradients', self.netG1.unet.l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
-        # self.trainer.summary_writer.add_image('netG2_layer1_gradients', self.netG2.unet.l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
+        try:
+            self.trainer.summary_writer.add_image('netG1_layer1_gradients', self.netG1[0].l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
+            self.trainer.summary_writer.add_image('netG2_layer1_gradients', self.netG2[0].l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
+        except:
+            logger.warning('Unable to write gradients to tensorboard.')
         self.trainer.summary_writer.flush()
 
     def _get_latest_checkpoint(self):
@@ -249,9 +253,18 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         return None, 0
         
-    def get_extents(self, side_length=None):
+    def get_extents(self, side_length=None, array_name=None):
         if side_length is None:
             side_length = self.side_length
+        if array_name is not None and not 'real' in array_name.lower():
+            shape = (1,1) + (side_length,) * self.ndims
+            result = self.netG1(torch.rand(*shape))
+            if 'fake' in array_name.lower():
+                side_length = result.shape[-1]
+            elif 'cycle' in array_name.lower():
+                result = self.netG1(result)
+                side_length = result.shape[-1]
+        
         extents = np.ones((len(self.common_voxel_size)))
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
@@ -282,7 +295,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         return gp.Coordinate(np.sum(level_pads, axis=0)) // 2 # in voxels per edge
 
-    def find_min_valid_size(self):
+    def find_min_valid_size(self, set=True, start_length=None):
         if self.residual_unet:
             net = ResidualUNet(
                     in_channels=1,
@@ -312,18 +325,39 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             net = torch.nn.Sequential(
                                 unet,
                                 ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding='valid', residual=self.residual_blocks))
+        
+        #For discriminators:
+        if self.ndims == 3: #3D case
+            discriminator_maker = NLayerDiscriminator3D
+        elif self.ndims == 2:
+            discriminator_maker = NLayerDiscriminator
+        Dnet = discriminator_maker(input_nc=1, 
+                                        ndf=self.d_num_fmaps, 
+                                        n_layers=self.dnet_depth, 
+                                        downsampling_kw=self.d_downsample_factor, 
+                                        kw=self.d_kernel_size,
+                                 )
         success = False
-        side_length = 16 # sets 16x16(x16) as absolute minimum
+        if start_length is None:
+            side_length = self.side_length
+        else:
+            side_length = start_length
         print('Finding minimum valid input size. This will run until it finds a solution or breaks your computer. Good luck.')
         while not success:
             shape = (1,1) + (side_length,) * self.ndims
             try:
                 result = net(torch.rand(*shape))
                 print(f'Side length {side_length} successful on first pass, with result side length {result.shape[-1]}.')
-                final_size = net(result).shape
-                print(f'Side length {side_length} successful on both passes, with final side length {final_size[-1]}.')
+                result = net(result)
+                print(f'Side length {side_length} successful on both passes, with final side length {result.shape[-1]}.')
+                final_size = Dnet(result).shape
+                print(f'Side length {side_length} successful on both passes and through discriminator, with final evaluated side length {final_size[-1]}.')
+                if set:
+                    self.side_length = side_length
                 return side_length
-            except:
+            except Exception as e:
+                print(e)
+                print(f'Side length {side_length} failed.')
                 side_length += 1
 
     def get_crop_roi(self, extents=None):
@@ -451,16 +485,18 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.optimizer_D2 = torch.optim.Adam(self.netD2.parameters(), lr=self.d_init_learning_rate, betas=(0.95, 0.999))
         self.optimizer = CycleGAN_Optimizer(self.optimizer_G1, self.optimizer_D1, self.optimizer_G2, self.optimizer_D2)
 
-        if self.crop_loss: # Get padding for cropping loss inputs to valid size
+        if self.crop_roi: # Get padding for cropping loss inputs to valid size
             padding = self.get_valid_padding()
+        elif self.padding_unet.lower() == 'valid':
+            padding = 'valid'
         else:
             padding = None
-        self.l1_loss = torch.nn.SmoothL1Loss() # switched from torch.nn.L1Loss()
+        self.l1_loss = torch.nn.L1Loss() # switched from torch.nn.SmoothL1Loss()
         self.gan_loss = GANLoss(gan_mode='lsgan')
         if self.loss_style.lower()=='cycle':
-            self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.l1_lambda, self.identity_lambda, padding)
+            self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.ndims, self.l1_lambda, self.identity_lambda, padding)
         elif self.loss_style.lower()=='split':
-            self.loss = SplitGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.l1_lambda, self.identity_lambda, padding)
+            self.loss = SplitGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.ndims, self.l1_lambda, self.identity_lambda, padding)
         else:
             print("Unexpected Loss Style. Accepted options are 'cycle' or 'split'")
             raise
@@ -690,8 +726,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # create request
         self.train_request = gp.BatchRequest()
-        extents = self.get_extents()
-        for array in self.arrays:
+        if (self.padding_unet is None) or (self.padding_unet.lower() != 'valid'):
+            extents = self.get_extents()
+        for array in self.arrays:            
+            if (self.padding_unet is not None) and (self.padding_unet.lower() == 'valid'):
+                extents = self.get_extents(array_name=array.identifier)
             self.train_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
             
     def test_train(self):
@@ -710,6 +749,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         with gp.build(self.training_pipeline):
             for i in tqdm(range(self.num_epochs)):
                 self.batch = self.training_pipeline.request_batch(self.train_request)
+                if hasattr(self.loss, 'loss_dict'):
+                    print(self.loss.loss_dict)
                 if i % self.log_every == 0 and i != 0:
                     self.batch_tBoard_write()
         return self.batch
@@ -860,7 +901,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 )
         
         #Get ROI for crop
-        crop_roi = self.get_crop_roi(extents)
+        if self.crop_roi:
+            crop_roi = self.get_crop_roi(extents)
 
         if cycle:
             # pipe += gp.Squeeze([real, fake, cycled], axis=0)
@@ -871,8 +913,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 pipe += gp.Squeeze([fake, cycled], axis=1)
             pipe += gp.Squeeze([fake, cycled], axis=0)
             pipe += normalize_fake + normalize_cycled
-            pipe += gp.Crop(fake, roi=crop_roi)
-            pipe += gp.Crop(cycled, roi=crop_roi)
+            if self.crop_roi:            
+                pipe += gp.Crop(fake, roi=crop_roi)
+                pipe += gp.Crop(cycled, roi=crop_roi)
             pipe += gp.AsType(fake, np.uint8)
             pipe += gp.AsType(cycled, np.uint8)
         else:
@@ -884,7 +927,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 pipe += gp.Squeeze([fake], axis=1)
             pipe += gp.Squeeze([fake], axis=0)
             pipe += normalize_fake
-            pipe += gp.Crop(fake, roi=crop_roi)
+            if self.crop_roi:
+                pipe += gp.Crop(fake, roi=crop_roi)
             pipe += gp.AsType(fake, np.uint8)
             self.model.cycle = False
         
