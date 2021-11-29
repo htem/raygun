@@ -9,7 +9,7 @@ from scipy import optimize
 # Load Trained Discriminator:
 import sys
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
-from CycleGun_CBv30nmBottom100um_cb2gcl1_20211119_ import *
+from CycleGun_CBv30nmBottom100um_cb2gcl1_20211126_ import *
 
 print('Defining functions...')
 def bring_the_noise(src, pipeline, noise_order, noise_dict):
@@ -173,7 +173,7 @@ bounds = [
             ]
 options = {'disp': True} 
 
-# print('Optimizing...')
-# result = optimize.shgo(func, bounds, options=options)
-# print('Done.')
-# print(f'x = {result.x}, Final loss = {result.fun}, Total # local minima found = {len(result.xl)}')
+print('Optimizing...')
+result = optimize.shgo(func, bounds, options=options)
+print('Done.')
+print(f'x = {result.x}, Final loss = {result.fun}, Total # local minima found = {len(result.xl)}')

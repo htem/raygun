@@ -79,6 +79,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             residual_unet=False,
             residual_blocks=False,
             padding_unet='same',
+            gan_mode='lsgan',
             ):
             self.src_A = src_A
             self.src_B = src_B
@@ -147,6 +148,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.residual_unet = residual_unet
             self.residual_blocks = residual_blocks
             self.padding_unet = padding_unet
+            self.gan_mode=gan_mode
             self.build_pipeline_parts()
             self.training_pipeline = None
             self.test_training_pipeline = None
@@ -492,7 +494,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             padding = None
         self.l1_loss = torch.nn.L1Loss() # switched from torch.nn.SmoothL1Loss()
-        self.gan_loss = GANLoss(gan_mode='lsgan')
+        self.gan_loss = GANLoss(gan_mode=self.gan_mode)
         if self.loss_style.lower()=='cycle':
             self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.ndims, self.l1_lambda, self.identity_lambda, padding)
         elif self.loss_style.lower()=='split':
