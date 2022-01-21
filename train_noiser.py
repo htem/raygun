@@ -172,7 +172,8 @@ print(f'Initial loss: {cost_func(cycleGun, pre_pipe, post_pipe, critic, out_arra
 
 print('Optimizing...')
 # result = optimize.shgo(func, bounds, options=options)
-result = optimize.basinhopping(func, optim_vars, niter=1000, disp=True)
+# result = optimize.basinhopping(func, optim_vars, niter=1000, disp=True)
+result = optimize.differential_evolution(func, bounds, disp=True, workers=10, x0=optim_vars)
 print(f'x = {result.x}, Final loss = {result.fun}, Total # local minima found = {len(result.xl)}')
 
 print('Saving...')

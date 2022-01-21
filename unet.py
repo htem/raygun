@@ -106,12 +106,14 @@ class Downsample(torch.nn.Module):
 
     def __init__(
             self,
-            downsample_factor):
+            downsample_factor,
+            flexible=False):
 
         super(Downsample, self).__init__()
 
         self.dims = len(downsample_factor)
         self.downsample_factor = downsample_factor
+        self.flexible = flexible
 
         pool = {
             2: torch.nn.MaxPool2d,
@@ -125,17 +127,25 @@ class Downsample(torch.nn.Module):
             ceil_mode=True) #ceil_mode added to attempt to increase flexibility
 
     def forward(self, x):
-        try:
+        if self.flexible:
+            try:
+                return self.down(x)
+            except:
+                self.check_mismatch(x.size())
+        else:
+            self.check_mismatch(x.size())
             return self.down(x)
-        except:
-            for d in range(1, self.dims + 1):
-                if x.size()[-d] % self.downsample_factor[-d] != 0:
-                    raise RuntimeError(
-                        "Can not downsample shape %s with factor %s, mismatch "
-                        "in spatial dimension %d" % (
-                            x.size(),
-                            self.downsample_factor,
-                            self.dims - d))
+            
+    def check_mismatch(self, size):
+        for d in range(1, self.dims + 1):
+                    if size[-d] % self.downsample_factor[-d] != 0:
+                        raise RuntimeError(
+                            "Can not downsample shape %s with factor %s, mismatch "
+                            "in spatial dimension %d" % (
+                                size,
+                                self.downsample_factor,
+                                self.dims - d))
+        return
 
 
 class Upsample(torch.nn.Module):

@@ -66,7 +66,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             g_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             d_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             l1_lambda=100,
-            identity_lambda=100,
+            identity_lambda=0,
             log_every=100,
             save_every=2000,
             tensorboard_path='./tensorboard/',
@@ -496,9 +496,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.l1_loss = torch.nn.L1Loss() # switched from torch.nn.SmoothL1Loss()
         self.gan_loss = GANLoss(gan_mode=self.gan_mode)
         if self.loss_style.lower()=='cycle':
-            self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.ndims, self.l1_lambda, self.identity_lambda, padding)
+            self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.ndims, self.l1_lambda, self.identity_lambda, padding, self.gan_mode)
         elif self.loss_style.lower()=='split':
-            self.loss = SplitGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.ndims, self.l1_lambda, self.identity_lambda, padding)
+            self.loss = SplitGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.ndims, self.l1_lambda, self.identity_lambda, padding, self.gan_mode)
         else:
             print("Unexpected Loss Style. Accepted options are 'cycle' or 'split'")
             raise
@@ -545,9 +545,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         )
 
         if self.min_coefvar is True:
-            self.reject_A = gp.RejectEmpty(self.real_A_src)
+            self.reject_A = gp.RejectConstant(self.real_A_src)
         elif self.min_coefvar: # for cases in which it is specified (i.e. non-default threshold)
-            self.reject_A = gp.RejectEmpty(self.real_A_src, min_coefvar=self.min_coefvar)
+            self.reject_A = gp.RejectConstant(self.real_A_src, min_coefvar=self.min_coefvar)
         else:
             self.reject_A = None
 
@@ -573,9 +573,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         )
 
         if self.min_coefvar is True:
-            self.reject_B = gp.RejectEmpty(self.real_B_src)
+            self.reject_B = gp.RejectConstant(self.real_B_src)
         elif self.min_coefvar: # for cases in which it is specified (i.e. non-default threshold)
-            self.reject_B = gp.RejectEmpty(self.real_B_src, min_coefvar=self.min_coefvar)
+            self.reject_B = gp.RejectConstant(self.real_B_src, min_coefvar=self.min_coefvar)
         else:
             self.reject_B = None
 

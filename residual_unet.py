@@ -15,17 +15,18 @@ class ConvPass(torch.nn.Module):
             out_channels,
             kernel_sizes,
             activation,
+            final_activation=True,
             padding='valid',
             residual=True):
 
         super(ConvPass, self).__init__()
 
         if activation is not None:
-            activation = getattr(torch.nn, activation)
-            self.activation = activation()
+            self.activation = getattr(torch.nn, activation)()
         else:
-            self.activation = None
+            self.activation = nn.Identity()
 
+        self.final_activation = final_activation
         self.padding = padding
         self.residual = residual
 
@@ -60,8 +61,8 @@ class ConvPass(torch.nn.Module):
 
             in_channels = out_channels
 
-            if activation is not None and not (i == (len(kernel_sizes) - 1)): #omit activation from final layer to allow for residual addition
-                layers.append(activation())            
+            if not (i == (len(kernel_sizes) - 1)): #omit activation from final layer to allow for residual addition
+                layers.append(self.activation)            
 
         self.conv_pass = torch.nn.Sequential(*layers)
 
@@ -81,26 +82,34 @@ class ConvPass(torch.nn.Module):
         return x[slices]
 
     def forward(self, x):
+        res = self.conv_pass(x)
         if not self.residual:
-            return self.conv_pass(x)
+            out = res
         else:
-            if self.padding == 'valid':
-                res = self.conv_pass(x)
-                return self.crop(x, res.size()[-self.dims:]) + res
+            if self.padding == 'valid':                
+                out = self.crop(x, res.size()[-self.dims:]) + res
             else:
-                return x + self.conv_pass(x)
+                out = x + res
+
+        if self.final_activation:
+            return self.activation(out)
+        else:
+            return out
+
 
 
 class Downsample(torch.nn.Module):
 
     def __init__(
             self,
-            downsample_factor):
+            downsample_factor,
+            flexible=False):
 
         super(Downsample, self).__init__()
 
         self.dims = len(downsample_factor)
         self.downsample_factor = downsample_factor
+        self.flexible = flexible
 
         pool = {
             2: torch.nn.MaxPool2d,
@@ -114,17 +123,25 @@ class Downsample(torch.nn.Module):
             ceil_mode=True) #ceil_mode added to attempt to increase flexibility
 
     def forward(self, x):
-        try:
+        if self.flexible:
+            try:
+                return self.down(x)
+            except:
+                self.check_mismatch(x.size())
+        else:
+            self.check_mismatch(x.size())
             return self.down(x)
-        except:
-            for d in range(1, self.dims + 1):
-                if x.size()[-d] % self.downsample_factor[-d] != 0:
-                    raise RuntimeError(
-                        "Can not downsample shape %s with factor %s, mismatch "
-                        "in spatial dimension %d" % (
-                            x.size(),
-                            self.downsample_factor,
-                            self.dims - d))
+            
+    def check_mismatch(self, size):
+        for d in range(1, self.dims + 1):
+                    if size[-d] % self.downsample_factor[-d] != 0:
+                        raise RuntimeError(
+                            "Can not downsample shape %s with factor %s, mismatch "
+                            "in spatial dimension %d" % (
+                                size,
+                                self.downsample_factor,
+                                self.dims - d))
+        return
 
 
 class Upsample(torch.nn.Module):
@@ -387,7 +404,7 @@ class ResidualUNet(torch.nn.Module):
         if activation is not None:
             self.activation = getattr(torch.nn, activation)()
         else:
-            self.activation = None
+            self.activation = nn.Identity()
         # default arguments
 
         if kernel_size_down is None:
@@ -448,7 +465,7 @@ class ResidualUNet(torch.nn.Module):
             for level in range(self.num_levels - 1)
         ])
 
-        # right up/crop/concatenate layers
+        # right up/crop layers
         self.r_up = nn.ModuleList([
             nn.ModuleList([
                 Upsample(
@@ -486,6 +503,7 @@ class ResidualUNet(torch.nn.Module):
                     num_fmaps*fmap_inc_factor**level,
                     kernel_size_up[level],
                     activation=activation,
+                    final_activation=False,
                     padding=padding,
                     residual=self.residual)
                 for level in range(self.num_levels - 1)
@@ -499,7 +517,7 @@ class ResidualUNet(torch.nn.Module):
                 num_fmaps,
                 in_channels,
                 [np.ones_like(kernel_size_down[self.num_levels - 1][0])],
-                activation=None,
+                activation=activation,
                 padding=padding,
                 residual=False)
             for _ in range(num_heads)
@@ -544,7 +562,7 @@ class ResidualUNet(torch.nn.Module):
             # nested levels
             gs_out = self.rec_forward(level - 1, g_in)
 
-            # up, concat, and crop
+            # up and crop
             gs_cropped = [
                 self.r_up[h][i](gs_out[h])
                 for h in range(self.num_heads)
@@ -556,7 +574,7 @@ class ResidualUNet(torch.nn.Module):
             ]
 
             # convolve
-            fs_mid = [
+            fs_mid = [ # no final activation applied
                 self.r_conv[h][i](fs_right[h])
                 for h in range(self.num_heads)
             ]
@@ -567,24 +585,19 @@ class ResidualUNet(torch.nn.Module):
             elif self.padding.lower() == 'same':
                 f_id_cropped = f_proj
             
-            if self.activation is not None:
-                fs_out = [
-                    self.activation(fs_mid[h] + f_id_cropped)
-                    for h in range(self.num_heads)
-                ]
-            else:
-                fs_out = [
-                    fs_mid[h] + f_id_cropped
-                    for h in range(self.num_heads)
-                ]
+            fs_out = [
+                self.activation(fs_mid[h] + f_id_cropped)
+                for h in range(self.num_heads)
+            ]
 
         return fs_out
 
     def forward(self, x):
         
-        z = [self.r_fin[h](self.rec_forward(self.num_levels - 1, x)[h]) for h in range(self.num_heads)]
-        x_cropped = [self.crop(x, z[h].size()[-self.dims:]) for h in range(self.num_heads)]
-        y = [x_cropped[h] + z[h] for h in range(self.num_heads)]
+        y = [
+            self.r_fin[h](self.rec_forward(self.num_levels - 1, x)[h])
+            for h in range(self.num_heads)
+        ]
 
         if self.num_heads == 1:
             return y[0]
