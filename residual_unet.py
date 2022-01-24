@@ -441,6 +441,7 @@ class ResidualUNet(torch.nn.Module):
                 num_fmaps*fmap_inc_factor**level,
                 [np.ones_like(kernel_size_down[level][0])],
                 activation=activation,
+                final_activation=False,
                 padding=padding,
                 residual=False)
             for level in range(self.num_levels)
@@ -488,6 +489,7 @@ class ResidualUNet(torch.nn.Module):
                     num_fmaps*fmap_inc_factor**level,
                     [np.ones_like(kernel_size_up[level][0])],
                     activation=activation,
+                    final_activation=False,
                     padding=padding,
                     residual=False)
                 for level in range(self.num_levels - 1)
@@ -544,7 +546,7 @@ class ResidualUNet(torch.nn.Module):
         i = self.num_levels - level - 1
 
         # project to feature space
-        f_proj = self.l_proj[i](f_in)
+        f_proj = self.l_proj[i](f_in) # no final activation applied
 
         # convolve
         f_left = self.l_conv[i](f_proj)
@@ -568,7 +570,7 @@ class ResidualUNet(torch.nn.Module):
                 for h in range(self.num_heads)
             ]
 
-            fs_right = [
+            fs_right = [ # no final activation applied
                 self.r_proj[h][i](gs_cropped[h])
                 for h in range(self.num_heads)
             ]
