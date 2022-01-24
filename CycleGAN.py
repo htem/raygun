@@ -76,7 +76,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             crop_roi=False,
             loss_style='cycle', # supports 'cycle' or 'split'
             min_coefvar=None,
-            unet_activtion='ReLU',
+            unet_activation='ReLU',
             residual_unet=False,
             residual_blocks=False,
             padding_unet='same',
@@ -146,7 +146,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.crop_roi = crop_roi
             self.loss_style = loss_style
             self.min_coefvar = min_coefvar
-            self.unet_activtion = unet_activtion
+            self.unet_activation = unet_activation
             self.residual_unet = residual_unet
             self.residual_blocks = residual_blocks
             self.padding_unet = padding_unet
@@ -312,7 +312,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     kernel_size_down=self.g_kernel_size_down,
                     kernel_size_up=self.g_kernel_size_up,
                     residual=self.residual_blocks,
-                    activation=self.unet_activtion
+                    activation=self.unet_activation
                     )
         else:
             unet = UNet(
@@ -326,7 +326,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     kernel_size_down=self.g_kernel_size_down,
                     kernel_size_up=self.g_kernel_size_up,
                     residual=self.residual_blocks,
-                    activation=self.unet_activtion
+                    activation=self.unet_activation
                     )
             net = torch.nn.Sequential(
                                 unet,
@@ -387,7 +387,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     kernel_size_down=self.g_kernel_size_down,
                     kernel_size_up=self.g_kernel_size_up,
                     residual=self.residual_blocks,
-                    activation=self.unet_activtion
+                    activation=self.unet_activation
                     )
             self.netG1 = torch.nn.Sequential(
                                 unet, 
@@ -404,7 +404,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     kernel_size_down=self.g_kernel_size_down,
                     kernel_size_up=self.g_kernel_size_up,
                     residual=self.residual_blocks,
-                    activation=self.unet_activtion
+                    activation=self.unet_activation
                     )
             self.netG1 = torch.nn.Sequential(
                                 unet,
@@ -426,7 +426,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     kernel_size_down=self.g_kernel_size_down,
                     kernel_size_up=self.g_kernel_size_up,
                     residual=self.residual_blocks,
-                    activation=self.unet_activtion
+                    activation=self.unet_activation
                     )
             self.netG2 = torch.nn.Sequential(
                                 unet, 
@@ -443,7 +443,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 kernel_size_down=self.g_kernel_size_down,
                 kernel_size_up=self.g_kernel_size_up,
                 residual=self.residual_blocks,
-                activation=self.unet_activtion
+                activation=self.unet_activation
                 )        
             self.netG2 = torch.nn.Sequential(
                                 unet,
