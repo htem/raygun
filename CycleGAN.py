@@ -76,6 +76,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             crop_roi=False,
             loss_style='cycle', # supports 'cycle' or 'split'
             min_coefvar=None,
+            unet_activtion='ReLU',
             residual_unet=False,
             residual_blocks=False,
             padding_unet='same',
@@ -145,6 +146,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.crop_roi = crop_roi
             self.loss_style = loss_style
             self.min_coefvar = min_coefvar
+            self.unet_activtion = unet_activtion
             self.residual_unet = residual_unet
             self.residual_blocks = residual_blocks
             self.padding_unet = padding_unet
@@ -309,7 +311,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     voxel_size=self.common_voxel_size[-self.ndims:],
                     kernel_size_down=self.g_kernel_size_down,
                     kernel_size_up=self.g_kernel_size_up,
-                    residual=self.residual_blocks
+                    residual=self.residual_blocks,
+                    activation=self.unet_activtion
                     )
         else:
             unet = UNet(
@@ -322,11 +325,12 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     voxel_size=self.common_voxel_size[-self.ndims:],
                     kernel_size_down=self.g_kernel_size_down,
                     kernel_size_up=self.g_kernel_size_up,
-                    residual=self.residual_blocks
+                    residual=self.residual_blocks,
+                    activation=self.unet_activtion
                     )
             net = torch.nn.Sequential(
                                 unet,
-                                ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding='valid', residual=self.residual_blocks))
+                                ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding='valid'))
         
         #For discriminators:
         if self.ndims == 3: #3D case
@@ -382,7 +386,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     voxel_size=self.common_voxel_size[-self.ndims:],
                     kernel_size_down=self.g_kernel_size_down,
                     kernel_size_up=self.g_kernel_size_up,
-                    residual=self.residual_blocks
+                    residual=self.residual_blocks,
+                    activation=self.unet_activtion
                     )
             self.netG1 = torch.nn.Sequential(
                                 unet, 
@@ -398,11 +403,12 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     voxel_size=self.common_voxel_size[-self.ndims:],
                     kernel_size_down=self.g_kernel_size_down,
                     kernel_size_up=self.g_kernel_size_up,
-                    residual=self.residual_blocks
+                    residual=self.residual_blocks,
+                    activation=self.unet_activtion
                     )
             self.netG1 = torch.nn.Sequential(
                                 unet,
-                                ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet, residual=self.residual_blocks), 
+                                ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet), 
                                 torch.nn.Sigmoid())
                             
         init_weights(self.netG1, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
@@ -419,7 +425,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     voxel_size=self.common_voxel_size[-self.ndims:],
                     kernel_size_down=self.g_kernel_size_down,
                     kernel_size_up=self.g_kernel_size_up,
-                    residual=self.residual_blocks
+                    residual=self.residual_blocks,
+                    activation=self.unet_activtion
                     )
             self.netG2 = torch.nn.Sequential(
                                 unet, 
@@ -435,12 +442,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 voxel_size=self.common_voxel_size[-self.ndims:],
                 kernel_size_down=self.g_kernel_size_down,
                 kernel_size_up=self.g_kernel_size_up,
-                residual=self.residual_blocks
+                residual=self.residual_blocks,
+                activation=self.unet_activtion
                 )        
             self.netG2 = torch.nn.Sequential(
-                            unet,
-                            ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet, residual=self.residual_blocks), 
-                            torch.nn.Sigmoid())
+                                unet,
+                                ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet), 
+                                torch.nn.Sigmoid())
                             
         init_weights(self.netG2, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
 
