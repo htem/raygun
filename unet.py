@@ -24,9 +24,10 @@ class ConvPass(torch.nn.Module):
             activation = getattr(torch.nn, activation)
             self.activation = activation()
         else:
-            self.activation = None
+            self.activation = nn.Identity()
 
         self.residual = residual
+        self.padding = padding
 
         layers = []
 
@@ -40,10 +41,10 @@ class ConvPass(torch.nn.Module):
                 4: Conv4d
             }[self.dims]
 
-            if padding == 'same':
-                pad = tuple(k//2 for k in kernel_size)
-            else:
-                pad = 0
+            # if padding == 'same':
+            #     pad = tuple(k//2 for k in kernel_size)
+            # else:
+            #     pad = 0
 
             try:
                 layers.append(
@@ -51,24 +52,26 @@ class ConvPass(torch.nn.Module):
                         in_channels,
                         out_channels,
                         kernel_size,
-                        padding=pad, 
-                        # padding_mode='circular'
+                        padding=padding, 
+                        # padding=pad, 
+                        padding_mode='reflection'
                         ))
                 if residual and i == 0:
                     self.x_init_map = conv(
                                 in_channels,
                                 out_channels,
                                 np.ones(self.dims, dtype=int),
-                                padding=pad, 
-                                # padding_mode='circular'
+                                padding=padding, 
+                                # padding=pad, 
+                                padding_mode='reflection'
                                 )
             except KeyError:
                 raise RuntimeError("%dD convolution not implemented" % self.dims)
 
             in_channels = out_channels
 
-            if activation is not None and not (residual and i == (len(kernel_sizes) - 1)):
-                layers.append(activation())            
+            if not (residual and i == (len(kernel_sizes) - 1)):
+                layers.append(self.activation)            
 
         self.conv_pass = torch.nn.Sequential(*layers)
 
@@ -96,10 +99,7 @@ class ConvPass(torch.nn.Module):
                 init_x = self.crop(self.x_init_map(x), res.size()[-self.dims:])
             else:
                 init_x = self.x_init_map(x)
-            if self.activation is not None:
-                return self.activation(self.activation(init_x) + res)
-            else:
-                return init_x + res
+            return self.activation(init_x + res)            
 
 
 class Downsample(torch.nn.Module):

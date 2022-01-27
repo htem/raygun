@@ -91,6 +91,7 @@ class CycleGAN_Loss(torch.nn.Module):
         return loss_D
 
     def backward_Ds(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, n_loop=5):
+        self.set_requires_grad([self.netG1, self.netG2], False)  # G does not require gradients when optimizing D
         self.set_requires_grad([self.netD1, self.netD2], True)  # enable backprop for D
         self.optimizer_D1.zero_grad()     # set D's gradients to zero
         self.optimizer_D2.zero_grad()     # set D's gradients to zero
@@ -140,6 +141,7 @@ class CycleGAN_Loss(torch.nn.Module):
         return loss_G
 
     def backward_Gs(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
+        self.set_requires_grad([self.netG1, self.netG2], True)  # G requires gradients when optimizing
         self.set_requires_grad([self.netD1, self.netD2], False)  # D requires no gradients when optimizing G
         self.optimizer_G1.zero_grad()        # set G's gradients to zero
         self.optimizer_G2.zero_grad()        # set G's gradients to zero
@@ -325,6 +327,7 @@ class SplitGAN_Loss(torch.nn.Module):
         return loss_D
 
     def backward_Ds(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, n_loop=5):
+        self.set_requires_grad([self.netG1, self.netG2], False)  # G does not require gradients when optimizing D
         self.set_requires_grad([self.netD1, self.netD2], True)  # enable backprop for D
         self.optimizer_D1.zero_grad()     # set D's gradients to zero
         self.optimizer_D2.zero_grad()     # set D's gradients to zero
@@ -391,6 +394,7 @@ class SplitGAN_Loss(torch.nn.Module):
         return loss_G
 
     def backward_Gs(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
+        self.set_requires_grad([self.netG1, self.netG2], True)  # G requires gradients when optimizing
         self.set_requires_grad([self.netD1, self.netD2], False)  # D requires no gradients when optimizing G
         self.optimizer_G1.zero_grad()        # set G's gradients to zero
         self.optimizer_G2.zero_grad()        # set G's gradients to zero

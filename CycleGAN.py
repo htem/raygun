@@ -231,12 +231,12 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #         data = img
         #     self.trainer.summary_writer.add_image(array.identifier, data, global_step=self.n_iter, dataformats='HW')
 
-        try:
-            self.trainer.summary_writer.add_image('netG1_layer1_gradients', self.netG1[0].l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
-            self.trainer.summary_writer.add_image('netG2_layer1_gradients', self.netG2[0].l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
-        except:
-            logger.warning('Unable to write gradients to tensorboard.')
-        self.trainer.summary_writer.flush()
+        # try:
+        #     self.trainer.summary_writer.add_image('netG1_layer1_gradients', self.netG1[0].l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
+        #     self.trainer.summary_writer.add_image('netG2_layer1_gradients', self.netG2[0].l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
+        # except:
+        #     logger.warning('Unable to write gradients to tensorboard.')
+        # self.trainer.summary_writer.flush()
 
     def _get_latest_checkpoint(self):
         basename = self.model_path + self.model_name
@@ -373,116 +373,77 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         padding = self.get_valid_padding()
         return crop_roi.grow(-padding, -padding)
 
-    def setup_networks(self):
-        #For netG1:
-        if self.residual_unet:
+    def get_generator(self, conf=None): 
+        if conf is None: conf = self
+        if conf.residual_unet:
             unet = ResidualUNet(
                     in_channels=1,
-                    num_fmaps=self.g_num_fmaps,
-                    fmap_inc_factor=self.g_fmap_inc_factor,
-                    downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                    padding=self.padding_unet,
-                    constant_upsample=self.g_constant_upsample,
-                    voxel_size=self.common_voxel_size[-self.ndims:],
-                    kernel_size_down=self.g_kernel_size_down,
-                    kernel_size_up=self.g_kernel_size_up,
-                    residual=self.residual_blocks,
-                    activation=self.unet_activation
+                    num_fmaps=conf.g_num_fmaps,
+                    fmap_inc_factor=conf.g_fmap_inc_factor,
+                    downsample_factors=[(conf.g_downsample_factor,)*conf.ndims,] * (conf.gnet_depth - 1),
+                    padding=conf.padding_unet,
+                    constant_upsample=conf.g_constant_upsample,
+                    voxel_size=conf.common_voxel_size[-conf.ndims:],
+                    kernel_size_down=conf.g_kernel_size_down,
+                    kernel_size_up=conf.g_kernel_size_up,
+                    residual=conf.residual_blocks,
+                    activation=conf.unet_activation
                     )
-            self.netG1 = torch.nn.Sequential(
+            generator = torch.nn.Sequential(
                                 unet, 
                                 torch.nn.Sigmoid())
         else:
             unet = UNet(
                     in_channels=1,
-                    num_fmaps=self.g_num_fmaps,
-                    fmap_inc_factor=self.g_fmap_inc_factor,
-                    downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                    padding=self.padding_unet,
-                    constant_upsample=self.g_constant_upsample,
-                    voxel_size=self.common_voxel_size[-self.ndims:],
-                    kernel_size_down=self.g_kernel_size_down,
-                    kernel_size_up=self.g_kernel_size_up,
-                    residual=self.residual_blocks,
-                    activation=self.unet_activation
+                    num_fmaps=conf.g_num_fmaps,
+                    fmap_inc_factor=conf.g_fmap_inc_factor,
+                    downsample_factors=[(conf.g_downsample_factor,)*conf.ndims,] * (conf.gnet_depth - 1),
+                    padding=conf.padding_unet,
+                    constant_upsample=conf.g_constant_upsample,
+                    voxel_size=conf.common_voxel_size[-conf.ndims:],
+                    kernel_size_down=conf.g_kernel_size_down,
+                    kernel_size_up=conf.g_kernel_size_up,
+                    residual=conf.residual_blocks,
+                    activation=conf.unet_activation
                     )
-            self.netG1 = torch.nn.Sequential(
+            generator = torch.nn.Sequential(
                                 unet,
-                                ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet), 
+                                ConvPass(conf.g_num_fmaps, 1, [(1,)*conf.ndims], activation=None, padding=conf.padding_unet), 
                                 torch.nn.Sigmoid())
-                            
-        init_weights(self.netG1, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
-
-        #For netG2:
-        if self.residual_unet:
-            unet = ResidualUNet(
-                    in_channels=1,
-                    num_fmaps=self.g_num_fmaps,
-                    fmap_inc_factor=self.g_fmap_inc_factor,
-                    downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                    padding=self.padding_unet,
-                    constant_upsample=self.g_constant_upsample,
-                    voxel_size=self.common_voxel_size[-self.ndims:],
-                    kernel_size_down=self.g_kernel_size_down,
-                    kernel_size_up=self.g_kernel_size_up,
-                    residual=self.residual_blocks,
-                    activation=self.unet_activation
-                    )
-            self.netG2 = torch.nn.Sequential(
-                                unet, 
-                                torch.nn.Sigmoid())
+        if conf.unet_activation is not None:
+            init_weights(generator, init_type='kaiming', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
         else:
-            unet = UNet(
-                in_channels=1,
-                num_fmaps=self.g_num_fmaps,
-                fmap_inc_factor=self.g_fmap_inc_factor,
-                downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                padding=self.padding_unet,
-                constant_upsample=self.g_constant_upsample,
-                voxel_size=self.common_voxel_size[-self.ndims:],
-                kernel_size_down=self.g_kernel_size_down,
-                kernel_size_up=self.g_kernel_size_up,
-                residual=self.residual_blocks,
-                activation=self.unet_activation
-                )        
-            self.netG2 = torch.nn.Sequential(
-                                unet,
-                                ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet), 
-                                torch.nn.Sigmoid())
-                            
-        init_weights(self.netG2, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
+            init_weights(generator, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
+        return generator
 
-        #For discriminators:
-        if self.ndims == 3: #3D case
+    def get_discriminator(self, conf=None):
+        if conf is None: conf = self
+        if conf.ndims == 3: #3D case
             norm_instance = torch.nn.InstanceNorm3d
             discriminator_maker = NLayerDiscriminator3D
-        elif self.ndims == 2:
+        elif conf.ndims == 2:
             norm_instance = torch.nn.InstanceNorm2d
             discriminator_maker = NLayerDiscriminator
 
         #For netD1:
         norm_layer = functools.partial(norm_instance, affine=False, track_running_stats=False)
-        self.netD1 = discriminator_maker(input_nc=1, 
-                                        ndf=self.d_num_fmaps, 
-                                        n_layers=self.dnet_depth, 
+        discriminator = discriminator_maker(input_nc=1, 
+                                        ndf=conf.d_num_fmaps, 
+                                        n_layers=conf.dnet_depth, 
                                         norm_layer=norm_layer,
-                                        downsampling_kw=self.d_downsample_factor, 
-                                        kw=self.d_kernel_size,
+                                        downsampling_kw=conf.d_downsample_factor, 
+                                        kw=conf.d_kernel_size,
                                  )
                                  
-        init_weights(self.netD1, init_type='normal')
+        init_weights(discriminator, init_type='kaiming')
+        return discriminator
 
-        #For netD2:
-        norm_layer = functools.partial(norm_instance, affine=False, track_running_stats=False)
-        self.netD2 = discriminator_maker(input_nc=1, 
-                                        ndf=self.d_num_fmaps, 
-                                        n_layers=self.dnet_depth, 
-                                        norm_layer=norm_layer,
-                                        downsampling_kw=self.d_downsample_factor, 
-                                        kw=self.d_kernel_size,
-                                 )
-                                 
-        init_weights(self.netD2, init_type='normal')
+    def setup_networks(self):
+        self.netG1 = self.get_generator()
+        self.netG2 = self.get_generator()
+        
+        self.netD1 = self.get_discriminator()
+        self.netD2 = self.get_discriminator()
 
     def setup_model(self):
         if not hasattr(self, 'netG1'):
