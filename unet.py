@@ -54,7 +54,7 @@ class ConvPass(torch.nn.Module):
                         kernel_size,
                         padding=padding, 
                         # padding=pad, 
-                        padding_mode='reflection'
+                        padding_mode='reflect'
                         ))
                 if residual and i == 0:
                     self.x_init_map = conv(
@@ -63,7 +63,7 @@ class ConvPass(torch.nn.Module):
                                 np.ones(self.dims, dtype=int),
                                 padding=padding, 
                                 # padding=pad, 
-                                padding_mode='reflection'
+                                padding_mode='reflect'
                                 )
             except KeyError:
                 raise RuntimeError("%dD convolution not implemented" % self.dims)
