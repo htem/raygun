@@ -195,21 +195,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             else:
                 axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
                 axes[r, c].set_title(label)
-    
-    # @torch.no_grad()
-    # def get_validation_loss(self):
-    #     validation_loss = self.loss.validation(
-    #                     self.batch[self.real_A].data, 
-    #                     self.batch[self.fake_A].data, 
-    #                     self.batch[self.cycled_A].data, 
-    #                     self.batch[self.real_B].data, 
-    #                     self.batch[self.fake_B].data, 
-    #                     self.batch[self.cycled_B].data, 
-    #                     not self.batch[self.mask_A].data, 
-    #                     not self.batch[self.mask_B].data
-    #                     )
-    #     self.validation_loss = validation_loss
-    #     return validation_loss
 
     def batch_tBoard_write(self, i=0):
         self.trainer.summary_writer.flush()

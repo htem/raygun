@@ -16,7 +16,9 @@ class ConvPass(torch.nn.Module):
             kernel_sizes,
             activation,
             padding='valid',
-            residual=False):
+            residual=False,
+            padding_mode='zeros'#TODO: evaluate 'reflect'
+            ):
 
         super(ConvPass, self).__init__()
 
@@ -54,16 +56,22 @@ class ConvPass(torch.nn.Module):
                         kernel_size,
                         padding=padding, 
                         # padding=pad, 
-                        padding_mode='reflect'
+                        padding_mode=padding_mode
                         ))
                 if residual and i == 0:
+                    if in_channels < out_channels: 
+                        groups = in_channels
+                    else: 
+                        groups = out_channels
                     self.x_init_map = conv(
                                 in_channels,
                                 out_channels,
                                 np.ones(self.dims, dtype=int),
                                 padding=padding, 
                                 # padding=pad, 
-                                padding_mode='reflect'
+                                padding_mode=padding_mode,
+                                bias=False,
+                                groups=groups
                                 )
             except KeyError:
                 raise RuntimeError("%dD convolution not implemented" % self.dims)
@@ -124,7 +132,8 @@ class Downsample(torch.nn.Module):
         self.down = pool(
             downsample_factor,
             stride=downsample_factor,
-            ceil_mode=True) #ceil_mode added to attempt to increase flexibility
+            # ceil_mode=True
+            ) #ceil_mode added to attempt to increase flexibility
 
     def forward(self, x):
         if self.flexible:
@@ -138,13 +147,13 @@ class Downsample(torch.nn.Module):
             
     def check_mismatch(self, size):
         for d in range(1, self.dims + 1):
-                    if size[-d] % self.downsample_factor[-d] != 0:
-                        raise RuntimeError(
-                            "Can not downsample shape %s with factor %s, mismatch "
-                            "in spatial dimension %d" % (
-                                size,
-                                self.downsample_factor,
-                                self.dims - d))
+            if size[-d] % self.downsample_factor[-d] != 0:
+                raise RuntimeError(
+                    "Can not downsample shape %s with factor %s, mismatch "
+                    "in spatial dimension %d" % (
+                        size,
+                        self.downsample_factor,
+                        self.dims - d))
         return
 
 
