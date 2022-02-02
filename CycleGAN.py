@@ -7,11 +7,7 @@ import zarr
 import daisy
 import os
 
-# import gunpowder as gp
-
-import sys #TODO: REMOVE AFTER DEV
-sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
-from gunpowder import gunpowder as gp
+import gunpowder as gp
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -266,9 +262,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         num_levels = len(downsample_factors) + 1
         if kernel_size_down is None:
-            kernel_size_down = [[(3, 3, 3), (3, 3, 3)]]*num_levels
+            kernel_size_down = [[(3,)*self.ndims, (3,)*self.ndims]]*num_levels
         if kernel_size_up is None:
-            kernel_size_up = [[(3, 3, 3), (3, 3, 3)]]*(num_levels - 1)
+            kernel_size_up = [[(3,)*self.ndims, (3,)*self.ndims]]*(num_levels - 1)
 
         level_pads = []
         #going down
@@ -283,51 +279,18 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             level_pads.append(np.sum(np.array(kernel_size_up[level]) - 1, axis=0) * (self.g_downsample_factor ** level))
 
         return gp.Coordinate(np.sum(level_pads, axis=0)) // 2 # in voxels per edge
+    
+    def get_valid_crop(self, in_size=None):
+        if in_size is None: 
+            pad = self.get_valid_padding()[0]
+            in_size = self.side_length - (pad*2)
+        
+        
 
     def find_min_valid_size(self, set=True, start_length=None):
-        if self.residual_unet:
-            net = ResidualUNet(
-                    in_channels=1,
-                    num_fmaps=self.g_num_fmaps,
-                    fmap_inc_factor=self.g_fmap_inc_factor,
-                    downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                    padding='valid',
-                    constant_upsample=self.g_constant_upsample,
-                    voxel_size=self.common_voxel_size[-self.ndims:],
-                    kernel_size_down=self.g_kernel_size_down,
-                    kernel_size_up=self.g_kernel_size_up,
-                    residual=self.residual_blocks,
-                    activation=self.unet_activation
-                    )
-        else:
-            unet = UNet(
-                    in_channels=1,
-                    num_fmaps=self.g_num_fmaps,
-                    fmap_inc_factor=self.g_fmap_inc_factor,
-                    downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                    padding='valid',
-                    constant_upsample=self.g_constant_upsample,
-                    voxel_size=self.common_voxel_size[-self.ndims:],
-                    kernel_size_down=self.g_kernel_size_down,
-                    kernel_size_up=self.g_kernel_size_up,
-                    residual=self.residual_blocks,
-                    activation=self.unet_activation
-                    )
-            net = torch.nn.Sequential(
-                                unet,
-                                ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding='valid'))
-        
-        #For discriminators:
-        if self.ndims == 3: #3D case
-            discriminator_maker = NLayerDiscriminator3D
-        elif self.ndims == 2:
-            discriminator_maker = NLayerDiscriminator
-        Dnet = discriminator_maker(input_nc=1, 
-                                        ndf=self.d_num_fmaps, 
-                                        n_layers=self.dnet_depth, 
-                                        downsampling_kw=self.d_downsample_factor, 
-                                        kw=self.d_kernel_size,
-                                 )
+        Gnet = self.get_generator()
+        Dnet = self.get_discriminator()
+
         success = False
         if start_length is None:
             side_length = self.side_length
@@ -337,9 +300,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         while not success:
             shape = (1,1) + (side_length,) * self.ndims
             try:
-                result = net(torch.rand(*shape))
+                result = Gnet(torch.rand(*shape))
                 print(f'Side length {side_length} successful on first pass, with result side length {result.shape[-1]}.')
-                result = net(result)
+                result = Gnet(result)
                 print(f'Side length {side_length} successful on both passes, with final side length {result.shape[-1]}.')
                 final_size = Dnet(result).shape
                 print(f'Side length {side_length} successful on both passes and through discriminator, with final evaluated side length {final_size[-1]}.')
@@ -447,7 +410,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             padding = 'valid'
         else:
             padding = None
-        self.l1_loss = torch.nn.SmoothL1Loss() # switched from torch.nn.L1Loss()
+        # self.l1_loss = torch.nn.SmoothL1Loss() 
+        self.l1_loss = torch.nn.L1Loss() 
         self.gan_loss = GANLoss(gan_mode=self.gan_mode)
         if self.loss_style.lower()=='cycle':
             self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.ndims, self.l1_lambda, self.identity_lambda, padding, self.gan_mode)
@@ -634,7 +598,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # assemble pipeline
         self.training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
         # self.training_pipeline += augmentations
-        self.training_pipeline += self.cache
         self.training_pipeline += self.trainer
         # remove "channel" dimensions if neccessary
         if self.ndims == len(self.common_voxel_size):
@@ -655,6 +618,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                             ], axis=0)
         self.training_pipeline += self.normalize_fake_B + self.normalize_cycled_A
         self.training_pipeline += self.normalize_fake_A + self.normalize_cycled_B
+        self.training_pipeline += self.cache
         self.training_pipeline += self.performance
 
         self.test_training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
@@ -917,7 +881,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                         # dataset_dtypes = {fake: pred_spec.dtype}
                         )        
         
-        pipe += self.cache
+        # pipe += self.cache
         pipe += gp.Scan(scan_request, num_workers=self.num_workers, cache_size=self.cache_size)#os.cpu_count())
 
         pipe += self.performance
