@@ -17,14 +17,13 @@ class ConvPass(torch.nn.Module):
             activation,
             padding='valid',
             residual=False,
-            padding_mode='zeros'#TODO: evaluate 'reflect'
+            padding_mode='reflect'#default to 'zeros' until 1/28/2022 (Jeff Rhoades)
             ):
 
         super(ConvPass, self).__init__()
 
         if activation is not None:
-            activation = getattr(torch.nn, activation)
-            self.activation = activation()
+            self.activation = getattr(torch.nn, activation)()
         else:
             self.activation = nn.Identity()
 

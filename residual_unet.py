@@ -17,7 +17,9 @@ class ConvPass(torch.nn.Module):
             activation,
             final_activation=True,
             padding='valid',
-            residual=True):
+            residual=True,
+            padding_mode='reflect'#default to 'zeros' until 1/28/2022 (Jeff Rhoades)
+            ):
 
         super(ConvPass, self).__init__()
 
@@ -42,10 +44,10 @@ class ConvPass(torch.nn.Module):
                 4: Conv4d
             }[self.dims]
 
-            if padding == 'same':
-                pad = tuple(k//2 for k in kernel_size)
-            else:
-                pad = 0
+            # if padding == 'same':
+            #     pad = tuple(k//2 for k in kernel_size)
+            # else:
+            #     pad = 0
 
             try:
                 layers.append(
@@ -53,8 +55,9 @@ class ConvPass(torch.nn.Module):
                         in_channels,
                         out_channels,
                         kernel_size,
-                        padding=pad, 
-                        # padding_mode='circular'
+                        padding=padding, 
+                        # padding=pad, 
+                        padding_mode=padding_mode
                         ))
             except KeyError:
                 raise RuntimeError("%dD convolution not implemented" % self.dims)
@@ -82,14 +85,12 @@ class ConvPass(torch.nn.Module):
         return x[slices]
 
     def forward(self, x):
-        res = self.conv_pass(x)
-        if not self.residual:
-            out = res
-        else:
+        out = self.conv_pass(x)
+        if self.residual:
             if self.padding == 'valid':                
-                out = self.crop(x, res.size()[-self.dims:]) + res
+                out += self.crop(x, out.size()[-self.dims:])
             else:
-                out = x + res
+                out += x
 
         if self.final_activation:
             return self.activation(out)

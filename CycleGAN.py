@@ -447,7 +447,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             padding = 'valid'
         else:
             padding = None
-        self.l1_loss = torch.nn.L1Loss() # switched from torch.nn.SmoothL1Loss()
+        self.l1_loss = torch.nn.SmoothL1Loss() # switched from torch.nn.L1Loss()
         self.gan_loss = GANLoss(gan_mode=self.gan_mode)
         if self.loss_style.lower()=='cycle':
             self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D1, self.optimizer_G1, self.optimizer_D2, self.optimizer_G2, self.ndims, self.l1_lambda, self.identity_lambda, padding, self.gan_mode)
@@ -707,7 +707,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 self.batch = self.training_pipeline.request_batch(self.train_request)
                 if hasattr(self.loss, 'loss_dict'):
                     print(self.loss.loss_dict)
-                if i % self.log_every == 0 and i != 0:
+                if i % self.log_every == 0:
                     self.batch_tBoard_write()
         return self.batch
         
@@ -930,6 +930,17 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             pipe.request_batch(request)
             print('Finished.')
 
+    def load_saved_model(self, checkpoint=None):
+        if checkpoint is None:
+            checkpoint = self.checkpoint
+        if checkpoint is not None:
+            checkpoint = torch.load(checkpoint)
+            if "model_state_dict" in checkpoint:
+                self.model.load_state_dict(checkpoint["model_state_dict"])
+            else:
+                self.model.load_state_dict()
+        else:
+            raise('No saved checkpoint found.')
 
 class CycleGAN_Model(torch.nn.Module):
     def __init__(self, netG1, netD1, netG2, netD2):

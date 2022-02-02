@@ -5,7 +5,7 @@ import neuroglancer
 import zarr
 import sys
 
-from funlib.show.neuroglancer import add_layer, new_layer
+from funlib.show.neuroglancer import add_layer#, new_layer
 
 from segway.gt_scripts.gt_tools import *
 
