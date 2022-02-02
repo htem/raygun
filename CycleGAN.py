@@ -254,18 +254,21 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
 
-    def get_valid_padding(self):
-        # figure out proper ROI padding for context
-        downsample_factors = [(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1)
+    def get_unet_kernels(self):
         kernel_size_down = self.g_kernel_size_down #<- length of list determines number of conv passes in level
         kernel_size_up = self.g_kernel_size_up
 
-        num_levels = len(downsample_factors) + 1
         if kernel_size_down is None:
-            kernel_size_down = [[(3,)*self.ndims, (3,)*self.ndims]]*num_levels
+            kernel_size_down = [[(3,)*self.ndims, (3,)*self.ndims]]*self.gnet_depth
         if kernel_size_up is None:
-            kernel_size_up = [[(3,)*self.ndims, (3,)*self.ndims]]*(num_levels - 1)
+            kernel_size_up = [[(3,)*self.ndims, (3,)*self.ndims]]*(self.gnet_depth - 1)
+        
+        return kernel_size_down, kernel_size_up
 
+    def get_valid_padding(self):
+        # figure out proper ROI padding for context
+        
+        kernel_size_down, kernel_size_up = self.get_unet_kernels()
         level_pads = []
         #going down
         for level in np.arange(self.gnet_depth - 1):
@@ -280,12 +283,54 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         return gp.Coordinate(np.sum(level_pads, axis=0)) // 2 # in voxels per edge
     
-    def get_valid_crop(self, in_size=None):
-        if in_size is None: 
-            pad = self.get_valid_padding()[0]
-            in_size = self.side_length - (pad*2)
+    def get_valid_crop_to(self, size=None):
+        #returns next valid size that could be cropped to
+        pad = self.get_valid_padding()[0] * 2
+        if size is None: 
+            size = self.side_length - pad
         
+        success = self.check_valid_size(size)
+        failed = (size - pad) <= 0
+        while not success and not failed:
+            size -= 1
+            success = self.check_valid_size(size)
+            failed = (size - pad) <= 0
         
+        if success:
+            return size
+        else:
+            return False
+            
+    def check_valid_size(self, in_size):
+        def _check_size(size):
+            return (int(size) == size) and (size > 0)
+
+        size = in_size
+        kernel_size_down, kernel_size_up = self.get_unet_kernels()
+        down_fac = self.g_downsample_factor
+        try:
+            #going down
+            for level in np.arange(self.gnet_depth - 1):
+                size -= np.sum(np.array(kernel_size_down[level]) - 1, axis=0)[0]
+                size /= down_fac
+                assert _check_size(size)
+
+            #bottom level
+            size -= np.sum(np.array(kernel_size_down[-1]) - 1, axis=0)[0]
+            assert _check_size(size)
+
+            #coming up
+            for level in np.arange(self.gnet_depth - 1)[::-1]:
+                size *= down_fac
+                size -= np.sum(np.array(kernel_size_up[level]) - 1, axis=0)[0]
+                assert _check_size(size)
+            
+            #final check
+            shape = (1,1) + (in_size,) * self.ndims
+            _ = self.netG1(torch.rand(*shape))
+            return True
+        except:
+            return False        
 
     def find_min_valid_size(self, set=True, start_length=None):
         Gnet = self.get_generator()
