@@ -302,6 +302,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             return False
             
     def check_valid_size(self, in_size):
+        # Checks if a size is a valid input to a generator, and returns the generators output size if successful
         def _check_size(size):
             return (int(size) == size) and (size > 0)
 
@@ -328,13 +329,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             #final check
             shape = (1,1) + (in_size,) * self.ndims
             _ = self.netG1(torch.rand(*shape))
-            return True
+            return size
         except:
             return False        
 
     def find_min_valid_size(self, set=True, start_length=None):
-        Gnet = self.get_generator()
         Dnet = self.get_discriminator()
+        pad = self.get_valid_padding()[0] * 2        
 
         success = False
         if start_length is None:
@@ -343,13 +344,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             side_length = start_length
         print('Finding minimum valid input size. This will run until it finds a solution or breaks your computer. Good luck.')
         while not success:
-            shape = (1,1) + (side_length,) * self.ndims
             try:
-                result = Gnet(torch.rand(*shape))
-                print(f'Side length {side_length} successful on first pass, with result side length {result.shape[-1]}.')
-                result = Gnet(result)
-                print(f'Side length {side_length} successful on both passes, with final side length {result.shape[-1]}.')
-                final_size = Dnet(result).shape
+                out_size = side_length - pad
+                print(f'Side length {side_length} successful on first pass, with result side length {out_size}.')
+                out_size = self.get_valid_crop_to(out_size)
+                print(f'Side length {side_length} successful on both passes, with final side length {out_size}.')
+                shape = (1,1) + (out_size,) * self.ndims                
+                final_size = Dnet(torch.rand(*shape)).shape
                 print(f'Side length {side_length} successful on both passes and through discriminator, with final evaluated side length {final_size[-1]}.')
                 if set:
                     self.side_length = side_length
@@ -970,7 +971,7 @@ class CycleGAN_Model(torch.nn.Module):
         else:
             fake_B = None
             cycled_A = None
-
+        #TODO: User torch.nn.functional.interpolate(mode='trilinear or bilinear', align_corners=True)
         if real_B is not None:
             fake_A = self.netG2(real_B)
             if self.cycle:

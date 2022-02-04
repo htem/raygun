@@ -5,9 +5,9 @@ TODO: DeprecationWarning
 
 #TODO: Make callable function
 # --- Parameters and paths --- #
-in_file_path = 'gs://lee-pacureanu_data-exchange_us-storage/ls2892_LTP/2102/CBxs_lobV/CBxs_lobV_overview_90nm_rec5iter_db9_l20p15_.vol'
+in_file_path = 'gs://lee-pacureanu_data-exchange_us-storage/ls2892_LTP/2102/CBxs_lobV/CBxs_lobV_topm100um_30nm_rec_db12_.raw'
 out_file_path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/'
-out_name = 'CBxs_lobV_overview_90nm_rec5iter_db9_l20p15_.n5'
+out_name = 'CBxs_lobV_topm100um_30nm_rec_db12_.n5'
 ds_name = 'volumes/raw'
 
 # --- Connect to image volume and get metadata --- #
