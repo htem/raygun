@@ -244,11 +244,14 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if side_length is None:
             side_length = self.side_length
 
-            if array_name is not None and not 'real' in array_name.lower(): # if real, return original side_length
-                side_length = self.get_valid_crop_to() # if fake, get validly cropped output of first generator
-                assert side_length, f'Unable to get valid side_length for {array_name}'
-                if 'cycle' in array_name.lower():
-                    side_length -= self.get_valid_padding()[0] * 2 # if cycled, get final output of second generator                
+            if array_name is not None and not 'real' in array_name.lower():
+                shape = (1,1) + (side_length,) * self.ndims
+                result = self.netG1(torch.rand(*shape))
+                if 'fake' in array_name.lower():
+                    side_length = result.shape[-1]
+                elif 'cycle' in array_name.lower():
+                    result = self.netG1(result)
+                    side_length = result.shape[-1]
 
         extents = np.ones((len(self.common_voxel_size)))
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
@@ -298,7 +301,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         
         if success:
             try: # final test: through discriminator
-                shape = (1,1) + (success,) * self.ndims
+                shape = (1,1) + (size - pad,) * self.ndims
                 temp = torch.rand(*shape)
                 _ = self.netD1(temp)
                 return size
@@ -320,22 +323,24 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             for level in np.arange(self.gnet_depth - 1):
                 size -= np.sum(np.array(kernel_size_down[level]) - 1, axis=0)[0]
                 size /= down_fac
+                logger.debug(f'Going down level {level} and size {size}')
                 assert _check_size(size)
 
             #bottom level
             size -= np.sum(np.array(kernel_size_down[-1]) - 1, axis=0)[0]
+            logger.debug(f'At bottom with size {size}')
             assert _check_size(size)
 
             #coming up
             for level in np.arange(self.gnet_depth - 1)[::-1]:
                 size *= down_fac
                 size -= np.sum(np.array(kernel_size_up[level]) - 1, axis=0)[0]
+                logger.debug(f'Going up level {level} and size {size}')
                 assert _check_size(size)
             
             #final check
             shape = (1,1) + (in_size,) * self.ndims
-            out = self.netG1(torch.rand(*shape))
-            assert out.shape[-1] == size # internal control
+            _ = self.netG1(torch.rand(*shape))
             return size
         except:
             return False        
@@ -353,8 +358,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         while not success:
             try:
                 out_size = side_length - pad
+                assert out_size > 0
                 print(f'Side length {side_length} successful on first pass, with result side length {out_size}.')
                 out_size = self.get_valid_crop_to(out_size)
+                assert out_size
                 print(f'Side length {side_length} successful on both passes, with final side length {out_size}.')
                 shape = (1,1) + (out_size,) * self.ndims                
                 final_size = Dnet(torch.rand(*shape)).shape
@@ -451,13 +458,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.setup_networks()
         # if self.A_voxel_size > self.common_voxel_size: TODO: WHICH DIMENSION TO test
         #     scale_factor_A = (self.common_voxel_size / self.A_voxel_size)
-        if self.padding_unet.lower() == 'valid':
-            valid_fake_side_length =  self.get_valid_crop_to()
-            assert valid_fake_side_length, 'Starting side length insufficient for valid padding through all networks.'
-            valid_fake_size = (valid_fake_side_length,) * self.ndims # only for cropping dimensions
-        else:
-            valid_fake_size = None
-        self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2, valid_fake_size)#, scale_factor_A, scale_factor_B)
+        # if self.padding_unet.lower() == 'valid':
+        #     valid_fake_side_length =  self.get_valid_crop_to()
+        #     assert valid_fake_side_length, 'Starting side length insufficient for valid padding through all networks.'
+        #     valid_fake_size = (valid_fake_side_length,) * self.ndims # only for cropping dimensions
+        # else:
+        #     valid_fake_size = None
+        self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2)#, scale_factor_A, scale_factor_B)#, valid_fake_size)
 
         self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=(0.95, 0.999))#TODO: add betas to config variables
         self.optimizer_D1 = torch.optim.Adam(self.netD1.parameters(), lr=self.d_init_learning_rate, betas=(0.95, 0.999))
@@ -576,7 +583,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
         self.pipe_A += gp.RandomLocation()
-        self.pipe_A += self.reject_A
+        if self.reject_A:
+            self.pipe_A += self.reject_A
         self.pipe_A += self.resample_A
 
         self.pipe_A += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
@@ -603,7 +611,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         
         # self.pipe_B += gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B
         self.pipe_B += gp.RandomLocation() 
-        self.pipe_B += self.reject_B
+        if self.reject_B:
+            self.pipe_B += self.reject_B
         self.pipe_B += self.resample_B
 
         self.pipe_B += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)

@@ -114,7 +114,7 @@ class Downsample(torch.nn.Module):
     def __init__(
             self,
             downsample_factor,
-            flexible=False):
+            flexible=True):
 
         super(Downsample, self).__init__()
 
