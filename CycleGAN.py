@@ -456,9 +456,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def setup_model(self):
         if not hasattr(self, 'netG1'):
             self.setup_networks()
-        # if self.A_voxel_size > self.common_voxel_size: TODO: WHICH DIMENSION TO test
-        #     scale_factor_A = (self.common_voxel_size / self.A_voxel_size)
-        self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2)#, scale_factor_A, scale_factor_B)
+
+        scale_factor_A = (1,1) + tuple(np.divide(self.common_voxel_size, self.A_voxel_size)[-self.ndims:])
+        if not any([s < 1 for s in scale_factor_A]): scale_factor_A = None
+        scale_factor_B = (1,1) + tuple(np.divide(self.common_voxel_size, self.B_voxel_size)[-self.ndims:])
+        if not any([s < 1 for s in scale_factor_B]): scale_factor_B = None
+
+        self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2, scale_factor_A, scale_factor_B)
 
         self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=(0.95, 0.999))#TODO: add betas to config variables
         self.optimizer_D1 = torch.optim.Adam(self.netD1.parameters(), lr=self.d_init_learning_rate, betas=(0.95, 0.999))
@@ -677,7 +681,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.training_pipeline += self.normalize_fake_B + self.normalize_cycled_A
         self.training_pipeline += self.normalize_fake_A + self.normalize_cycled_B
         self.training_pipeline += self.cache
-        self.training_pipeline += self.performance
+        # self.training_pipeline += self.performance
 
         self.test_training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
         # self.test_training_pipeline += augmentations
