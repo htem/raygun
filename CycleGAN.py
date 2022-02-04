@@ -79,6 +79,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             residual_blocks=False,
             padding_unet='same',
             gan_mode='lsgan',
+            sampling_bottleneck=False,
             ):
             self.src_A = src_A
             self.src_B = src_B
@@ -143,6 +144,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.interp_order = interp_order
             self.crop_roi = crop_roi
             self.loss_style = loss_style
+            self.sampling_bottleneck =sampling_bottleneck
             self.min_coefvar = min_coefvar
             self.unet_activation = unet_activation
             self.residual_unet = residual_unet
@@ -457,10 +459,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if not hasattr(self, 'netG1'):
             self.setup_networks()
 
-        scale_factor_A = (1,1) + tuple(np.divide(self.common_voxel_size, self.A_voxel_size)[-self.ndims:])
-        if not any([s < 1 for s in scale_factor_A]): scale_factor_A = None
-        scale_factor_B = (1,1) + tuple(np.divide(self.common_voxel_size, self.B_voxel_size)[-self.ndims:])
-        if not any([s < 1 for s in scale_factor_B]): scale_factor_B = None
+        if self.sampling_bottleneck:
+            scale_factor_A = (1,1) + tuple(np.divide(self.common_voxel_size, self.A_voxel_size)[-self.ndims:])
+            if not any([s < 1 for s in scale_factor_A]): scale_factor_A = None
+            scale_factor_B = (1,1) + tuple(np.divide(self.common_voxel_size, self.B_voxel_size)[-self.ndims:])
+            if not any([s < 1 for s in scale_factor_B]): scale_factor_B = None
+        else:
+            scale_factor_A, scale_factor_B = None, None
 
         self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2, scale_factor_A, scale_factor_B)
 
