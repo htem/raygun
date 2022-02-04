@@ -190,14 +190,8 @@ class CycleGAN_Loss(torch.nn.Module):
         #return losses
         return cycle_loss, loss_G1, loss_G2
 
-    def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):#s, mask_A, mask_B):
+    def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
 
-        # real_A_mask = real_A * mask_A
-        # cycled_A_mask = cycled_A * mask_A
-        # fake_A_mask = fake_A * mask_B # masked based on mask from "real" version of array before generator pass
-        # real_B_mask = real_B * mask_B
-        # cycled_B_mask = cycled_B * mask_B
-        # fake_B_mask = fake_B * mask_A
         if (self.padding is not None) and (self.padding.lower() != 'valid'):
             real_A = real_A[self.pad_inds]
             fake_A = fake_A[self.pad_inds]
@@ -207,11 +201,9 @@ class CycleGAN_Loss(torch.nn.Module):
             cycled_B = cycled_B[self.pad_inds]
 
         # # update Ds
-        # loss_D1, loss_D2 = self.backward_Ds(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
         loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
 
         # update Gs
-        # cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
         cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
         
         self.loss_dict.update({
@@ -412,14 +404,8 @@ class SplitGAN_Loss(torch.nn.Module):
         #return losses
         return loss_G1, loss_G2
 
-    def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):#s, mask_A, mask_B):
+    def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
 
-        # real_A_mask = real_A * mask_A
-        # cycled_A_mask = cycled_A * mask_A
-        # fake_A_mask = fake_A * mask_B # masked based on mask from "real" version of array before generator pass
-        # real_B_mask = real_B * mask_B
-        # cycled_B_mask = cycled_B * mask_B
-        # fake_B_mask = fake_B * mask_A
         if (self.padding is not None) and (self.padding.lower() != 'valid'):
             real_A = real_A[self.pad_inds]
             fake_A = fake_A[self.pad_inds]
@@ -429,11 +415,9 @@ class SplitGAN_Loss(torch.nn.Module):
             cycled_B = cycled_B[self.pad_inds]
 
         # # update Ds
-        # loss_D1, loss_D2 = self.backward_Ds(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
         loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
 
         # update Gs
-        # cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A_mask, fake_A_mask, cycled_A_mask, real_B_mask, fake_B_mask, cycled_B_mask)
         loss_G1, loss_G2 = self.backward_Gs(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
         
         self.loss_dict.update({
