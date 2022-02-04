@@ -1,4 +1,5 @@
 # !conda activate n2v
+from cgi import test
 from matplotlib import pyplot as plt
 import torch
 import glob
@@ -24,6 +25,7 @@ torch.backends.cudnn.benchmark = True
 from residual_unet import ResidualUNet
 from unet import UNet, ConvPass
 from tri_utils import NLayerDiscriminator, NLayerDiscriminator3D, GANLoss, init_weights
+from CycleGAN_Model import *
 from CycleGAN_LossFunctions import *
 
 class CycleGAN(): #TODO: Just pass config file or dictionary
@@ -241,15 +243,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def get_extents(self, side_length=None, array_name=None):
         if side_length is None:
             side_length = self.side_length
-        if array_name is not None and not 'real' in array_name.lower():
-            shape = (1,1) + (side_length,) * self.ndims
-            result = self.netG1(torch.rand(*shape))
-            if 'fake' in array_name.lower():
-                side_length = result.shape[-1]
-            elif 'cycle' in array_name.lower():
-                result = self.netG1(result)
-                side_length = result.shape[-1]
-        
+
+            if array_name is not None and not 'real' in array_name.lower(): # if real, return original side_length
+                side_length = self.get_valid_crop_to() # if fake, get validly cropped output of first generator
+                assert side_length, f'Unable to get valid side_length for {array_name}'
+                if 'cycle' in array_name.lower():
+                    side_length -= self.get_valid_padding()[0] * 2 # if cycled, get final output of second generator                
+
         extents = np.ones((len(self.common_voxel_size)))
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
@@ -293,16 +293,22 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         failed = (size - pad) <= 0
         while not success and not failed:
             size -= 1
-            success = self.check_valid_size(size)
+            success = self.check_valid_size(size) # if successful, final generator output size is returned
             failed = (size - pad) <= 0
         
         if success:
-            return size
+            try: # final test: through discriminator
+                shape = (1,1) + (success,) * self.ndims
+                temp = torch.rand(*shape)
+                _ = self.netD1(temp)
+                return size
+            except:
+                return False
         else:
             return False
             
     def check_valid_size(self, in_size):
-        # Checks if a size is a valid input to a generator, and returns the generators output size if successful
+        # Checks if a size is a valid input to a generator, and returns the generators output side length if successful
         def _check_size(size):
             return (int(size) == size) and (size > 0)
 
@@ -328,7 +334,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             
             #final check
             shape = (1,1) + (in_size,) * self.ndims
-            _ = self.netG1(torch.rand(*shape))
+            out = self.netG1(torch.rand(*shape))
+            assert out.shape[-1] == size # internal control
             return size
         except:
             return False        
@@ -442,7 +449,15 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def setup_model(self):
         if not hasattr(self, 'netG1'):
             self.setup_networks()
-        self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2)
+        # if self.A_voxel_size > self.common_voxel_size: TODO: WHICH DIMENSION TO test
+        #     scale_factor_A = (self.common_voxel_size / self.A_voxel_size)
+        if self.padding_unet.lower() == 'valid':
+            valid_fake_side_length =  self.get_valid_crop_to()
+            assert valid_fake_side_length, 'Starting side length insufficient for valid padding through all networks.'
+            valid_fake_size = (valid_fake_side_length,) * self.ndims # only for cropping dimensions
+        else:
+            valid_fake_size = None
+        self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2, valid_fake_size)#, scale_factor_A, scale_factor_B)
 
         self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=(0.95, 0.999))#TODO: add betas to config variables
         self.optimizer_D1 = torch.optim.Adam(self.netD1.parameters(), lr=self.d_init_learning_rate, betas=(0.95, 0.999))
@@ -951,38 +966,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 self.model.load_state_dict()
         else:
             raise('No saved checkpoint found.')
-
-class CycleGAN_Model(torch.nn.Module):
-    def __init__(self, netG1, netD1, netG2, netD2):
-        super(CycleGAN_Model, self).__init__()
-        self.netG1 = netG1
-        self.netD1 = netD1
-        self.netG2 = netG2
-        self.netD2 = netD2
-        self.cycle = True
-
-    def forward(self, real_A=None, real_B=None):
-        if real_A is not None: #allow calling for single direction pass (i.e. prediction)
-            fake_B = self.netG1(real_A)
-            if self.cycle:
-                cycled_A = self.netG2(fake_B)
-            else:
-                cycled_A = None
-        else:
-            fake_B = None
-            cycled_A = None
-        #TODO: User torch.nn.functional.interpolate(mode='trilinear or bilinear', align_corners=True)
-        if real_B is not None:
-            fake_A = self.netG2(real_B)
-            if self.cycle:
-                cycled_B = self.netG1(fake_A)
-            else:
-                cycled_B = None
-        else:
-            fake_A = None
-            cycled_B = None
-
-        return fake_B, cycled_B, fake_A, cycled_A
 
 
 class CycleGAN_Optimizer(torch.nn.Module):
