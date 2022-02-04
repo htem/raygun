@@ -17,7 +17,7 @@ class ConvPass(torch.nn.Module):
             activation,
             padding='valid',
             residual=False,
-            padding_mode='reflect'#default to 'zeros' until 1/28/2022 (Jeff Rhoades)
+            padding_mode='reflect'
             ):
 
         super(ConvPass, self).__init__()
@@ -131,8 +131,7 @@ class Downsample(torch.nn.Module):
         self.down = pool(
             downsample_factor,
             stride=downsample_factor,
-            # ceil_mode=True
-            ) #ceil_mode added to attempt to increase flexibility
+            )
 
     def forward(self, x):
         if self.flexible:

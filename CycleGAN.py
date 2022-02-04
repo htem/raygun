@@ -458,13 +458,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.setup_networks()
         # if self.A_voxel_size > self.common_voxel_size: TODO: WHICH DIMENSION TO test
         #     scale_factor_A = (self.common_voxel_size / self.A_voxel_size)
-        # if self.padding_unet.lower() == 'valid':
-        #     valid_fake_side_length =  self.get_valid_crop_to()
-        #     assert valid_fake_side_length, 'Starting side length insufficient for valid padding through all networks.'
-        #     valid_fake_size = (valid_fake_side_length,) * self.ndims # only for cropping dimensions
-        # else:
-        #     valid_fake_size = None
-        self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2)#, scale_factor_A, scale_factor_B)#, valid_fake_size)
+        self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2)#, scale_factor_A, scale_factor_B)
 
         self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=(0.95, 0.999))#TODO: add betas to config variables
         self.optimizer_D1 = torch.optim.Adam(self.netD1.parameters(), lr=self.d_init_learning_rate, betas=(0.95, 0.999))
@@ -988,23 +982,3 @@ class CycleGAN_Optimizer(torch.nn.Module):
     def step(self):
         """Dummy step pass for Gunpowder's Train node step() call"""
         pass
-
-# TODO:
-# if __name__ == '__main__':
-
-#     import json    
-#     config = json.loads(sys.argv[0])
-#     print('Loaded config...')
-
-#     cycleGAN = CycleGAN(config)
-
-#     try:
-#         cycleGAN.num_epochs = int(sys.argv[1])
-#     except:
-#         pass    
-
-#     if 'test' in sys.argv:
-#         cycleGAN.num_workers = 1        
-#         cycleGAN.test_train()
-#     else:
-#         cycleGAN.train()
