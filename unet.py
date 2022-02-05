@@ -114,7 +114,9 @@ class Downsample(torch.nn.Module):
     def __init__(
             self,
             downsample_factor,
-            flexible=True):
+            flexible=True): 
+            # flexible=True allows torch.nn.MaxPoolNd to crop the right/bottom of tensors in order to allow pooling of tensors not evenly divisible by the downsample_factor. Alternative implementations could pass 'ceil_mode=True' or 'padding= {# > 0}' to avoid cropping of inputs.
+            # flexible=False forces inputs to be evenly divisible by the downsample_factor, which generally restricts the flexibility of model architectures.
 
         super(Downsample, self).__init__()
 
