@@ -13,10 +13,10 @@ class CycleGAN_Model(torch.nn.Module):
         self.cycle = True
     
     def sampling_bottleneck(self, array, scale_factor):
-        size = array.shape
-        mode = {4: 'bilinear', 5: 'trilinear'}[len(size)]
+        size = array.shape[-len(scale_factor):]
+        mode = {2: 'bilinear', 3: 'trilinear'}[len(size)]
         down = F.interpolate(array, scale_factor=scale_factor, mode=mode, align_corners=True)
-        return F.interpolate(down, size=size, moe=mode, align_corners=True)
+        return F.interpolate(down, size=size, mode=mode, align_corners=True)
 
     def forward(self, real_A=None, real_B=None): 
         if real_A is not None: #allow calling for single direction pass (i.e. prediction)

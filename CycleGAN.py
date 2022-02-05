@@ -460,9 +460,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.setup_networks()
 
         if self.sampling_bottleneck:
-            scale_factor_A = (1,1) + tuple(np.divide(self.common_voxel_size, self.A_voxel_size)[-self.ndims:])
+            # scale_factor_A = (1,1) + tuple(np.divide(self.common_voxel_size, self.A_voxel_size)[-self.ndims:])
+            scale_factor_A = tuple(np.divide(self.common_voxel_size, self.A_voxel_size)[-self.ndims:])
             if not any([s < 1 for s in scale_factor_A]): scale_factor_A = None
-            scale_factor_B = (1,1) + tuple(np.divide(self.common_voxel_size, self.B_voxel_size)[-self.ndims:])
+            # scale_factor_B = (1,1) + tuple(np.divide(self.common_voxel_size, self.B_voxel_size)[-self.ndims:])
+            scale_factor_B = tuple(np.divide(self.common_voxel_size, self.B_voxel_size)[-self.ndims:])
             if not any([s < 1 for s in scale_factor_B]): scale_factor_B = None
         else:
             scale_factor_A, scale_factor_B = None, None
