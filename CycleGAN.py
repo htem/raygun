@@ -8,7 +8,10 @@ import zarr
 import daisy
 import os
 
-import gunpowder as gp
+# import gunpowder as gp
+import sys
+sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
+from gunpowder import gunpowder as gp
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -38,8 +41,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             ndims=None,
             A_name='raw',
             B_name='raw',
-            # mask_A_name='mask', # expects mask to be in same place as real zarr
-            # mask_B_name='mask',
+            mask_A_name=None, # expects mask to be in same place as real zarr
+            mask_B_name=None,
             A_out_path=None,
             B_out_path=None,
             model_name='CycleGun',
@@ -95,8 +98,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 self.ndims = ndims
             self.A_name = A_name
             self.B_name = B_name
-            # self.mask_A_name = mask_A_name
-            # self.mask_B_name = mask_B_name
+            self.mask_A_name = mask_A_name
+            self.mask_B_name = mask_B_name
             if A_out_path is None:
                 self.A_out_path = self.src_A
             else:
@@ -246,7 +249,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if side_length is None:
             side_length = self.side_length
 
-            if array_name is not None and not 'real' in array_name.lower():
+            if array_name is not None and not ('real' in array_name.lower() or 'mask' in array_name.lower()):
                 shape = (1,1) + (side_length,) * self.ndims
                 result = self.netG1(torch.rand(*shape))
                 if 'fake' in array_name.lower():
@@ -496,15 +499,17 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
     def build_pipeline_parts(self):        
         # declare arrays to use in the pipelines
-        self.array_names = ['real_A', 
-                            # 'mask_A', 
+        self.array_names = ['real_A', # [from source A, mask of source for training, netG2 output, netG2(netG1(real_A)) output,...for other side...] 
                             'fake_A', 
                             'cycled_A', 
                             'real_B', 
-                            # 'mask_B', 
                             'fake_B', 
                             'cycled_B']#, 'gradients_G1', 'gradients_G2']
-        # [from source A, mask of source for training, netG2 output, netG2(netG1(real_A)) output,...for other side...] #TODO: add gradients for network training debugging
+        if self.mask_A_name is not None: 
+            self.array_names += 'mask_A'
+        if self.mask_B_name is not None: 
+            self.array_names += 'mask_B'
+        #TODO: add gradients for network training debugging
         self.arrays = []
         for array in self.array_names:
             setattr(self, array, gp.ArrayKey(array.upper())) # add ArrayKeys to object
@@ -516,24 +521,35 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # A:
         if self.common_voxel_size != self.A_voxel_size:
             self.real_A_src = gp.ArrayKey('REAL_A_SRC')
-            # self.mask_A_src = gp.ArrayKey('MASK_A_SRC')
-            self.resample_A = gp.Resample(self.real_A_src, self.common_voxel_size, self.real_A, interp_order=self.interp_order)
-            # self.resample_A += gp.Resample(self.mask_A_src, self.common_voxel_size, self.mask_A, interp_order=self.interp_order)
+            self.resample_A = gp.Resample(self.real_A_src, self.common_voxel_size, self.real_A, ndim=self.ndims, interp_order=self.interp_order)
+            if self.mask_A_name is not None: 
+                self.mask_A_src = gp.ArrayKey('MASK_A_SRC')
+                self.resample_A += gp.Resample(self.mask_A_src, self.common_voxel_size, self.mask_A, ndim=self.ndims, interp_order=self.interp_order)
         else:            
             self.real_A_src = self.real_A
-            # self.mask_A_src = self.mask_A
             self.resample_A = None
+            if self.mask_A_name is not None: 
+                self.mask_A_src = self.mask_A
 
         # setup data sources
-        self.source_A = gp.ZarrSource(    # add the data source
-            self.src_A,  # the zarr container
-            {   self.real_A_src: self.A_name,
-                # self.mask_A_src: self.mask_A_name,
-                },  # which dataset to associate to the array key
-            {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=self.A_voxel_size),
-                # self.mask_A_src: gp.ArraySpec(interpolatable=False), 
-                }  # meta-information
-        )
+        if self.mask_A_name is not None: 
+            self.source_A = gp.ZarrSource(    # add the data source
+                self.src_A,  # the zarr container
+                {   self.real_A_src: self.A_name,
+                    self.mask_A_src: self.mask_A_name,
+                    },  # which dataset to associate to the array key
+                {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=self.A_voxel_size),
+                    self.mask_A_src: gp.ArraySpec(interpolatable=False), 
+                    }  # meta-information
+            )
+        else:            
+            self.source_A = gp.ZarrSource(    # add the data source
+                self.src_A,  # the zarr container
+                {   self.real_A_src: self.A_name,
+                    },  # which dataset to associate to the array key
+                {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=self.A_voxel_size),
+                    }  # meta-information
+            )
 
         if self.min_coefvar is True:
             self.reject_A = gp.RejectConstant(self.real_A_src)
@@ -542,26 +558,38 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             self.reject_A = None
 
-        # B:
-        if self.common_voxel_size != self.A_voxel_size:
+        # B:       
+        if self.common_voxel_size != self.B_voxel_size:
             self.real_B_src = gp.ArrayKey('REAL_B_SRC')
-            # self.mask_B_src = gp.ArrayKey('MASK_B_SRC')
-            self.resample_B = gp.Resample(self.real_B_src, self.common_voxel_size, self.real_B, interp_order=self.interp_order)
-            # self.resample_B += gp.Resample(self.mask_B_src, self.common_voxel_size, self.mask_B, interp_order=self.interp_order)
+            self.resample_B = gp.Resample(self.real_B_src, self.common_voxel_size, self.real_B, ndim=self.ndims, interp_order=self.interp_order)
+            if self.mask_B_name is not None: 
+                self.mask_B_src = gp.ArrayKey('MASK_B_SRC')
+                self.resample_B += gp.Resample(self.mask_B_src, self.common_voxel_size, self.mask_B, ndim=self.ndims, interp_order=self.interp_order)
         else:            
             self.real_B_src = self.real_B
-            # self.mask_B_src = self.mask_B
             self.resample_B = None
+            if self.mask_B_name is not None: 
+                self.mask_B_src = self.mask_B
 
-        self.source_B = gp.ZarrSource(    # add the data source
-            self.src_B,  # the zarr container
-            {   self.real_B_src: self.B_name,
-                # self.mask_B_src: self.mask_B_name,
-                },  # which dataset to associate to the array key
-            {   self.real_B_src: gp.ArraySpec(interpolatable=True, voxel_size=self.B_voxel_size),
-                # self.mask_B_src: gp.ArraySpec(interpolatable=False),
-                }  # meta-information
-        )
+        # setup data sources
+        if self.mask_B_name is not None: 
+            self.source_B = gp.ZarrSource(    # add the data source
+                self.src_B,  # the zarr container
+                {   self.real_B_src: self.B_name,
+                    self.mask_B_src: self.mask_B_name,
+                    },  # which dataset to associate to the array key
+                {   self.real_B_src: gp.ArraySpec(interpolatable=True, voxel_size=self.B_voxel_size),
+                    self.mask_B_src: gp.ArraySpec(interpolatable=False), 
+                    }  # meta-information
+            )
+        else:            
+            self.source_B = gp.ZarrSource(    # add the data source
+                self.src_B,  # the zarr container
+                {   self.real_B_src: self.B_name,
+                    },  # which dataset to associate to the array key
+                {   self.real_B_src: gp.ArraySpec(interpolatable=True, voxel_size=self.B_voxel_size),
+                    }  # meta-information
+            )
 
         if self.min_coefvar is True:
             self.reject_B = gp.RejectConstant(self.real_B_src)
@@ -586,8 +614,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #make initial pipe section for A: TODO: Make min_masked part of config
         self.pipe_A = self.source_A
 
-        # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
-        self.pipe_A += gp.RandomLocation()
+        if self.mask_A_name is not None:
+            self.pipe_A += gp.RandomLocation(min_masked=1, mask=self.mask_A)
+        else:
+            self.pipe_A += gp.RandomLocation()
+
         if self.reject_A:
             self.pipe_A += self.reject_A
         self.pipe_A += self.resample_A
@@ -611,8 +642,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #make initial pipe section for B: 
         self.pipe_B = self.source_B 
         
-        # self.pipe_B += gp.RandomLocation(min_masked=0.5, mask=self.mask_B) + self.normalize_real_B
-        self.pipe_B += gp.RandomLocation() 
+        if self.mask_B_name is not None:
+            self.pipe_B += gp.RandomLocation(min_masked=1, mask=self.mask_B)
+        else:
+            self.pipe_B += gp.RandomLocation() 
+
         if self.reject_B:
             self.pipe_B += self.reject_B
         self.pipe_B += self.resample_B
@@ -793,10 +827,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 outputs = output_dict,
                                 checkpoint = self.checkpoint
                                 )
-
-        # remove "channel" dimensions if neccessary
-        if self.ndims == len(self.common_voxel_size):
-            pipe += gp.Squeeze([real, fake, cycled], axis=1)
+        
+        pipe += gp.Squeeze([real, fake, cycled], axis=1) # remove "channel" dimension
         pipe += gp.Squeeze([real, fake, cycled], axis=0) # remove batch dimension
         pipe += normalize_fake + normalize_cycled
 
@@ -897,9 +929,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             # pipe += gp.Squeeze([real, fake, cycled], axis=0)
             # pipe += gp.Squeeze([real, fake, cycled], axis=0)
 
-            # remove "channel" dimensions if neccessary
-            if self.ndims == len(self.common_voxel_size):
-                pipe += gp.Squeeze([fake, cycled], axis=1)
+            # remove "channel" dimension
+            pipe += gp.Squeeze([fake, cycled], axis=1)
             pipe += gp.Squeeze([fake, cycled], axis=0)
             pipe += normalize_fake + normalize_cycled
             if self.crop_roi:            
@@ -911,9 +942,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             # pipe += gp.Squeeze([real, fake], axis=0)
             # pipe += gp.Squeeze([real, fake], axis=0)
 
-            # remove "channel" dimensions if neccessary
-            if self.ndims == len(self.common_voxel_size):
-                pipe += gp.Squeeze([fake], axis=1)
+            # remove "channel" dimension
+            pipe += gp.Squeeze([fake], axis=1)
             pipe += gp.Squeeze([fake], axis=0)
             pipe += normalize_fake
             if self.crop_roi:
