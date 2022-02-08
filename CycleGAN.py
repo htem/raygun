@@ -474,10 +474,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2, scale_factor_A, scale_factor_B)
 
-        self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=(0.95, 0.999))#TODO: add betas to config variables
-        self.optimizer_D1 = torch.optim.Adam(self.netD1.parameters(), lr=self.d_init_learning_rate, betas=(0.95, 0.999))
-        self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=(0.95, 0.999))#TODO: add betas to config variables
-        self.optimizer_D2 = torch.optim.Adam(self.netD2.parameters(), lr=self.d_init_learning_rate, betas=(0.95, 0.999))
+        self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate)#TODO: add betas to config variables
+        self.optimizer_D1 = torch.optim.Adam(self.netD1.parameters(), lr=self.d_init_learning_rate)
+        self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate)#TODO: add betas to config variables
+        self.optimizer_D2 = torch.optim.Adam(self.netD2.parameters(), lr=self.d_init_learning_rate)
         self.optimizer = CycleGAN_Optimizer(self.optimizer_G1, self.optimizer_D1, self.optimizer_G2, self.optimizer_D2)
 
         if self.crop_roi: # Get padding for cropping loss inputs to valid size
@@ -506,9 +506,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                             'fake_B', 
                             'cycled_B']#, 'gradients_G1', 'gradients_G2']
         if self.mask_A_name is not None: 
-            self.array_names += 'mask_A'
+            self.array_names += ['mask_A']
         if self.mask_B_name is not None: 
-            self.array_names += 'mask_B'
+            self.array_names += ['mask_B']
         #TODO: add gradients for network training debugging
         self.arrays = []
         for array in self.array_names:
@@ -621,7 +621,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         if self.reject_A:
             self.pipe_A += self.reject_A
-        self.pipe_A += self.resample_A
+        if self.resample_A:
+            self.pipe_A += self.resample_A
 
         self.pipe_A += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
         self.pipe_A += self.normalize_real_A    
@@ -649,7 +650,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         if self.reject_B:
             self.pipe_B += self.reject_B
-        self.pipe_B += self.resample_B
+        if self.resample_B:
+            self.pipe_B += self.resample_B
 
         self.pipe_B += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
         self.pipe_B += self.normalize_real_B

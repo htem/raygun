@@ -1,6 +1,6 @@
-from functools import partial
 from daisy import *
 import numpy as np
+from tqdm import tqdm
 
 # --- Parameters and paths --- #
 file_path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/'
@@ -8,7 +8,7 @@ file_name = 'CBxs_lobV_bottomp100um_30nm_rec_db9_.n5'
 in_name = 'volumes/raw'
 mask_name = 'volumes/volume_mask'
 # below all in voxel units (not world units) *xyz
-base_coor = (1603, 1603, 0)
+base = (1603, 1603, 0)
 radius = 1475
 height = 2048
 
@@ -28,15 +28,12 @@ mask_vol = prepare_ds(file_path+file_name,
 # --- Make mask --- #
 print('Making mask volume...')
 # defining mask coordinate volume
-def in_cylinder(base, radius, height, x, y, z): #assumes simple verticle cylinder
-    # determines of point (x,y,z) is contained within cylinder defined by base (in xyz coordinates), radius and height
-    return (((x - base[0])**2 + (y - base[1])**2) <= radius**2) * (z >= base[2]) * (z <= (base[2] + height))
-    
-        
-cylinder_func = partial(in_cylinder, base_coor, radius, height)
+mask = np.empty(vol.shape, dtype=bool) # too avoid memory issues
+# defining circle
+circle = np.fromfunction(lambda i, j: (i - base[0])**2 + (j - base[1])**2 <= radius**2, vol.shape[:2]).astype(np.bool)
 
 # filling numpy mask
-mask = np.fromfunction(cylinder_func, vol.shape, dtype=np.uint8).astype(np.bool)
+mask[:,:,base[2]:] = np.tile(circle, [height,1,1]).T
 
 # check shape
 assert vol.shape == mask.shape, f"Zarr volume shape:{vol.shape} != Mask volume shape: {mask.shape}"
