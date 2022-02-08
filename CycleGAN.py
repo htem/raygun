@@ -614,10 +614,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #make initial pipe section for A: TODO: Make min_masked part of config
         self.pipe_A = self.source_A
 
+        self.pipe_A += gp.RandomLocation()
         if self.mask_A_name is not None:
-            self.pipe_A += gp.RandomLocation(min_masked=1, mask=self.mask_A)
-        else:
-            self.pipe_A += gp.RandomLocation()
+            self.pipe_A += gp.Reject(mask=self.mask_A, min_masked=1)
 
         if self.reject_A:
             self.pipe_A += self.reject_A
@@ -644,9 +643,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.pipe_B = self.source_B 
         
         if self.mask_B_name is not None:
-            self.pipe_B += gp.RandomLocation(min_masked=1, mask=self.mask_B)
-        else:
-            self.pipe_B += gp.RandomLocation() 
+            self.pipe_B += gp.gp.Reject(mask=self.mask_B, min_masked=1)
 
         if self.reject_B:
             self.pipe_B += self.reject_B
