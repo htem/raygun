@@ -174,8 +174,8 @@ class CycleGAN_Loss(torch.nn.Module):
                 'Identity_Loss/B': float(identity_loss_B),                
             })
         else:
-            identity_loss_B = None
-            identity_loss_A = None
+            identity_loss_B = 0
+            identity_loss_A = 0
 
         #Then G1 first
         loss_G1 = self.backward_G(self.netD1, fake_B, cycled_B.clone(), cycle_loss.clone(), identity_loss_B)                   # calculate gradient for G

@@ -438,7 +438,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             norm_instance = torch.nn.InstanceNorm2d
             discriminator_maker = NLayerDiscriminator
 
-        #For netD1:
         norm_layer = functools.partial(norm_instance, affine=False, track_running_stats=False)
         discriminator = discriminator_maker(input_nc=1, 
                                         ndf=conf.d_num_fmaps, 
