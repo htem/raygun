@@ -14,9 +14,8 @@ class CycleGAN_Loss(torch.nn.Module):
                 netD2, 
                 netG2, 
                 optimizer_D1, 
-                optimizer_G1, 
+                optimizer_G, 
                 optimizer_D2, 
-                optimizer_G2, 
                 dims,
                 l1_lambda=100, 
                 identity_lambda=0,
@@ -31,9 +30,8 @@ class CycleGAN_Loss(torch.nn.Module):
         self.netD2 = netD2 # differentiates between fake and real As
         self.netG2 = netG2 # turns Bs into As
         self.optimizer_D1 = optimizer_D1
-        self.optimizer_G1 = optimizer_G1
+        self.optimizer_G = optimizer_G
         self.optimizer_D2 = optimizer_D2
-        self.optimizer_G2 = optimizer_G2
         self.l1_lambda = l1_lambda
         self.identity_lambda = identity_lambda
         self.padding = padding
@@ -48,8 +46,8 @@ class CycleGAN_Loss(torch.nn.Module):
             'Loss/D1': float(),
             'Loss/D2': float(),
             'Loss/cycle': float(),
-            'Loss/G1': float(),
-            'Loss/G2': float(),
+            'GAN_Loss/G1': float(),
+            'GAN_Loss/G2': float(),
         }
 
     def crop(self, x, shape):
@@ -120,39 +118,17 @@ class CycleGAN_Loss(torch.nn.Module):
         #return losses
         return loss_D1, loss_D2
 
-    def backward_G(self, Dnet, fake, cycled, cycle_loss, identity_loss=None):
-        """Calculate GAN and L1 loss for the generator"""        
-        # First, G(A) should fake the discriminator
-        pred_fake = Dnet(fake)
-        gan_loss_fake = self.gan_loss(pred_fake, True)
-
-        # Second, G(F(B)) should also fake the discriminator 
-        pred_cycled = Dnet(cycled)
-        gan_loss_cycle = self.gan_loss(pred_cycled, True)
-        
-        # Include L1 loss for forward and reverse cycle consistency
-        if self.identity_lambda > 0:
-            loss_G = cycle_loss + gan_loss_fake + gan_loss_cycle + self.identity_lambda*identity_loss
-        else:
-            loss_G = cycle_loss + gan_loss_fake + gan_loss_cycle
-
-        # calculate gradients
-        loss_G.backward(retain_graph=True)
-        return loss_G
-
-    def backward_Gs(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
-        # self.set_requires_grad([self.netG1, self.netG2], True)  # G requires gradients when optimizing
+    def backward_G(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
         self.set_requires_grad([self.netD1, self.netD2], False)  # D requires no gradients when optimizing G
-        self.optimizer_G1.zero_grad()        # set G's gradients to zero
-        self.optimizer_G2.zero_grad()        # set G's gradients to zero
+        self.optimizer_G.zero_grad()        # set G's gradients to zero
 
         #get cycle loss for both directions (i.e. real == cycled, a.k.a. real_A == netG2(netG1(real_A)) for A and B)
         if self.padding is not None and self.padding.lower() == 'valid':
-            l1_loss_A = self.l1_loss(self.crop(real_A, cycled_A.size()[-self.dims:]), cycled_A.clone())
-            l1_loss_B = self.l1_loss(self.crop(real_B, cycled_B.size()[-self.dims:]), cycled_B.clone())
+            l1_loss_A = self.l1_loss(self.crop(real_A, cycled_A.size()[-self.dims:]), cycled_A)
+            l1_loss_B = self.l1_loss(self.crop(real_B, cycled_B.size()[-self.dims:]), cycled_B)
         else:
-            l1_loss_A = self.l1_loss(real_A, cycled_A.clone())
-            l1_loss_B = self.l1_loss(real_B, cycled_B.clone())        
+            l1_loss_A = self.l1_loss(real_A, cycled_A)
+            l1_loss_B = self.l1_loss(real_B, cycled_B)        
         self.loss_dict.update({
             'Cycle_Loss/A': float(l1_loss_A),                
             'Cycle_Loss/B': float(l1_loss_B),                
@@ -176,19 +152,25 @@ class CycleGAN_Loss(torch.nn.Module):
         else:
             identity_loss_B = 0
             identity_loss_A = 0
+        identity_loss = self.identity_lambda * (identity_loss_A + identity_loss_B)
 
-        #Then G1 first
-        loss_G1 = self.backward_G(self.netD1, fake_B, cycled_B.clone(), cycle_loss.clone(), identity_loss_B)                   # calculate gradient for G
+        #Then G1 discriminator loss first
+        gan_loss_G1 = self.gan_loss(self.netD1(fake_B), True)
 
-        #Then G2
-        loss_G2 = self.backward_G(self.netD2, fake_A, cycled_A.clone(), cycle_loss.clone(), identity_loss_A)                   # calculate gradient for G
+        #Then G2 discriminator loss
+        gan_loss_G2 = self.gan_loss(self.netD2(fake_A), True)
         
-        #Step optimizers
-        self.optimizer_G1.step()             # udpate G's weights
-        self.optimizer_G2.step()             # udpate G's weights
+        #Sum all losses
+        self.loss_G = cycle_loss + identity_loss + gan_loss_G1 + gan_loss_G2
+
+        #Calculate gradients
+        self.loss_G.backward()
+
+        #Step optimizer
+        self.optimizer_G.step()             # udpate G's weights
 
         #return losses
-        return cycle_loss, loss_G1, loss_G2
+        return cycle_loss, gan_loss_G1, gan_loss_G2
 
     def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
 
@@ -200,21 +182,21 @@ class CycleGAN_Loss(torch.nn.Module):
             fake_B = fake_B[self.pad_inds]
             cycled_B = cycled_B[self.pad_inds]
 
+        # update Gs
+        cycle_loss, gan_loss_G1, gan_loss_G2 = self.backward_G(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
+        
         # # update Ds
         loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
 
-        # update Gs
-        cycle_loss, loss_G1, loss_G2 = self.backward_Gs(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
-        
         self.loss_dict.update({
             'Loss/D1': float(loss_D1),
             'Loss/D2': float(loss_D2),
             'Loss/cycle': float(cycle_loss),
-            'Loss/G1': float(loss_G1),
-            'Loss/G2': float(loss_G2),
+            'GAN_Loss/G1': float(gan_loss_G1),
+            'GAN_Loss/G2': float(gan_loss_G2),
         })
 
-        total_loss = cycle_loss + loss_G1 + loss_G2 #+ loss_D1 + loss_D2
+        total_loss = self.loss_G.detach()
         # define dummy backward pass to disable Gunpowder's Train node loss.backward() call
         total_loss.backward = lambda: None
 
@@ -414,11 +396,11 @@ class SplitGAN_Loss(torch.nn.Module):
             fake_B = fake_B[self.pad_inds]
             cycled_B = cycled_B[self.pad_inds]
 
-        # # update Ds
-        loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
-
         # update Gs
         loss_G1, loss_G2 = self.backward_Gs(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
+        
+        # # update Ds
+        loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
         
         self.loss_dict.update({
             'Loss/D1': float(loss_D1),
