@@ -13,9 +13,8 @@ class CycleGAN_Loss(torch.nn.Module):
                 netG1, 
                 netD2, 
                 netG2, 
-                optimizer_D1, 
+                optimizer_D, 
                 optimizer_G, 
-                optimizer_D2, 
                 dims,
                 l1_lambda=100, 
                 identity_lambda=0,
@@ -29,9 +28,8 @@ class CycleGAN_Loss(torch.nn.Module):
         self.netG1 = netG1 # turns As into Bs
         self.netD2 = netD2 # differentiates between fake and real As
         self.netG2 = netG2 # turns Bs into As
-        self.optimizer_D1 = optimizer_D1
+        self.optimizer_D = optimizer_D
         self.optimizer_G = optimizer_G
-        self.optimizer_D2 = optimizer_D2
         self.l1_lambda = l1_lambda
         self.identity_lambda = identity_lambda
         self.padding = padding
@@ -71,7 +69,7 @@ class CycleGAN_Loss(torch.nn.Module):
                 temp = module.weight.data
                 module.weight.data = temp.clamp(min, max)
 
-    def backward_D(self, Dnet, real, fake, cycled):
+    def backward_D(self, Dnet, real, fake):
         # Real
         pred_real = Dnet(real)
         loss_D_real = self.gan_loss(pred_real, True)
@@ -80,43 +78,29 @@ class CycleGAN_Loss(torch.nn.Module):
         pred_fake = Dnet(fake.detach())
         loss_D_fake = self.gan_loss(pred_fake, False)
 
-        # Cycled; stop backprop to the generator by detaching cycled
-        pred_cycled = Dnet(cycled.detach())
-        loss_D_cycled = self.gan_loss(pred_cycled, False)
-
-        loss_D = loss_D_real + loss_D_fake + loss_D_cycled
+        loss_D = loss_D_real + loss_D_fake
         loss_D.backward()
         return loss_D
 
-    def backward_Ds(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, n_loop=5):
+    def backward_Ds(self, real_A, fake_A, real_B, fake_B, n_loop=5):
         # self.set_requires_grad([self.netG1, self.netG2], False)  # G does not require gradients when optimizing D
         self.set_requires_grad([self.netD1, self.netD2], True)  # enable backprop for D
-        self.optimizer_D1.zero_grad()     # set D's gradients to zero
-        self.optimizer_D2.zero_grad()     # set D's gradients to zero
+        self.optimizer_D.zero_grad()     # set D's gradients to zero
 
-        #Do D1 first
-        if self.gan_mode.lower() == 'wgangp':
+        if self.gan_mode.lower() == 'wgangp': # Wasserstein Loss
             for _ in range(n_loop):
-                loss_D1 = self.backward_D(self.netD1, real_B, fake_B, cycled_B)
-                self.optimizer_D1.step()          # update D's weights
+                self.loss_D1 = self.backward_D(self.netD1, real_B, fake_B)
+                self.loss_D2 = self.backward_D(self.netD2, real_A, fake_A)
+                self.optimizer_D.step()          # update D's weights
                 self.clamp_weights(self.netD1)
-        else:
-            loss_D1 = self.backward_D(self.netD1, real_B, fake_B, cycled_B)
-            self.optimizer_D1.step()          # update D's weights
-            
-
-        #Then D2
-        if self.gan_mode.lower() == 'wgangp':
-            for _ in range(n_loop):
-                loss_D2 = self.backward_D(self.netD2, real_A, fake_A, cycled_A)
-                self.optimizer_D2.step()
                 self.clamp_weights(self.netD2)
         else:
-            loss_D2 = self.backward_D(self.netD2, real_A, fake_A, cycled_A)
-            self.optimizer_D2.step()
+            self.loss_D1 = self.backward_D(self.netD1, real_B, fake_B)
+            self.loss_D2 = self.backward_D(self.netD2, real_A, fake_A)
+            self.optimizer_D.step()          # update D's weights            
         
         #return losses
-        return loss_D1, loss_D2
+        return self.loss_D1, self.loss_D2
 
     def backward_G(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
         self.set_requires_grad([self.netD1, self.netD2], False)  # D requires no gradients when optimizing G
@@ -186,7 +170,7 @@ class CycleGAN_Loss(torch.nn.Module):
         cycle_loss, gan_loss_G1, gan_loss_G2 = self.backward_G(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
         
         # # update Ds
-        loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
+        loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, real_B, fake_B)
 
         self.loss_dict.update({
             'Loss/D1': float(loss_D1),
@@ -283,7 +267,7 @@ class SplitGAN_Loss(torch.nn.Module):
                 temp = module.weight.data
                 module.weight.data = temp.clamp(min, max)
 
-    def backward_D(self, Dnet, real, fake, cycled):
+    def backward_D(self, Dnet, real, fake):
         # Real
         pred_real = Dnet(real)
         loss_D_real = self.gan_loss(pred_real, True)
@@ -292,15 +276,11 @@ class SplitGAN_Loss(torch.nn.Module):
         pred_fake = Dnet(fake.detach())
         loss_D_fake = self.gan_loss(pred_fake, False)
 
-        # Cycled; stop backprop to the generator by detaching cycled
-        pred_cycled = Dnet(cycled.detach())
-        loss_D_cycled = self.gan_loss(pred_cycled, False)
-
-        loss_D = loss_D_real + loss_D_fake + loss_D_cycled
+        loss_D = loss_D_real + loss_D_fake
         loss_D.backward()
         return loss_D
 
-    def backward_Ds(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B, n_loop=5):
+    def backward_Ds(self, real_A, fake_A, real_B, fake_B, n_loop=5):
         # self.set_requires_grad([self.netG1, self.netG2], False)  # G does not require gradients when optimizing D
         self.set_requires_grad([self.netD1, self.netD2], True)  # enable backprop for D
         self.optimizer_D1.zero_grad()     # set D's gradients to zero
@@ -309,22 +289,22 @@ class SplitGAN_Loss(torch.nn.Module):
         #Do D1 first
         if self.gan_mode.lower() == 'wgangp':
             for _ in range(n_loop):
-                loss_D1 = self.backward_D(self.netD1, real_B, fake_B, cycled_B)
+                loss_D1 = self.backward_D(self.netD1, real_B, fake_B)
                 self.optimizer_D1.step()          # update D's weights
                 self.clamp_weights(self.netD1)
         else:
-            loss_D1 = self.backward_D(self.netD1, real_B, fake_B, cycled_B)
+            loss_D1 = self.backward_D(self.netD1, real_B, fake_B)
             self.optimizer_D1.step()          # update D's weights
             
 
         #Then D2
         if self.gan_mode.lower() == 'wgangp':
             for _ in range(n_loop):
-                loss_D2 = self.backward_D(self.netD2, real_A, fake_A, cycled_A)
+                loss_D2 = self.backward_D(self.netD2, real_A, fake_A)
                 self.optimizer_D2.step()
                 self.clamp_weights(self.netD2)
         else:
-            loss_D2 = self.backward_D(self.netD2, real_A, fake_A, cycled_A)
+            loss_D2 = self.backward_D(self.netD2, real_A, fake_A)
             self.optimizer_D2.step()
 
         #return losses
@@ -400,7 +380,7 @@ class SplitGAN_Loss(torch.nn.Module):
         loss_G1, loss_G2 = self.backward_Gs(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
         
         # # update Ds
-        loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
+        loss_D1, loss_D2 = self.backward_Ds(real_A, fake_A, real_B, fake_B)
         
         self.loss_dict.update({
             'Loss/D1': float(loss_D1),

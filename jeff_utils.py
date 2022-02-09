@@ -1,4 +1,3 @@
-from gunpowder import *
 
 def get_discriminator_FOV(net):
     # Returns the receptive field of one output neuron for a network (written for patch discriminators)
