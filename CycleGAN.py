@@ -626,7 +626,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         self.pipe_A += gp.RandomLocation()
         if self.mask_A_name is not None:
-            self.pipe_A += gp.Reject(mask=self.mask_A, min_masked=0.999)
+            self.pipe_A += gp.Reject(mask=self.mask_A_src, min_masked=0.999)
 
         if self.reject_A:
             self.pipe_A += self.reject_A
@@ -654,7 +654,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         
         self.pipe_B += gp.RandomLocation()
         if self.mask_B_name is not None:
-            self.pipe_B += gp.Reject(mask=self.mask_B, min_masked=0.999)
+            self.pipe_B += gp.Reject(mask=self.mask_B_src, min_masked=0.999)
 
         if self.reject_B:
             self.pipe_B += self.reject_B

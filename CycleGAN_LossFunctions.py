@@ -78,7 +78,7 @@ class CycleGAN_Loss(torch.nn.Module):
         pred_fake = Dnet(fake.detach())
         loss_D_fake = self.gan_loss(pred_fake, False)
 
-        loss_D = loss_D_real + loss_D_fake
+        loss_D = (loss_D_real + loss_D_fake) * 0.5
         loss_D.backward()
         return loss_D
 
