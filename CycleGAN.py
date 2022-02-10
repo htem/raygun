@@ -507,6 +507,103 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             print("Unexpected Loss Style. Accepted options are 'cycle' or 'split'")
             raise
 
+    def build_machine(self):       
+        # define our network model for training
+        self.setup_networks()        
+        self.setup_model()
+
+        # get performance stats
+        self.performance = gp.PrintProfilingStats(every=self.log_every)
+
+        # setup a cache
+        self.cache = gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)#os.cpu_count())
+
+        #define axes for mirroring and transpositions
+        self.augment_axes = list(np.arange(3)[-self.ndims:])
+
+    def build_pipe_side(self, side):
+        src_voxel_size = getattr(self, side+'_voxel_size')
+        
+        # declare arrays to use in the pipelines
+        array_names = ['real_'+side, 
+                            'fake_'+side, 
+                            'cycled_'+side]
+        if getattr(self, f'mask_{side}_name') is not None: 
+            array_names += ['mask_'+side]
+        for array in array_names:
+            array_key = gp.ArrayKey(array.upper())
+            setattr(self, array, array_key) # add ArrayKeys to object
+            if 'mask' not in array:            
+                setattr(self, 'normalize_'+array, gp.Normalize(array_key))#add normalizations, if appropriate        
+        
+        #Setup sources and resampling nodes
+        if self.common_voxel_size != src_voxel_size:
+            setattr(self, f'real_{side}_src', gp.ArrayKey(f'REAL_{side}_SRC'))
+            self.resample_A = gp.Resample(self.real_A_src, self.common_voxel_size, self.real_A, ndim=self.ndims, interp_order=self.interp_order)
+            if self.mask_A_name is not None: 
+                self.mask_A_src = gp.ArrayKey('MASK_A_SRC')
+                self.resample_A += gp.Resample(self.mask_A_src, self.common_voxel_size, self.mask_A, ndim=self.ndims, interp_order=self.interp_order)
+        else:            
+            self.real_A_src = self.real_A
+            self.resample_A = None
+            if self.mask_A_name is not None: 
+                self.mask_A_src = self.mask_A
+
+        # setup data sources
+        if self.mask_A_name is not None: 
+            self.source_A = gp.ZarrSource(    # add the data source
+                self.src_A,  # the zarr container
+                {   self.real_A_src: self.A_name,
+                    self.mask_A_src: self.mask_A_name,
+                    },  # which dataset to associate to the array key
+                {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=src_voxel_size),
+                    self.mask_A_src: gp.ArraySpec(interpolatable=False), 
+                    }  # meta-information
+            )
+        else:            
+            self.source_A = gp.ZarrSource(    # add the data source
+                self.src_A,  # the zarr container
+                {   self.real_A_src: self.A_name,
+                    },  # which dataset to associate to the array key
+                {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=src_voxel_size),
+                    }  # meta-information
+            )
+
+        if self.min_coefvar is True:
+            self.reject_A = gp.RejectConstant(self.real_A_src)
+        elif self.min_coefvar: # for cases in which it is specified (i.e. non-default threshold)
+            self.reject_A = gp.RejectConstant(self.real_A_src, min_coefvar=self.min_coefvar)
+        else:
+            self.reject_A = None
+        
+        #make initial pipe section for A: TODO: Make min_masked part of config
+        self.pipe_A = self.source_A
+
+        self.pipe_A += gp.RandomLocation()
+        if self.mask_A_name is not None:
+            self.pipe_A += gp.Reject(mask=self.mask_A_src, min_masked=0.999)
+
+        if self.reject_A:
+            self.pipe_A += self.reject_A
+        if self.resample_A:
+            self.pipe_A += self.resample_A
+
+        self.pipe_A += gp.SimpleAugment(mirror_only=self.augment_axes, transpose_only=self.augment_axes)
+        self.pipe_A += self.normalize_real_A    
+        self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+            control_point_spacing=self.side_length//2,
+            jitter_sigma=(10.0,)*self.ndims,
+            rotation_interval=(0, math.pi/8),
+            subsample=4,
+            spatial_dims=self.ndims
+            )
+
+        # add "channel" dimensions if neccessary, else use z dimension as channel
+        if self.ndims == len(self.common_voxel_size):
+            self.pipe_A += gp.Unsqueeze([self.real_A])
+        # add "batch" dimensions
+        self.pipe_A += gp.Stack(self.batch_size)
+
     def build_pipeline_parts(self):        
         # declare arrays to use in the pipelines
         self.array_names = ['real_A', # [from source A, mask of source for training, netG2 output, netG2(netG1(real_A)) output,...for other side...] 
