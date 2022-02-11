@@ -467,9 +467,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2, scale_factor_A, scale_factor_B)
 
-        if self.crop_roi: # Get padding for cropping loss inputs to valid size
-            padding = self.get_valid_padding()
-        elif self.padding_unet.lower() == 'valid':
+        if self.padding_unet.lower() == 'valid':
             padding = 'valid'
         else:
             padding = None
@@ -500,6 +498,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             raise
 
     def build_machine(self):       
+        # initialize needed variables
+        self.arrays = []
+
         # define our network model for training
         self.setup_networks()        
         self.setup_model()
@@ -514,112 +515,111 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.augment_axes = list(np.arange(3)[-self.ndims:])
 
         # build datapipes
-        self.datapipe_A = self.build_datapipe('A')
-        self.datapipe_B = self.build_datapipe('B') #{train_pipe: train_pipe, src_pipe: src_pipe, reject: reject, resample: resample, augment: augment, unsqueeze: unsqueeze}
+        self.datapipe_A = self.get_datapipe('A')
+        self.datapipe_B = self.get_datapipe('B') #datapipe has: train_pipe, src_pipe, reject, resample, augment, unsqueeze, etc.}
 
-    def build_datapipe(self, side):
+    def get_datapipe(self, side):
+        datapipe = type('DataPipe', (object,), {}) # make simple object to smoothly store variables
         side = side.upper() # ensure uppercase
-        src_voxel_size = getattr(self, side+'_voxel_size')
+        datapipe.src_voxel_size = getattr(self, side+'_voxel_size')
         
         # declare arrays to use in the pipelines
-        array_names = ['real_', 
-                        'fake_', 
-                        'cycled_']
+        array_names = ['real', 
+                        'fake', 
+                        'cycled']
         if getattr(self, f'mask_{side}_name') is not None: 
-            array_names += ['mask_']
-            masked = True
-
+            array_names += ['mask']
+            datapipe.masked = True
+        else:
+            datapipe.masked = False
+                
         for array in array_names:
-            array_name = array + side
+            if 'cycled' in array:
+                other_side = ['A','B']
+                other_side.remove(side)
+                array_name = array + '_' + other_side[0]
+            else:
+                array_name = array + '_' + side
             array_key = gp.ArrayKey(array_name.upper())
-            locals()[array[:-1]] = array_key # set local variable keys
-            setattr(self, array_name, array_key) # add ArrayKeys to object
+            setattr(datapipe, array, array_key) # add ArrayKeys to object
+            setattr(self, array_name, array_key) 
+            self.arrays += [array_key]
             if 'mask' not in array:            
-                setattr(self, 'normalize_'+array_name, gp.Normalize(array_key))#add normalizations, if appropriate        
+                setattr(datapipe, 'normalize_'+array, gp.Normalize(array_key))#add normalizations, if appropriate        
+                setattr(self, 'normalize_'+array_name, gp.Normalize(array_key))
         
         #Setup sources and resampling nodes
-        if self.common_voxel_size != src_voxel_size:
-            real_src = gp.ArrayKey(f'REAL_{side}_SRC')
-            setattr(self, f'real_{side}_src', real_src)
-            resample = gp.Resample(real_src, self.common_voxel_size, real, ndim=self.ndims, interp_order=self.interp_order)
-            if masked: 
-                mask_src = gp.ArrayKey(f'MASK_{side}_SRC')
-                setattr(self, f'mask_{side}_src', mask_src)
-                resample += gp.Resample(mask_src, self.common_voxel_size, mask, ndim=self.ndims, interp_order=self.interp_order)
+        if self.common_voxel_size != datapipe.src_voxel_size:
+            datapipe.real_src = gp.ArrayKey(f'REAL_{side}_SRC')
+            setattr(self, f'real_{side}_src', datapipe.real_src)
+            datapipe.resample = gp.Resample(datapipe.real_src, self.common_voxel_size, datapipe.real, ndim=self.ndims, interp_order=self.interp_order)
+            if datapipe.masked: 
+                datapipe.mask_src = gp.ArrayKey(f'MASK_{side}_SRC')
+                setattr(self, f'mask_{side}_src', datapipe.mask_src)
+                datapipe.resample += gp.Resample(datapipe.mask_src, self.common_voxel_size, datapipe.mask, ndim=self.ndims, interp_order=self.interp_order)
         else:            
-            real_src = real
-            resample = None
-            if masked: 
-                mask_src = mask
+            datapipe.real_src = datapipe.real
+            datapipe.resample = None
+            if datapipe.masked: 
+                datapipe.mask_src = datapipe.mask
 
         # setup data sources
-        src = getattr(self, 'src_'+side)# the zarr container
-        src_name = getattr(self, side+'_name')
-        if masked: 
-            mask_name = getattr(self, f'mask_{side}_name')
-            source = gp.ZarrSource(    # add the data source
-                    src,  
-                {   real_src: src_name,
-                    mask_src: mask_name,
-                    },  # which dataset to associate to the array key
-                {   real_src: gp.ArraySpec(interpolatable=True, voxel_size=src_voxel_size),
-                    mask_src: gp.ArraySpec(interpolatable=False), 
-                    }  # meta-information
-            )
-        else:                        
-            source = gp.ZarrSource(    # add the data source
-                    src,  
-                {   real_src: src_name,
-                    },  # which dataset to associate to the array key
-                {   real_src: gp.ArraySpec(interpolatable=True, voxel_size=src_voxel_size),
-                    }  # meta-information
-            )
-
-        #make initial pipe section for A: TODO: Make min_masked part of config
-        src_pipe = source
-
-        if masked:
-            reject = gp.Reject(mask=self.mask_A_src, min_masked=0.999)
+        datapipe.src_path = getattr(self, 'src_'+side)# the zarr container
+        datapipe.out_path = getattr(self, side+'_out_path')
+        datapipe.real_name = getattr(self, side+'_name')
+        datapipe.src_names = {datapipe.real_src: datapipe.real_name}
+        datapipe.src_specs = {datapipe.real_src: gp.ArraySpec(interpolatable=True, voxel_size=datapipe.src_voxel_size)}
+        if datapipe.masked: 
+            datapipe.mask_name = getattr(self, f'mask_{side}_name')
+            datapipe.src_names[datapipe.mask_src] = datapipe.mask_name
+            datapipe.src_specs[datapipe.mask_src] = gp.ArraySpec(interpolatable=False)
+        datapipe.source = gp.ZarrSource(    # add the data source
+                    datapipe.src_path,  
+                    datapipe.src_names,  # which dataset to associate to the array key
+                    datapipe.src_specs  # meta-information
+        )
+        
+        # setup rejections
+        datapipe.reject = None
+        if datapipe.masked:
+            datapipe.reject = gp.Reject(mask = datapipe.mask_src, min_masked=0.999)
 
         if self.min_coefvar:
-            if not hasattr(locals(), 'reject'):
-                reject = gp.RejectConstant(real_src, min_coefvar=self.min_coefvar)
+            if datapipe.reject is None:
+                datapipe.reject = gp.RejectConstant(datapipe.real_src, min_coefvar = self.min_coefvar)
             else:
-                reject += gp.RejectConstant(real_src, min_coefvar=self.min_coefvar)
-        
-        if not hasattr(locals(), 'reject'):
-            reject = None
+                datapipe.reject += gp.RejectConstant(datapipe.real_src, min_coefvar = self.min_coefvar)
 
-        augment = gp.SimpleAugment(mirror_only=self.augment_axes, transpose_only=self.augment_axes)
-        augment += getattr(self, 'normalize_real_'+side)    
-        augment += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            control_point_spacing=self.side_length//2,
-            # jitter_sigma=(5.0,)*self.ndims,
-            jitter_sigma=(0., 5.0, 5.0,)[-self.ndims:],
-            rotation_interval=(0, math.pi/2),
-            subsample=4,
-            spatial_dims=self.ndims
-            )
+        datapipe.augment = gp.SimpleAugment(mirror_only = self.augment_axes, transpose_only = self.augment_axes)
+        datapipe.augment += datapipe.normalize_real    
+        datapipe.augment += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+                    control_point_spacing=self.side_length//2,
+                    # jitter_sigma=(5.0,)*self.ndims,
+                    jitter_sigma=(0., 5.0, 5.0,)[-self.ndims:],
+                    rotation_interval=(0, math.pi/2),
+                    subsample=4,
+                    spatial_dims=self.ndims
+        )
 
         # add "channel" dimensions if neccessary, else use z dimension as channel
         if self.ndims == len(self.common_voxel_size):
-            unsqueeze = gp.Unsqueeze([real])
+            datapipe.unsqueeze = gp.Unsqueeze([datapipe.real])
         else:
-            unsqueeze = None
+            datapipe.unsqueeze = None
 
         # Make training datapipe
-        train_pipe = src_pipe + gp.RandomLocation()
-        if reject:
-            train_pipe += reject
-        if resample:
-            train_pipe += resample
-        train_pipe += augment
-        if unsqueeze:
-            train_pipe += unsqueeze # add "channel" dimensions if neccessary, else use z dimension as channel
-        train_pipe += gp.Stack(self.batch_size)# add "batch" dimensions    
-        setattr(self, 'pipe_'+side, train_pipe)
+        datapipe.train_pipe = datapipe.source + gp.RandomLocation()
+        if datapipe.reject:
+            datapipe.train_pipe += datapipe.reject
+        if datapipe.resample:
+            datapipe.train_pipe += datapipe.resample
+        datapipe.train_pipe += datapipe.augment
+        if datapipe.unsqueeze:
+            datapipe.train_pipe += datapipe.unsqueeze # add "channel" dimensions if neccessary, else use z dimension as channel
+        datapipe.train_pipe += gp.Stack(self.batch_size)# add "batch" dimensions    
+        setattr(self, 'pipe_'+side, datapipe.train_pipe)
 
-        return {train_pipe: train_pipe, src_pipe: src_pipe, reject: reject, resample: resample, augment: augment, unsqueeze: unsqueeze}
+        return datapipe
 
     def build_training_pipeline(self):
         # create a train node using our model, loss, and optimizer
@@ -705,40 +705,38 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     self.batch_tBoard_write()
         return self.batch
         
-    def test_prediction(self, side='A', side_length=None):
+    def test_prediction(self, side='A', side_length=None, cycle=True):
         #set model into evaluation mode
         self.model.eval()
+        self.model.cycle = cycle
         # model_outputs = {
         #     0: self.fake_B,
         #     1: self.cycled_B,
         #     2: self.fake_A,
         #     3: self.cycled_A}
 
-        #{train_pipe: train_pipe, src_pipe: src_pipe, reject: reject, resample: resample, augment: augment, unsqueeze: unsqueeze}
-        datapipe = getattr(self, 'datapipe_'+side)
-        for key, value in datapipe:
-            locals()[key] = value
-        
-        for array in ['real_', 'fake_', 'cycle_']:
-            locals()[array[:-1]] = getattr(self, array+side)
-            locals()['normalize_'+array[:-1]] = getattr(self, 'normalize_'+array+side)
+        #datapipe has: train_pipe, src_pipe, reject, resample, augment, unsqueeze, etc.}
+        datapipe = getattr(self, 'datapipe_'+side)        
+        arrays = [datapipe.real, datapipe.fake]
+        if cycle:
+            arrays += [datapipe.cycled]
 
-        input_dict = {'real_'+side: real}
+        input_dict = {'real_'+side: datapipe.real}
 
-        if in_type=='A':
-            output_dict = { 0: fake,
-                            3: cycled
-            }
-        else:           
-            output_dict = { 2: fake,
-                            1: cycled
-            }
+        if side=='A':
+            output_dict = {0: datapipe.fake},
+            if cycle:
+                output_dict[3] = datapipe.cycled
+        else:        
+            output_dict = {2: datapipe.fake},
+            if cycle:
+                output_dict[1] = datapipe.cycled   
 
-        predict_pipe = src_pipe + gp.RandomLocation() + reject + resample + normalize_real
+        predict_pipe = datapipe.src_pipe + gp.RandomLocation() + datapipe.reject + datapipe.resample + datapipe.normalize_real
 
-        if unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
-            predict_pipe += unsqueeze
-        predict_pipe += gp.Unsqueeze([real]) # add batch dimension
+        if datapipe.unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
+            predict_pipe += datapipe.unsqueeze
+        predict_pipe += gp.Unsqueeze([datapipe.real]) # add batch dimension
 
         predict_pipe += gp.torch.Predict(self.model,
                                 inputs = input_dict,
@@ -746,12 +744,14 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 checkpoint = self.checkpoint
                                 )
         
-        predict_pipe += gp.Squeeze([real, fake, cycled], axis=1) # remove "channel" dimension
-        predict_pipe += gp.Squeeze([real, fake, cycled], axis=0) # remove batch dimension
-        predict_pipe += normalize_fake + normalize_cycled
+        predict_pipe += gp.Squeeze(arrays, axis=1) # remove "channel" dimension
+        predict_pipe += gp.Squeeze(arrays, axis=0) # remove batch dimension
+        predict_pipe += datapipe.normalize_fake 
+        if cycle:
+            predict_pipe += datapipe.normalize_cycled
 
         request = gp.BatchRequest()
-        for array in [real, fake, cycled]:            
+        for array in arrays:            
             extents = self.get_extents(side_length, array_name=array.identifier)
             request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
 
@@ -772,45 +772,37 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #     2: self.fake_A,
         #     3: self.cycled_A}
         
-        #{train_pipe: train_pipe, src_pipe: src_pipe, reject: reject, resample: resample, augment: augment, unsqueeze: unsqueeze}
-        datapipe = getattr(self, 'datapipe_'+side)
-        for key, value in datapipe:
-            locals()[key] = value
-        src_path = getattr(self, 'src_'+side)
-        out_path = getattr(self, side+'_out_path')
-        real_name = getattr(self, side+'_name')
-        
-        for array in ['real_', 'fake_', 'cycle_']:
-            locals()[array[:-1]] = getattr(self, array+side)
-            locals()['normalize_'+array[:-1]] = getattr(self, 'normalize_'+array+side)
+        #datapipe has: train_pipe, src_pipe, reject, resample, augment, unsqueeze, etc.}
+        datapipe = getattr(self, 'datapipe_'+side)        
+        arrays = [datapipe.real, datapipe.fake]
+        if cycle:
+            arrays += [datapipe.cycled]
 
-        input_dict = {'real_'+side: real}
+        input_dict = {'real_'+side: datapipe.real}                
 
-        if in_type=='A':
-            output_dict = { 0: fake,
-                            3: cycled
-            }
-        else:           
-            output_dict = { 2: fake,
-                            1: cycled
-            }
+        if side=='A':
+            output_dict = {0: datapipe.fake},
+            if cycle:
+                output_dict[3] = datapipe.cycled
+        else:        
+            output_dict = {2: datapipe.fake},
+            if cycle:
+                output_dict[1] = datapipe.cycled   
 
         # set prediction spec 
-        if src_pipe.spec is None:
-            data_file = zarr.open(src_path)
-            pred_spec = src_pipe._Hdf5LikeSource__read_spec(real, data_file, real_name).copy()
+        if datapipe.src_pipe.spec is None:
+            data_file = zarr.open(datapipe.src_path)
+            pred_spec = datapipe.src_pipe._Hdf5LikeSource__read_spec(datapipe.real, data_file, datapipe.real_name).copy()
         else:
-            pred_spec = src_pipe.spec[real].copy()        
+            pred_spec = datapipe.src_pipe.spec[datapipe.real].copy()        
         pred_spec.voxel_size = self.common_voxel_size
-        pred_spec.dtype = normalize_fake.dtype
+        pred_spec.dtype = datapipe.normalize_fake.dtype
 
-        arrays = [real, fake]
-        dataset_names = {fake: 'volumes/'+self.model_name+'_enFAKE'}
-        array_specs = {fake: pred_spec.copy()}
+        dataset_names = {datapipe.fake: 'volumes/'+self.model_name+'_enFAKE'}
+        array_specs = {datapipe.fake: pred_spec.copy()}
         if cycle:
-            arrays += [cycled]
-            dataset_names[cycled] = 'volumes/'+self.model_name+'_enCYCLED'
-            array_specs[cycled] = pred_spec.copy()
+            dataset_names[datapipe.cycled] = 'volumes/'+self.model_name+'_enCYCLED'
+            array_specs[datapipe.cycled] = pred_spec.copy()
 
         scan_request = gp.BatchRequest()
         for array in arrays:            
@@ -825,25 +817,25 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 'blocksize': 64
                 }
         
-        source_ds = daisy.open_ds(src_path, real_name)
-        total_roi = source_ds.data_roi
+        source_ds = daisy.open_ds(datapipe.src_path, datapipe.real_name)
+        datapipe.total_roi = source_ds.data_roi
         for key, name in dataset_names.items():
             write_size = scan_request[key].roi.get_shape()
             daisy.prepare_ds(
-                out_path,
+                datapipe.out_path,
                 name,
-                total_roi,
+                datapipe.total_roi,
                 daisy.Coordinate(self.common_voxel_size),
                 np.uint8,
                 write_size=write_size,
                 num_channels=1,
                 compressor=self.compressor)
 
-        render_pipe = src_pipe + resample + normalize_real
+        render_pipe = datapipe.src_pipe + datapipe.resample + datapipe.normalize_real
 
-        if unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
-            render_pipe += unsqueeze
-        render_pipe += gp.Unsqueeze([real]) # add batch dimension
+        if datapipe.unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
+            render_pipe += datapipe.unsqueeze
+        render_pipe += gp.Unsqueeze([datapipe.real]) # add batch dimension
 
         render_pipe += gp.torch.Predict(self.model,
                                 inputs = input_dict,
@@ -856,13 +848,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         render_pipe += gp.Squeeze(arrays[1:], axis=1) # remove "channel" dimension
         render_pipe += gp.Squeeze(arrays[1:], axis=0) # remove batch dimension
         
-        render_pipe += normalize_fake + gp.AsType(fake, np.uint8)        
+        render_pipe += datapipe.normalize_fake + gp.AsType(datapipe.fake, np.uint8)        
         if cycle:
-            render_pipe += normalize_cycled + gp.AsType(cycled, np.uint8)        
+            render_pipe += datapipe.normalize_cycled + gp.AsType(datapipe.cycled, np.uint8)        
 
         render_pipe += gp.ZarrWrite(
                         dataset_names = dataset_names,
-                        output_filename = out_path,
+                        output_filename = datapipe.out_path,
                         compression_type = self.compressor
                         # dataset_dtypes = {fake: pred_spec.dtype}
                         )        
