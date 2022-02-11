@@ -156,7 +156,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.residual_blocks = residual_blocks
             self.padding_unet = padding_unet
             self.gan_mode=gan_mode
-            self.build_pipeline_parts()
+            # self.build_pipeline_parts()
+            self.build_machine()
             self.training_pipeline = None
             self.test_training_pipeline = None
 
@@ -518,91 +519,116 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # setup a cache
         self.cache = gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)#os.cpu_count())
 
-        #define axes for mirroring and transpositions
+        # define axes for mirroring and transpositions
         self.augment_axes = list(np.arange(3)[-self.ndims:])
 
-    def build_pipe_side(self, side):
+        # build datapipes
+        self.datapipe_A = self.build_datapipe('A')
+        self.datapipe_B = self.build_datapipe('B') #{train_pipe: train_pipe, src_pipe: src_pipe, reject: reject, resample: resample, augment: augment, unsqueeze: unsqueeze}
+
+    def build_datapipe(self, side):
+        side = side.upper() # ensure uppercase
         src_voxel_size = getattr(self, side+'_voxel_size')
         
         # declare arrays to use in the pipelines
-        array_names = ['real_'+side, 
-                            'fake_'+side, 
-                            'cycled_'+side]
+        array_names = ['real_', 
+                            'fake_', 
+                            'cycled_']
         if getattr(self, f'mask_{side}_name') is not None: 
-            array_names += ['mask_'+side]
+            array_names += ['mask_']
+            masked = True
+
         for array in array_names:
-            array_key = gp.ArrayKey(array.upper())
-            setattr(self, array, array_key) # add ArrayKeys to object
+            array_name = array + side
+            array_key = gp.ArrayKey(array_name.upper())
+            locals()[array[:-1]] = array_key # set local variable keys
+            setattr(self, array_name, array_key) # add ArrayKeys to object
             if 'mask' not in array:            
-                setattr(self, 'normalize_'+array, gp.Normalize(array_key))#add normalizations, if appropriate        
+                setattr(self, 'normalize_'+array_name, gp.Normalize(array_key))#add normalizations, if appropriate        
         
         #Setup sources and resampling nodes
         if self.common_voxel_size != src_voxel_size:
-            setattr(self, f'real_{side}_src', gp.ArrayKey(f'REAL_{side}_SRC'))
-            self.resample_A = gp.Resample(self.real_A_src, self.common_voxel_size, self.real_A, ndim=self.ndims, interp_order=self.interp_order)
-            if self.mask_A_name is not None: 
-                self.mask_A_src = gp.ArrayKey('MASK_A_SRC')
-                self.resample_A += gp.Resample(self.mask_A_src, self.common_voxel_size, self.mask_A, ndim=self.ndims, interp_order=self.interp_order)
+            real_src = gp.ArrayKey(f'REAL_{side}_SRC')
+            setattr(self, f'real_{side}_src', real_src)
+            resample = gp.Resample(real_src, self.common_voxel_size, real, ndim=self.ndims, interp_order=self.interp_order)
+            if masked: 
+                mask_src = gp.ArrayKey(f'MASK_{side}_SRC')
+                setattr(self, f'mask_{side}_src', mask_src)
+                resample += gp.Resample(mask_src, self.common_voxel_size, mask, ndim=self.ndims, interp_order=self.interp_order)
         else:            
-            self.real_A_src = self.real_A
-            self.resample_A = None
-            if self.mask_A_name is not None: 
-                self.mask_A_src = self.mask_A
+            real_src = real
+            resample = None
+            if masked: 
+                mask_src = mask
 
         # setup data sources
-        if self.mask_A_name is not None: 
-            self.source_A = gp.ZarrSource(    # add the data source
-                self.src_A,  # the zarr container
-                {   self.real_A_src: self.A_name,
-                    self.mask_A_src: self.mask_A_name,
+        src = getattr(self, 'src_'+side)# the zarr container
+        src_name = getattr(self, side+'_name')
+        if masked: 
+            mask_name = getattr(self, f'mask_{side}_name')
+            source = gp.ZarrSource(    # add the data source
+                    src,  
+                {   real_src: src_name,
+                    mask_src: mask_name,
                     },  # which dataset to associate to the array key
-                {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=src_voxel_size),
-                    self.mask_A_src: gp.ArraySpec(interpolatable=False), 
+                {   real_src: gp.ArraySpec(interpolatable=True, voxel_size=src_voxel_size),
+                    mask_src: gp.ArraySpec(interpolatable=False), 
                     }  # meta-information
             )
-        else:            
-            self.source_A = gp.ZarrSource(    # add the data source
-                self.src_A,  # the zarr container
-                {   self.real_A_src: self.A_name,
+        else:                        
+            source = gp.ZarrSource(    # add the data source
+                    src,  
+                {   real_src: src_name,
                     },  # which dataset to associate to the array key
-                {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=src_voxel_size),
+                {   real_src: gp.ArraySpec(interpolatable=True, voxel_size=src_voxel_size),
                     }  # meta-information
             )
 
-        if self.min_coefvar is True:
-            self.reject_A = gp.RejectConstant(self.real_A_src)
-        elif self.min_coefvar: # for cases in which it is specified (i.e. non-default threshold)
-            self.reject_A = gp.RejectConstant(self.real_A_src, min_coefvar=self.min_coefvar)
-        else:
-            self.reject_A = None
-        
         #make initial pipe section for A: TODO: Make min_masked part of config
-        self.pipe_A = self.source_A
+        src_pipe = source
 
-        self.pipe_A += gp.RandomLocation()
-        if self.mask_A_name is not None:
-            self.pipe_A += gp.Reject(mask=self.mask_A_src, min_masked=0.999)
+        if masked:
+            reject = gp.Reject(mask=self.mask_A_src, min_masked=0.999)
 
-        if self.reject_A:
-            self.pipe_A += self.reject_A
-        if self.resample_A:
-            self.pipe_A += self.resample_A
+        if self.min_coefvar:
+            if not hasattr(locals(), 'reject'):
+                reject = gp.RejectConstant(real_src, min_coefvar=self.min_coefvar)
+            else:
+                reject += gp.RejectConstant(real_src, min_coefvar=self.min_coefvar)
+        
+        if not hasattr(locals(), 'reject'):
+            reject = None
 
-        self.pipe_A += gp.SimpleAugment(mirror_only=self.augment_axes, transpose_only=self.augment_axes)
-        self.pipe_A += self.normalize_real_A    
-        self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
+        augment = gp.SimpleAugment(mirror_only=self.augment_axes, transpose_only=self.augment_axes)
+        augment += getattr(self, 'normalize_real_'+side)    
+        augment += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
             control_point_spacing=self.side_length//2,
-            jitter_sigma=(10.0,)*self.ndims,
-            rotation_interval=(0, math.pi/8),
+            # jitter_sigma=(5.0,)*self.ndims,
+            jitter_sigma=(0., 5.0, 5.0,)[-self.ndims:],
+            rotation_interval=(0, math.pi/2),
             subsample=4,
             spatial_dims=self.ndims
             )
 
         # add "channel" dimensions if neccessary, else use z dimension as channel
         if self.ndims == len(self.common_voxel_size):
-            self.pipe_A += gp.Unsqueeze([self.real_A])
-        # add "batch" dimensions
-        self.pipe_A += gp.Stack(self.batch_size)
+            unsqueeze = gp.Unsqueeze([real])
+        else:
+            unsqueeze = None
+
+        # Make training datapipe
+        train_pipe = src_pipe + gp.RandomLocation()
+        if reject:
+            train_pipe += reject
+        if resample:
+            train_pipe += resample
+        train_pipe += augment
+        if unsqueeze:
+            train_pipe += unsqueeze # add "channel" dimensions if neccessary, else use z dimension as channel
+        train_pipe += gp.Stack(self.batch_size)# add "batch" dimensions    
+        setattr(self, 'pipe_'+side, train_pipe)
+
+        return {train_pipe: train_pipe, src_pipe: src_pipe, reject: reject, resample: resample, augment: augment, unsqueeze: unsqueeze}
 
     def build_pipeline_parts(self):        
         # declare arrays to use in the pipelines
