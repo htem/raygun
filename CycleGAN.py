@@ -74,7 +74,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             verbose=True,
             checkpoint=None, # Used for prediction/rendering, training always starts from latest
             interp_order=None,
-            crop_roi=False,
             loss_style='cycle', # supports 'cycle' or 'split'
             min_coefvar=None,
             unet_activation='ReLU',
@@ -146,7 +145,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             else:
                 self.checkpoint = checkpoint
             self.interp_order = interp_order
-            self.crop_roi = crop_roi
             self.loss_style = loss_style
             self.sampling_bottleneck =sampling_bottleneck
             self.adam_betas = adam_betas
@@ -156,7 +154,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.residual_blocks = residual_blocks
             self.padding_unet = padding_unet
             self.gan_mode=gan_mode
-            # self.build_pipeline_parts()
             self.build_machine()
             self.training_pipeline = None
             self.test_training_pipeline = None
@@ -252,6 +249,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if side_length is None:
             side_length = self.side_length
 
+        if (self.padding_unet is not None) and (self.padding_unet.lower() == 'valid'):
             if array_name is not None and not ('real' in array_name.lower() or 'mask' in array_name.lower()):
                 shape = (1,1) + (side_length,) * self.ndims
                 result = self.netG1(torch.rand(*shape))
@@ -381,13 +379,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 print(e)
                 print(f'Side length {side_length} failed.')
                 side_length += 1
-
-    def get_crop_roi(self, extents=None):
-        if extents is None:
-            extents = self.get_extents()       
-        crop_roi = gp.Roi((0,)*self.ndims, self.common_voxel_size * extents)
-        padding = self.get_valid_padding()
-        return crop_roi.grow(-padding, -padding)
 
     def get_generator(self, conf=None): 
         if conf is None: conf = self
@@ -532,8 +523,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         
         # declare arrays to use in the pipelines
         array_names = ['real_', 
-                            'fake_', 
-                            'cycled_']
+                        'fake_', 
+                        'cycled_']
         if getattr(self, f'mask_{side}_name') is not None: 
             array_names += ['mask_']
             masked = True
@@ -630,176 +621,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         return {train_pipe: train_pipe, src_pipe: src_pipe, reject: reject, resample: resample, augment: augment, unsqueeze: unsqueeze}
 
-    def build_pipeline_parts(self):        
-        # declare arrays to use in the pipelines
-        self.array_names = ['real_A', # [from source A, mask of source for training, netG2 output, netG2(netG1(real_A)) output,...for other side...] 
-                            'fake_A', 
-                            'cycled_A', 
-                            'real_B', 
-                            'fake_B', 
-                            'cycled_B']#, 'gradients_G1', 'gradients_G2']
-        if self.mask_A_name is not None: 
-            self.array_names += ['mask_A']
-        if self.mask_B_name is not None: 
-            self.array_names += ['mask_B']
-        #TODO: add gradients for network training debugging
-        self.arrays = []
-        for array in self.array_names:
-            setattr(self, array, gp.ArrayKey(array.upper())) # add ArrayKeys to object
-            self.arrays.append(getattr(self, array))
-            if 'mask' not in array:            
-                setattr(self, 'normalize_'+array, gp.Normalize(getattr(self, array)))#add normalizations, if appropriate        
-        
-        #Setup sources and resampling nodes
-        # A:
-        if self.common_voxel_size != self.A_voxel_size:
-            self.real_A_src = gp.ArrayKey('REAL_A_SRC')
-            self.resample_A = gp.Resample(self.real_A_src, self.common_voxel_size, self.real_A, ndim=self.ndims, interp_order=self.interp_order)
-            if self.mask_A_name is not None: 
-                self.mask_A_src = gp.ArrayKey('MASK_A_SRC')
-                self.resample_A += gp.Resample(self.mask_A_src, self.common_voxel_size, self.mask_A, ndim=self.ndims, interp_order=self.interp_order)
-        else:            
-            self.real_A_src = self.real_A
-            self.resample_A = None
-            if self.mask_A_name is not None: 
-                self.mask_A_src = self.mask_A
-
-        # setup data sources
-        if self.mask_A_name is not None: 
-            self.source_A = gp.ZarrSource(    # add the data source
-                self.src_A,  # the zarr container
-                {   self.real_A_src: self.A_name,
-                    self.mask_A_src: self.mask_A_name,
-                    },  # which dataset to associate to the array key
-                {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=self.A_voxel_size),
-                    self.mask_A_src: gp.ArraySpec(interpolatable=False), 
-                    }  # meta-information
-            )
-        else:            
-            self.source_A = gp.ZarrSource(    # add the data source
-                self.src_A,  # the zarr container
-                {   self.real_A_src: self.A_name,
-                    },  # which dataset to associate to the array key
-                {   self.real_A_src: gp.ArraySpec(interpolatable=True, voxel_size=self.A_voxel_size),
-                    }  # meta-information
-            )
-
-        if self.min_coefvar is True:
-            self.reject_A = gp.RejectConstant(self.real_A_src)
-        elif self.min_coefvar: # for cases in which it is specified (i.e. non-default threshold)
-            self.reject_A = gp.RejectConstant(self.real_A_src, min_coefvar=self.min_coefvar)
-        else:
-            self.reject_A = None
-
-        # B:       
-        if self.common_voxel_size != self.B_voxel_size:
-            self.real_B_src = gp.ArrayKey('REAL_B_SRC')
-            self.resample_B = gp.Resample(self.real_B_src, self.common_voxel_size, self.real_B, ndim=self.ndims, interp_order=self.interp_order)
-            if self.mask_B_name is not None: 
-                self.mask_B_src = gp.ArrayKey('MASK_B_SRC')
-                self.resample_B += gp.Resample(self.mask_B_src, self.common_voxel_size, self.mask_B, ndim=self.ndims, interp_order=self.interp_order)
-        else:            
-            self.real_B_src = self.real_B
-            self.resample_B = None
-            if self.mask_B_name is not None: 
-                self.mask_B_src = self.mask_B
-
-        # setup data sources
-        if self.mask_B_name is not None: 
-            self.source_B = gp.ZarrSource(    # add the data source
-                self.src_B,  # the zarr container
-                {   self.real_B_src: self.B_name,
-                    self.mask_B_src: self.mask_B_name,
-                    },  # which dataset to associate to the array key
-                {   self.real_B_src: gp.ArraySpec(interpolatable=True, voxel_size=self.B_voxel_size),
-                    self.mask_B_src: gp.ArraySpec(interpolatable=False), 
-                    }  # meta-information
-            )
-        else:            
-            self.source_B = gp.ZarrSource(    # add the data source
-                self.src_B,  # the zarr container
-                {   self.real_B_src: self.B_name,
-                    },  # which dataset to associate to the array key
-                {   self.real_B_src: gp.ArraySpec(interpolatable=True, voxel_size=self.B_voxel_size),
-                    }  # meta-information
-            )
-
-        if self.min_coefvar is True:
-            self.reject_B = gp.RejectConstant(self.real_B_src)
-        elif self.min_coefvar: # for cases in which it is specified (i.e. non-default threshold)
-            self.reject_B = gp.RejectConstant(self.real_B_src, min_coefvar=self.min_coefvar)
-        else:
-            self.reject_B = None
-
-        # get performance stats
-        self.performance = gp.PrintProfilingStats(every=self.log_every)
-
-        # setup a cache
-        self.cache = gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)#os.cpu_count())
-
-        # define our network model for training
-        self.setup_networks()        
-        self.setup_model()
-
-        #define axes for mirroring and transpositions
-        augment_axes = list(np.arange(3)[-self.ndims:])
-        
-        #make initial pipe section for A: TODO: Make min_masked part of config
-        self.pipe_A = self.source_A
-
-        self.pipe_A += gp.RandomLocation()
-        if self.mask_A_name is not None:
-            self.pipe_A += gp.Reject(mask=self.mask_A_src, min_masked=0.999)
-
-        if self.reject_A:
-            self.pipe_A += self.reject_A
-        if self.resample_A:
-            self.pipe_A += self.resample_A
-
-        self.pipe_A += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
-        self.pipe_A += self.normalize_real_A    
-        self.pipe_A += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            control_point_spacing=self.side_length//2,
-            jitter_sigma=(10.0,)*self.ndims,
-            rotation_interval=(0, math.pi/8),
-            subsample=4,
-            spatial_dims=self.ndims
-            )
-
-        # add "channel" dimensions if neccessary, else use z dimension as channel
-        if self.ndims == len(self.common_voxel_size):
-            self.pipe_A += gp.Unsqueeze([self.real_A])
-        # add "batch" dimensions
-        self.pipe_A += gp.Stack(self.batch_size)
-
-        #make initial pipe section for B: 
-        self.pipe_B = self.source_B 
-        
-        self.pipe_B += gp.RandomLocation()
-        if self.mask_B_name is not None:
-            self.pipe_B += gp.Reject(mask=self.mask_B_src, min_masked=0.999)
-
-        if self.reject_B:
-            self.pipe_B += self.reject_B
-        if self.resample_B:
-            self.pipe_B += self.resample_B
-
-        self.pipe_B += gp.SimpleAugment(mirror_only=augment_axes, transpose_only=augment_axes)
-        self.pipe_B += self.normalize_real_B
-        self.pipe_B += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-            control_point_spacing=self.side_length//2,
-            jitter_sigma=(10.0,)*self.ndims,
-            rotation_interval=(0, math.pi/8),
-            subsample=4,
-            spatial_dims=self.ndims
-            )
-        
-        # add "channel" dimensions if neccessary, else use z dimension as channel
-        if self.ndims == len(self.common_voxel_size):
-            self.pipe_B += gp.Unsqueeze([self.real_B])
-        # add "batch" dimensions
-        self.pipe_B += gp.Stack(self.batch_size) 
-
     def build_training_pipeline(self):
         # create a train node using our model, loss, and optimizer
         self.trainer = gp.torch.Train(
@@ -833,7 +654,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # assemble pipeline
         self.training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
-        # self.training_pipeline += augmentations
         self.training_pipeline += self.trainer
         # remove "channel" dimensions if neccessary
         if self.ndims == len(self.common_voxel_size):
@@ -854,39 +674,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                             ], axis=0)
         self.training_pipeline += self.normalize_fake_B + self.normalize_cycled_A
         self.training_pipeline += self.normalize_fake_A + self.normalize_cycled_B
+        self.test_training_pipeline = self.training_pipeline.copy() + self.performance
         self.training_pipeline += self.cache
-        # self.training_pipeline += self.performance
-
-        self.test_training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
-        # self.test_training_pipeline += augmentations
-        self.test_training_pipeline += self.trainer        
-        # remove "channel" dimensions if neccessary
-        if self.ndims == len(self.common_voxel_size):
-            self.test_training_pipeline += gp.Squeeze([self.real_A, 
-                                            self.fake_A, 
-                                            self.cycled_A, 
-                                            self.real_B, 
-                                            self.fake_B, 
-                                            self.cycled_B
-                                            ], axis=1) # remove channel dimension for grayscale
-        if self.batch_size == 1:
-            self.test_training_pipeline += gp.Squeeze([self.real_A, 
-                                            self.fake_A, 
-                                            self.cycled_A, 
-                                            self.real_B, 
-                                            self.fake_B, 
-                                            self.cycled_B
-                                            ], axis=0)
-        self.test_training_pipeline += self.normalize_fake_B + self.normalize_cycled_A
-        self.test_training_pipeline += self.normalize_fake_A + self.normalize_cycled_B
 
         # create request
         self.train_request = gp.BatchRequest()
-        if (self.padding_unet is None) or (self.padding_unet.lower() != 'valid'):
-            extents = self.get_extents()
         for array in self.arrays:            
-            if (self.padding_unet is not None) and (self.padding_unet.lower() == 'valid'):
-                extents = self.get_extents(array_name=array.identifier)
+            extents = self.get_extents(array_name=array.identifier)
             self.train_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
             
     def test_train(self):
@@ -911,7 +705,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     self.batch_tBoard_write()
         return self.batch
         
-    def test_prediction(self, in_type='A', side_length=None):
+    def test_prediction(self, side='A', side_length=None):
         #set model into evaluation mode
         self.model.eval()
         # model_outputs = {
@@ -920,173 +714,112 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #     2: self.fake_A,
         #     3: self.cycled_A}
 
-        if in_type=='A':
-            pipe = self.source_A
-            # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
-            pipe += gp.RandomLocation() + self.resample_A + self.normalize_real_A       
-            # add "channel" dimensions if neccessary, else use z dimension as channel
-            if self.ndims == len(self.common_voxel_size):
-                pipe += gp.Unsqueeze([self.real_A])
-            pipe += gp.Unsqueeze([self.real_A]) # add batch dimension
-            input_dict = {'real_A': self.real_A}
-            output_dict = { 0: self.fake_B,
-                            3: self.cycled_A
-                }
-            real = self.real_A
-            fake = self.fake_B
-            cycled = self.cycled_A
-            normalize_fake = self.normalize_fake_B
-            normalize_cycled = self.normalize_cycled_A
-        else:
-            pipe = self.source_B
-            # self.pipe_A += gp.RandomLocation(min_masked=0.5, mask=self.mask_A) + self.resample + self.normalize_real_A        
-            pipe += gp.RandomLocation() + self.resample_B + self.normalize_real_B            
-            # add "channel" dimensions if neccessary, else use z dimension as channel
-            if self.ndims == len(self.common_voxel_size):
-                pipe += gp.Unsqueeze([self.real_B])
-            pipe += gp.Unsqueeze([self.real_B]) # add batch dimension    
-            input_dict = {'real_B': self.real_B}
-            output_dict = { 2: self.fake_A,
-                            1: self.cycled_B
-                }
-            real = self.real_B
-            fake = self.fake_A
-            cycled = self.cycled_B
-            normalize_fake = self.normalize_fake_A
-            normalize_cycled = self.normalize_cycled_B
+        #{train_pipe: train_pipe, src_pipe: src_pipe, reject: reject, resample: resample, augment: augment, unsqueeze: unsqueeze}
+        datapipe = getattr(self, 'datapipe_'+side)
+        for key, value in datapipe:
+            locals()[key] = value
+        
+        for array in ['real_', 'fake_', 'cycle_']:
+            locals()[array[:-1]] = getattr(self, array+side)
+            locals()['normalize_'+array[:-1]] = getattr(self, 'normalize_'+array+side)
 
-        pipe += gp.torch.Predict(self.model,
+        input_dict = {'real_'+side: real}
+
+        if in_type=='A':
+            output_dict = { 0: fake,
+                            3: cycled
+            }
+        else:           
+            output_dict = { 2: fake,
+                            1: cycled
+            }
+
+        predict_pipe = src_pipe + gp.RandomLocation() + reject + resample + normalize_real
+
+        if unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
+            predict_pipe += unsqueeze
+        predict_pipe += gp.Unsqueeze([real]) # add batch dimension
+
+        predict_pipe += gp.torch.Predict(self.model,
                                 inputs = input_dict,
                                 outputs = output_dict,
                                 checkpoint = self.checkpoint
                                 )
         
-        pipe += gp.Squeeze([real, fake, cycled], axis=1) # remove "channel" dimension
-        pipe += gp.Squeeze([real, fake, cycled], axis=0) # remove batch dimension
-        pipe += normalize_fake + normalize_cycled
+        predict_pipe += gp.Squeeze([real, fake, cycled], axis=1) # remove "channel" dimension
+        predict_pipe += gp.Squeeze([real, fake, cycled], axis=0) # remove batch dimension
+        predict_pipe += normalize_fake + normalize_cycled
 
-        extents = self.get_extents(side_length=side_length)        
         request = gp.BatchRequest()
-        request.add(real, self.common_voxel_size * extents, self.common_voxel_size)
-        request.add(fake, self.common_voxel_size * extents, self.common_voxel_size)
-        request.add(cycled, self.common_voxel_size * extents, self.common_voxel_size)
+        for array in [real, fake, cycled]:            
+            extents = self.get_extents(side_length, array_name=array.identifier)
+            request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
 
-        with gp.build(pipe):
-            self.batch = pipe.request_batch(request)
+        with gp.build(predict_pipe):
+            self.batch = predict_pipe.request_batch(request)
 
         self.batch_show()
         return self.batch
 
-    def render_full(self, in_type='A', side_length=None, cycle=False):
+    def render_full(self, side='A', side_length=None, cycle=False):
         #CYCLED CURRENTLY SAVED IN UPSAMPLED FORM (i.e. not original voxel size)
         #set model into evaluation mode
         self.model.eval()
+        self.model.cycle = cycle
         # model_outputs = {
         #     0: self.fake_B,
         #     1: self.cycled_B,
         #     2: self.fake_A,
         #     3: self.cycled_A}
-  
-        if in_type=='A':
-            input_dict = {'real_A': self.real_A}
-            output_dict = { 0: self.fake_B,
-                            3: self.cycled_A
-                }
-            out_path = self.A_out_path
-            real = self.real_A
-            fake = self.fake_B
-            cycled = self.cycled_A
-            normalize_real = self.normalize_real_A
-            normalize_fake = self.normalize_fake_B
-            normalize_cycled = self.normalize_cycled_A
-            source = self.source_A
-            src_path = self.src_A
-            real_name = self.A_name
-            resample = self.resample_A
-        else:
-            input_dict = {'real_B': self.real_B}
-            output_dict = { 2: self.fake_A,
-                            1: self.cycled_B
-                }
-            out_path = self.B_out_path
-            real = self.real_B
-            fake = self.fake_A
-            cycled = self.cycled_B
-            normalize_real = self.normalize_real_B
-            normalize_fake = self.normalize_fake_A
-            normalize_cycled = self.normalize_cycled_B
-            source = self.source_B
-            src_path = self.src_B
-            real_name = self.B_name
-            resample = self.resample_B
         
-        pipe = source + resample + normalize_real + gp.Unsqueeze([real])
-        # add "channel" dimension if neccessary, else use z dimension as channel
-        if self.ndims == len(self.common_voxel_size):
-            pipe += gp.Unsqueeze([real])
+        #{train_pipe: train_pipe, src_pipe: src_pipe, reject: reject, resample: resample, augment: augment, unsqueeze: unsqueeze}
+        datapipe = getattr(self, 'datapipe_'+side)
+        for key, value in datapipe:
+            locals()[key] = value
+        src_path = getattr(self, 'src_'+side)
+        out_path = getattr(self, side+'_out_path')
+        real_name = getattr(self, side+'_name')
+        
+        for array in ['real_', 'fake_', 'cycle_']:
+            locals()[array[:-1]] = getattr(self, array+side)
+            locals()['normalize_'+array[:-1]] = getattr(self, 'normalize_'+array+side)
+
+        input_dict = {'real_'+side: real}
+
+        if in_type=='A':
+            output_dict = { 0: fake,
+                            3: cycled
+            }
+        else:           
+            output_dict = { 2: fake,
+                            1: cycled
+            }
 
         # set prediction spec 
-        if source.spec is None:
+        if src_pipe.spec is None:
             data_file = zarr.open(src_path)
-            pred_spec = source._Hdf5LikeSource__read_spec(real, data_file, real_name).copy()
+            pred_spec = src_pipe._Hdf5LikeSource__read_spec(real, data_file, real_name).copy()
         else:
-            pred_spec = source.spec[real].copy()        
+            pred_spec = src_pipe.spec[real].copy()        
         pred_spec.voxel_size = self.common_voxel_size
         pred_spec.dtype = normalize_fake.dtype
-        
-        extents = self.get_extents(side_length=side_length)       
-        scan_request = gp.BatchRequest()
-        scan_request.add(real, self.common_voxel_size * extents, self.common_voxel_size)
-        scan_request.add(fake, self.common_voxel_size * extents, self.common_voxel_size)
 
+        arrays = [real, fake]
         dataset_names = {fake: 'volumes/'+self.model_name+'_enFAKE'}
         array_specs = {fake: pred_spec.copy()}
         if cycle:
+            arrays += [cycled]
             dataset_names[cycled] = 'volumes/'+self.model_name+'_enCYCLED'
             array_specs[cycled] = pred_spec.copy()
-            scan_request.add(cycled, self.common_voxel_size * extents, self.common_voxel_size)
 
-        pipe += gp.torch.Predict(self.model,
-                                inputs = input_dict,
-                                outputs = output_dict,
-                                checkpoint = self.checkpoint,
-                                array_specs = array_specs, 
-                                spawn_subprocess=self.spawn_subprocess
-                                )
-        
-        #Get ROI for crop
-        if self.crop_roi:
-            crop_roi = self.get_crop_roi(extents)
+        scan_request = gp.BatchRequest()
+        for array in arrays:            
+            extents = self.get_extents(side_length, array_name=array.identifier)
+            scan_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
 
-        if cycle:
-            # pipe += gp.Squeeze([real, fake, cycled], axis=0)
-            # pipe += gp.Squeeze([real, fake, cycled], axis=0)
-
-            # remove "channel" dimension
-            pipe += gp.Squeeze([fake, cycled], axis=1)
-            pipe += gp.Squeeze([fake, cycled], axis=0)
-            pipe += normalize_fake + normalize_cycled
-            if self.crop_roi:            
-                pipe += gp.Crop(fake, roi=crop_roi)
-                pipe += gp.Crop(cycled, roi=crop_roi)
-            pipe += gp.AsType(fake, np.uint8)
-            pipe += gp.AsType(cycled, np.uint8)
-        else:
-            # pipe += gp.Squeeze([real, fake], axis=0)
-            # pipe += gp.Squeeze([real, fake], axis=0)
-
-            # remove "channel" dimension
-            pipe += gp.Squeeze([fake], axis=1)
-            pipe += gp.Squeeze([fake], axis=0)
-            pipe += normalize_fake
-            if self.crop_roi:
-                pipe += gp.Crop(fake, roi=crop_roi)
-            pipe += gp.AsType(fake, np.uint8)
-            self.model.cycle = False
-        
         #Declare new array to write to
         if not hasattr(self, 'compressor'):
-            self.compressor = {  'id': 'blosc', 
+            self.compressor = {'id': 'blosc', 
                 'clevel': 3,
                 'cname': 'blosclz',
                 'blocksize': 64
@@ -1094,8 +827,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         
         source_ds = daisy.open_ds(src_path, real_name)
         total_roi = source_ds.data_roi
-        write_size = self.common_voxel_size * extents
-        for name in dataset_names.values():
+        for key, name in dataset_names.items():
+            write_size = scan_request[key].roi.get_shape()
             daisy.prepare_ds(
                 out_path,
                 name,
@@ -1106,24 +839,42 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 num_channels=1,
                 compressor=self.compressor)
 
-        pipe += gp.ZarrWrite(
+        render_pipe = src_pipe + resample + normalize_real
+
+        if unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
+            render_pipe += unsqueeze
+        render_pipe += gp.Unsqueeze([real]) # add batch dimension
+
+        render_pipe += gp.torch.Predict(self.model,
+                                inputs = input_dict,
+                                outputs = output_dict,
+                                checkpoint = self.checkpoint,
+                                array_specs = array_specs, 
+                                spawn_subprocess=self.spawn_subprocess
+                                )
+        
+        render_pipe += gp.Squeeze(arrays[1:], axis=1) # remove "channel" dimension
+        render_pipe += gp.Squeeze(arrays[1:], axis=0) # remove batch dimension
+        
+        render_pipe += normalize_fake + gp.AsType(fake, np.uint8)        
+        if cycle:
+            render_pipe += normalize_cycled + gp.AsType(cycled, np.uint8)        
+
+        render_pipe += gp.ZarrWrite(
                         dataset_names = dataset_names,
                         output_filename = out_path,
                         compression_type = self.compressor
                         # dataset_dtypes = {fake: pred_spec.dtype}
                         )        
         
-        # pipe += self.cache
-        pipe += gp.Scan(scan_request, num_workers=self.num_workers, cache_size=self.cache_size)#os.cpu_count())
-
-        pipe += self.performance
+        render_pipe += gp.Scan(scan_request, num_workers=self.num_workers, cache_size=self.cache_size)
 
         request = gp.BatchRequest()
 
-        print(f'Full rendering pipeline declared for input type {in_type}. Building...')
-        with gp.build(pipe):
+        print(f'Full rendering pipeline declared for input type {side}. Building...')
+        with gp.build(render_pipe):
             print('Starting full volume render...')
-            pipe.request_batch(request)
+            render_pipe.request_batch(request)
             print('Finished.')
 
     def load_saved_model(self, checkpoint=None):
