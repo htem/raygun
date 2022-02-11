@@ -30,6 +30,7 @@ from unet import UNet, ConvPass
 from tri_utils import NLayerDiscriminator, NLayerDiscriminator3D, GANLoss, init_weights
 from CycleGAN_Model import *
 from CycleGAN_LossFunctions import *
+from CycleGAN_Optimizers import *
 
 class CycleGAN(): #TODO: Just pass config file or dictionary
     def __init__(self,
@@ -202,29 +203,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def batch_tBoard_write(self, i=0):
         self.trainer.summary_writer.flush()
         self.n_iter = self.trainer.iteration
-        # for key, loss in self.loss.loss_dict.items():
-        #     # self.trainer.summary_writer.add_scalar(key.replace('_', '/'), loss, n_iter)
-        #     self.trainer.summary_writer.add_scalar(key, loss, self.n_iter)
-        # # self.trainer.summary_writer.add_scalars('Loss', self.loss.loss_dict, n_iter)
-
-        # for array in self.arrays:
-        #     if len(self.batch[array].data.shape) > 3: # pull out batch dimension if necessary
-        #         img = self.batch[array].data[i].squeeze()
-        #     else:
-        #         img = self.batch[array].data.squeeze()
-        #     if len(img.shape) == 3:
-        #         mid = img.shape[0] // 2 # for 3D volume
-        #         data = img[mid]
-        #     else:
-        #         data = img
-        #     self.trainer.summary_writer.add_image(array.identifier, data, global_step=self.n_iter, dataformats='HW')
-
-        # try:
-        #     self.trainer.summary_writer.add_image('netG1_layer1_gradients', self.netG1[0].l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
-        #     self.trainer.summary_writer.add_image('netG2_layer1_gradients', self.netG2[0].l_conv[0].conv_pass[0].weight.grad, global_step=self.n_iter, dataformats='HW')
-        # except:
-        #     logger.warning('Unable to write gradients to tensorboard.')
-        # self.trainer.summary_writer.flush()
 
     def _get_latest_checkpoint(self):
         basename = self.model_path + self.model_name
@@ -262,123 +240,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         extents = np.ones((len(self.common_voxel_size)))
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
-
-    def get_unet_kernels(self):
-        kernel_size_down = self.g_kernel_size_down #<- length of list determines number of conv passes in level
-        kernel_size_up = self.g_kernel_size_up
-
-        if kernel_size_down is None:
-            kernel_size_down = [[(3,)*self.ndims, (3,)*self.ndims]]*self.gnet_depth
-        if kernel_size_up is None:
-            kernel_size_up = [[(3,)*self.ndims, (3,)*self.ndims]]*(self.gnet_depth - 1)
-        
-        return kernel_size_down, kernel_size_up
-
-    def get_valid_padding(self):
-        # figure out proper ROI padding for context
-        
-        kernel_size_down, kernel_size_up = self.get_unet_kernels()
-        level_pads = []
-        #going down
-        for level in np.arange(self.gnet_depth - 1):
-            level_pads.append(np.sum(np.array(kernel_size_down[level]) - 1, axis=0) * (self.g_downsample_factor ** level))
-
-        #bottom level
-        level_pads.append(np.sum(np.array(kernel_size_down[-1]) - 1, axis=0) * (self.g_downsample_factor ** (self.gnet_depth - 1)))
-
-        #coming up
-        for level in np.arange(self.gnet_depth - 1)[::-1]:
-            level_pads.append(np.sum(np.array(kernel_size_up[level]) - 1, axis=0) * (self.g_downsample_factor ** level))
-
-        return gp.Coordinate(np.sum(level_pads, axis=0)) // 2 # in voxels per edge
-    
-    def get_valid_crop_to(self, size=None):
-        #returns next valid size that could be cropped to
-        pad = self.get_valid_padding()[0] * 2
-        if size is None: 
-            size = self.side_length - pad
-        
-        success = self.check_valid_size(size)
-        failed = (size - pad) <= 0
-        while not success and not failed:
-            size -= 1
-            success = self.check_valid_size(size) # if successful, final generator output size is returned
-            failed = (size - pad) <= 0
-        
-        if success:
-            try: # final test: through discriminator
-                shape = (1,1) + (size - pad,) * self.ndims
-                temp = torch.rand(*shape)
-                _ = self.netD1(temp)
-                return size
-            except:
-                return False
-        else:
-            return False
-            
-    def check_valid_size(self, in_size):
-        # Checks if a size is a valid input to a generator, and returns the generators output side length if successful
-        def _check_size(size):
-            return (int(size) == size) and (size > 0)
-
-        size = in_size
-        kernel_size_down, kernel_size_up = self.get_unet_kernels()
-        down_fac = self.g_downsample_factor
-        try:
-            #going down
-            for level in np.arange(self.gnet_depth - 1):
-                size -= np.sum(np.array(kernel_size_down[level]) - 1, axis=0)[0]
-                size /= down_fac
-                logger.debug(f'Going down level {level} and size {size}')
-                assert _check_size(size)
-
-            #bottom level
-            size -= np.sum(np.array(kernel_size_down[-1]) - 1, axis=0)[0]
-            logger.debug(f'At bottom with size {size}')
-            assert _check_size(size)
-
-            #coming up
-            for level in np.arange(self.gnet_depth - 1)[::-1]:
-                size *= down_fac
-                size -= np.sum(np.array(kernel_size_up[level]) - 1, axis=0)[0]
-                logger.debug(f'Going up level {level} and size {size}')
-                assert _check_size(size)
-            
-            #final check
-            shape = (1,1) + (in_size,) * self.ndims
-            _ = self.netG1(torch.rand(*shape))
-            return size
-        except:
-            return False        
-
-    def find_min_valid_size(self, set=True, start_length=None):
-        Dnet = self.get_discriminator()
-        pad = self.get_valid_padding()[0] * 2        
-
-        success = False
-        if start_length is None:
-            side_length = self.side_length
-        else:
-            side_length = start_length
-        print('Finding minimum valid input size. This will run until it finds a solution or breaks your computer. Good luck.')
-        while not success:
-            try:
-                out_size = side_length - pad
-                assert out_size > 0
-                print(f'Side length {side_length} successful on first pass, with result side length {out_size}.')
-                out_size = self.get_valid_crop_to(out_size)
-                assert out_size
-                print(f'Side length {side_length} successful on both passes, with final side length {out_size}.')
-                shape = (1,1) + (out_size,) * self.ndims                
-                final_size = Dnet(torch.rand(*shape)).shape
-                print(f'Side length {side_length} successful on both passes and through discriminator, with final evaluated side length {final_size[-1]}.')
-                if set:
-                    self.side_length = side_length
-                return side_length
-            except Exception as e:
-                print(e)
-                print(f'Side length {side_length} failed.')
-                side_length += 1
 
     def get_generator(self, conf=None): 
         if conf is None: conf = self
@@ -880,26 +741,3 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 self.model.load_state_dict()
         else:
             raise('No saved checkpoint found.')
-
-
-class CycleGAN_Optimizer(torch.nn.Module):
-    def __init__(self, optimizer_G, optimizer_D):
-        super(CycleGAN_Optimizer, self).__init__()
-        self.optimizer_G = optimizer_G
-        self.optimizer_D = optimizer_D
-
-    def step(self):
-        """Dummy step pass for Gunpowder's Train node step() call"""
-        pass
-
-class Split_CycleGAN_Optimizer(torch.nn.Module):
-    def __init__(self, optimizer_G1, optimizer_D1, optimizer_G2, optimizer_D2):
-        super(Split_CycleGAN_Optimizer, self).__init__()
-        self.optimizer_G1 = optimizer_G1
-        self.optimizer_D1 = optimizer_D1
-        self.optimizer_G2 = optimizer_G2
-        self.optimizer_D2 = optimizer_D2
-
-    def step(self):
-        """Dummy step pass for Gunpowder's Train node step() call"""
-        pass
