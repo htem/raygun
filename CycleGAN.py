@@ -27,7 +27,7 @@ torch.backends.cudnn.benchmark = True
 # from funlib.learn.torch.models.unet import UNet, ConvPass
 from residual_unet import ResidualUNet
 from unet import UNet, ConvPass
-from tri_utils import NLayerDiscriminator, NLayerDiscriminator3D, GANLoss, init_weights
+from tri_utils import *
 from CycleGAN_Model import *
 from CycleGAN_LossFunctions import *
 from CycleGAN_Optimizers import *
@@ -48,43 +48,52 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             B_out_path=None,
             model_name='CycleGun',
             model_path='./models/',
-            side_length=32,# in dataset A sized voxels at output layer - actual used ROI for network input will be bigger for valid padding
+            
+            gnet_type='unet',
+            gnet_kwargs = {},
+            ### below temporarily kept for backward compatibility
             gnet_depth=3, # number of layers in unets (i.e. generators)
-            dnet_depth=3, # number of layers in Discriminator networks
             g_downsample_factor=2,
-            d_downsample_factor=2,
             g_num_fmaps=16,
-            d_num_fmaps=16,
             g_fmap_inc_factor=2,
             g_constant_upsample=True,            
             g_kernel_size_down=None,
             g_kernel_size_up=None,
+            gnet_activation='ReLU',
+            residual_unet=False,
+            residual_blocks=False,
+            padding_unet='same',
+            ###
+            g_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
+
+            dnet_depth=3, # number of layers in Discriminator networks
+            d_downsample_factor=2,
+            d_num_fmaps=16,
             d_kernel_size=3, 
-            num_epochs=10000,
+            d_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
+            
+            l1_lambda=10, # Default from CycleGAN paper
+            identity_lambda=0.5, # Default from CycleGAN paper
+            loss_style='cycle', # supports 'cycle' or 'split'
+            gan_mode='lsgan',
+            sampling_bottleneck=False,
+            adam_betas = [0.9, 0.999],
+            
+            min_coefvar=None,
+            interp_order=None,
+            side_length=32,# in dataset A sized voxels at output layer - actual used ROI for network input will be bigger for valid padding
             batch_size=1,
             num_workers=11,
             cache_size=50,
             spawn_subprocess=False,
-            g_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
-            d_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
-            l1_lambda=10, # Default from CycleGAN paper
-            identity_lambda=0.5, # Default from CycleGAN paper
+            num_epochs=10000,
             log_every=100,
             save_every=2000,
             tensorboard_path='./tensorboard/',
             verbose=True,
-            checkpoint=None, # Used for prediction/rendering, training always starts from latest
-            interp_order=None,
-            loss_style='cycle', # supports 'cycle' or 'split'
-            min_coefvar=None,
-            unet_activation='ReLU',
-            residual_unet=False,
-            residual_blocks=False,
-            padding_unet='same',
-            gan_mode='lsgan',
-            sampling_bottleneck=False,
-            adam_betas = [0.9, 0.999]
+            checkpoint=None, # Used for prediction/rendering, training always starts from latest            
             ):
+
             self.src_A = src_A
             self.src_B = src_B
             self.A_voxel_size = gp.Coordinate(A_voxel_size)
@@ -112,6 +121,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.model_name = model_name
             self.model_path = model_path
             self.side_length = side_length
+
+            self.gnet_type = gnet_type.lower()
+            self.gnet_kwargs = gnet_kwargs
+
             self.gnet_depth = gnet_depth
             self.dnet_depth = dnet_depth
             self.g_downsample_factor = g_downsample_factor
@@ -150,7 +163,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.sampling_bottleneck =sampling_bottleneck
             self.adam_betas = adam_betas
             self.min_coefvar = min_coefvar
-            self.unet_activation = unet_activation
+            self.gnet_activation = gnet_activation
             self.residual_unet = residual_unet
             self.residual_blocks = residual_blocks
             self.padding_unet = padding_unet
@@ -241,44 +254,70 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
 
-    def get_generator(self, conf=None): 
-        if conf is None: conf = self
-        if conf.residual_unet:
-            unet = ResidualUNet(
-                    in_channels=1,
-                    num_fmaps=conf.g_num_fmaps,
-                    fmap_inc_factor=conf.g_fmap_inc_factor,
-                    downsample_factors=[(conf.g_downsample_factor,)*conf.ndims,] * (conf.gnet_depth - 1),
-                    padding=conf.padding_unet,
-                    constant_upsample=conf.g_constant_upsample,
-                    voxel_size=conf.common_voxel_size[-conf.ndims:],
-                    kernel_size_down=conf.g_kernel_size_down,
-                    kernel_size_up=conf.g_kernel_size_up,
-                    residual=conf.residual_blocks,
-                    activation=conf.unet_activation
-                    )
-            generator = torch.nn.Sequential(
-                                unet, 
-                                torch.nn.Sigmoid())
+    def get_generator(self): 
+        if self.gnet_type == 'unet':
+
+            if self.ndims == 2:
+                generator = UnetGenerator(**self.gnet_kwargs)
+            
+            elif self.ndims == 3:
+                generator = UnetGenerator3D(**self.gnet_kwargs)
+
+            else:
+                raise f'Unet generators only specified for 2D or 3D, not {self.ndims}D'
+
+                # if self.residual_unet:
+                #     unet = ResidualUNet(
+                #             in_channels=1,
+                #             num_fmaps=self.g_num_fmaps,
+                #             fmap_inc_factor=self.g_fmap_inc_factor,
+                #             downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
+                #             padding=self.padding_unet,
+                #             constant_upsample=self.g_constant_upsample,
+                #             voxel_size=self.common_voxel_size[-self.ndims:],
+                #             kernel_size_down=self.g_kernel_size_down,
+                #             kernel_size_up=self.g_kernel_size_up,
+                #             residual=self.residual_blocks,
+                #             activation=self.gnet_activation
+                #             )
+                #     generator = torch.nn.Sequential(
+                #                         unet, 
+                #                         torch.nn.Tanh())
+                # else:
+                #     unet = UNet(
+                #             in_channels=1,
+                #             num_fmaps=self.g_num_fmaps,
+                #             fmap_inc_factor=self.g_fmap_inc_factor,
+                #             downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
+                #             padding=self.padding_unet,
+                #             constant_upsample=self.g_constant_upsample,
+                #             voxel_size=self.common_voxel_size[-self.ndims:],
+                #             kernel_size_down=self.g_kernel_size_down,
+                #             kernel_size_up=self.g_kernel_size_up,
+                #             residual=self.residual_blocks,
+                #             activation=self.gnet_activation
+                #             )
+                #     generator = torch.nn.Sequential(
+                #                         unet,
+                #                         ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet), 
+                #                         torch.nn.Tanh())
+            
+        elif self.gnet_type == 'resnet':
+            
+            if self.ndims == 2:
+                generator = ResnetGenerator(**self.gnet_kwargs)
+            
+            elif self.ndims == 3:
+                generator = ResnetGenerator3D(**self.gnet_kwargs)
+
+            else:
+                raise f'Resnet generators only specified for 2D or 3D, not {self.ndims}D'
+
         else:
-            unet = UNet(
-                    in_channels=1,
-                    num_fmaps=conf.g_num_fmaps,
-                    fmap_inc_factor=conf.g_fmap_inc_factor,
-                    downsample_factors=[(conf.g_downsample_factor,)*conf.ndims,] * (conf.gnet_depth - 1),
-                    padding=conf.padding_unet,
-                    constant_upsample=conf.g_constant_upsample,
-                    voxel_size=conf.common_voxel_size[-conf.ndims:],
-                    kernel_size_down=conf.g_kernel_size_down,
-                    kernel_size_up=conf.g_kernel_size_up,
-                    residual=conf.residual_blocks,
-                    activation=conf.unet_activation
-                    )
-            generator = torch.nn.Sequential(
-                                unet,
-                                ConvPass(conf.g_num_fmaps, 1, [(1,)*conf.ndims], activation=None, padding=conf.padding_unet), 
-                                torch.nn.Sigmoid())
-        if conf.unet_activation is not None:
+
+            raise f'Unknown generator type requested: {self.gnet_type}'
+
+        if self.gnet_activation is not None:
             init_weights(generator, init_type='kaiming', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
         else:
             init_weights(generator, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
