@@ -376,7 +376,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.gan_loss = GANLoss(gan_mode=self.gan_mode)
         if self.loss_style.lower()=='cycle':
             
-            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG1.parameters(), self.netG2.parameters()), lr=self.g_init_learning_rate, betas=self.adam_betas)#TODO: add betas to config variables
+            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG1.parameters(), self.netG2.parameters()), lr=self.g_init_learning_rate, betas=self.adam_betas)
             self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas)
             self.optimizer = CycleGAN_Optimizer(self.optimizer_G, self.optimizer_D)
             
@@ -384,8 +384,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         
         elif self.loss_style.lower()=='split':
         
-            self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)#TODO: add betas to config variables
-            self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)#TODO: add betas to config variables
+            self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
+            self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
             self.optimizer_D1 = torch.optim.Adam(self.netD1.parameters(), lr=self.d_init_learning_rate, betas=self.adam_betas)
             self.optimizer_D2 = torch.optim.Adam(self.netD2.parameters(), lr=self.d_init_learning_rate, betas=self.adam_betas)
             self.optimizer = Split_CycleGAN_Optimizer(self.optimizer_G1, self.optimizer_D1, self.optimizer_G2, self.optimizer_D2)
@@ -416,7 +416,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # build datapipes
         self.datapipe_A = self.get_datapipe('A')
-        self.datapipe_B = self.get_datapipe('B') #datapipe has: train_pipe, src_pipe, reject, resample, augment, unsqueeze, etc.}
+        self.datapipe_B = self.get_datapipe('B') #datapipe has: train_pipe, source, reject, resample, augment, unsqueeze, etc.}
 
     def get_datapipe(self, side):
         datapipe = type('DataPipe', (object,), {}) # make simple object to smoothly store variables
@@ -615,24 +615,29 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #     2: self.fake_A,
         #     3: self.cycled_A}
 
-        #datapipe has: train_pipe, src_pipe, reject, resample, augment, unsqueeze, etc.}
+        #datapipe has: train_pipe, source, reject, resample, augment, unsqueeze, etc.}
         datapipe = getattr(self, 'datapipe_'+side)        
         arrays = [datapipe.real, datapipe.fake]
         if cycle:
             arrays += [datapipe.cycled]
+        if datapipe.masked:
+            arrays += [datapipe.mask]
 
         input_dict = {'real_'+side: datapipe.real}
 
         if side=='A':
-            output_dict = {0: datapipe.fake},
+            output_dict = {0: datapipe.fake}
             if cycle:
                 output_dict[3] = datapipe.cycled
         else:        
-            output_dict = {2: datapipe.fake},
+            output_dict = {2: datapipe.fake}
             if cycle:
                 output_dict[1] = datapipe.cycled   
 
-        predict_pipe = datapipe.src_pipe + gp.RandomLocation() + datapipe.reject + datapipe.resample + datapipe.normalize_real
+        predict_pipe = datapipe.source + gp.RandomLocation() 
+        if datapipe.reject: predict_pipe += datapipe.reject
+        if datapipe.resample: predict_pipe += datapipe.resample
+        predict_pipe += datapipe.normalize_real
 
         if datapipe.unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
             predict_pipe += datapipe.unsqueeze
@@ -672,7 +677,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #     2: self.fake_A,
         #     3: self.cycled_A}
         
-        #datapipe has: train_pipe, src_pipe, reject, resample, augment, unsqueeze, etc.}
+        #datapipe has: train_pipe, source, reject, resample, augment, unsqueeze, etc.}
         datapipe = getattr(self, 'datapipe_'+side)        
         arrays = [datapipe.real, datapipe.fake]
         if cycle:
@@ -690,11 +695,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 output_dict[1] = datapipe.cycled   
 
         # set prediction spec 
-        if datapipe.src_pipe.spec is None:
+        if datapipe.source.spec is None:
             data_file = zarr.open(datapipe.src_path)
-            pred_spec = datapipe.src_pipe._Hdf5LikeSource__read_spec(datapipe.real, data_file, datapipe.real_name).copy()
+            pred_spec = datapipe.source._Hdf5LikeSource__read_spec(datapipe.real, data_file, datapipe.real_name).copy()
         else:
-            pred_spec = datapipe.src_pipe.spec[datapipe.real].copy()        
+            pred_spec = datapipe.source.spec[datapipe.real].copy()        
         pred_spec.voxel_size = self.common_voxel_size
         pred_spec.dtype = datapipe.normalize_fake.dtype
 
@@ -731,7 +736,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 num_channels=1,
                 compressor=self.compressor)
 
-        render_pipe = datapipe.src_pipe + datapipe.resample + datapipe.normalize_real
+        render_pipe = datapipe.source 
+        if datapipe.resample: render_pipe += datapipe.resample
+        render_pipe += datapipe.normalize_real
 
         if datapipe.unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
             render_pipe += datapipe.unsqueeze
