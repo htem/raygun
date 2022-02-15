@@ -351,7 +351,6 @@ class SliceFill(): #TODO: Just pass config file or dictionary
 
         # declare arrays to use in the pipelines
         array_names = [ 'real',
-                        'norm_real',
                         'pred']
         if self.mask_name is not None: 
             array_names += ['mask']
@@ -363,7 +362,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
             array_key = gp.ArrayKey(array_name.upper())
             setattr(self, array_name, array_key) # add ArrayKeys to object
             self.arrays += [array_key]
-            if array_name != 'real':            
+            if array_name != 'mask':            
                 setattr(self, 'normalize_'+array_name, gp.Normalize(array_key)) # add normalizations, if appropriate                       
 
         # setup data sources
@@ -412,11 +411,10 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                                 'input': self.real,
                             },
                             outputs = {
-                                0: self.norm_real,
-                                1: self.pred
+                                0: self.pred
                             },
                             loss_inputs = {
-                                0: self.norm_real,
+                                0: self.real,
                                 1: self.pred
                             },
                             log_dir=self.tensorboard_path,
@@ -429,15 +427,14 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         # Make training pipeline
         self.train_pipe = self.source + gp.RandomLocation()
         if self.reject:
-            self.train_pipe += self.reject
-        self.train_pipe += self.augment + gp.Stack(self.batch_size) + self.trainer
+            self.train_pipe += self.reject            
+        self.train_pipe += self.normalize_real + self.augment + gp.Stack(self.batch_size) + self.trainer
         
         if self.batch_size == 1:
             self.train_pipe += gp.Squeeze([self.real, 
-                                            self.norm_real, 
                                             self.pred
                                             ], axis=0)
-        # self.train_pipe += self.normalize_norm_real + self.normalize_pred
+        self.train_pipe += self.normalize_pred
         self.test_train_pipe = self.train_pipe.copy() + self.performance
         self.train_pipe += self.cache
 
@@ -470,29 +467,26 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         #set model into evaluation mode
         self.model.eval()
         # model_outputs = {
-        #     0: self.norm_real,
-        #     1: self.pred,
+        #     0: self.pred,
         # }        
         
         self.predict_pipe = self.source + gp.RandomLocation() 
         if self.reject: self.predict_pipe += self.reject
-
+        self.predict_pipe += self.normalize_real
         self.predict_pipe += gp.Unsqueeze([self.real]) # add batch dimension
         self.predict_pipe += gp.torch.Predict(self.model,
                                 inputs = {'input': self.real},
                                 outputs = {
-                                    0: self.norm_real,
-                                    1: self.pred
+                                    0: self.pred
                                 },
                                 checkpoint = self.checkpoint
                                 )
         
         # remove "batch" dimension
         self.predict_pipe += gp.Squeeze([self.real, 
-                                        self.norm_real, 
                                         self.pred
                                         ], axis=0)
-        self.predict_pipe += self.normalize_norm_real + self.normalize_pred
+        self.predict_pipe += self.normalize_pred
 
         self.pred_request = self.get_request(side_length)
 
@@ -506,8 +500,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         #set model into evaluation mode
         self.model.eval()
         # model_outputs = {
-        #     0: self.norm_real,
-        #     1: self.pred,
+        #     0: self.pred,
         # }        
         
     
@@ -547,14 +540,13 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                 num_channels=1,
                 compressor=self.compressor)
 
-        self.render_pipe = self.source 
+        self.render_pipe = self.source + self.normalize_real
         self.render_pipe += gp.Unsqueeze([self.real]) # add batch dimension
 
         self.render_pipe += gp.torch.Predict(self.model,
                                 inputs = {'input': self.real},
                                 outputs = {
-                                    # 0: self.norm_real,
-                                    1: self.pred,
+                                    0: self.pred,
                                 },
                                 checkpoint = self.checkpoint,
                                 array_specs = array_specs, 
@@ -564,10 +556,9 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         # remove "batch" dimension
         self.render_pipe += gp.Squeeze([
                                         # self.real, 
-                                        # self.norm_real, 
                                         self.pred
                                         ], axis=0)
-        self.render_pipe += self.normalize_pred # + self.normalize_norm_real
+        self.render_pipe += self.normalize_pred
         
         self.render_pipe += gp.AsType(self.pred, np.uint8)       
 
