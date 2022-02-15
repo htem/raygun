@@ -7,13 +7,12 @@ class SliceFill_Model(torch.nn.Module):
         self.Gnet = Gnet
         self.norm = norm
 
-    def forward(self, input): 
-        # input is array of dims [batch, z (should be 3), y, x]
-        input = self.norm(input.unsqueeze(1).float()) # input normalized into tensor of dims [batch, channel, z, y, x]
-        adj_slices = input[:,:,[0,2],:,:].squeeze(1) # separate slice data in channel dimension 
-        # back to 4D: [b, c, y, x]
-        real_mid_slice = input[:,:,1,:,:] # slice to predict
+    def forward(self, input): # input is array of dims [batch, z (should be 3), y, x]        
+        norm_real = self.norm(input.unsqueeze(1).float()) # input normalized into tensor of dims [batch, channel, z, y, x]
+        norm_real = norm_real.squeeze(1) # make volume for Dnet to adjudicate by concatenating slices in channel dimension        
+        adj_slices = norm_real[:,[0,2],:,:] # separate slice data in channel dimension (i.e. [b, c, y, x])
 
         pred_mid_slice = self.Gnet(adj_slices) # predict middle slice
+        pred = torch.cat([adj_slices[:,0,:,:].unsqueeze(1), pred_mid_slice, adj_slices[:,1,:,:].unsqueeze(1)], 1)
 
-        return adj_slices, real_mid_slice, pred_mid_slice
+        return norm_real, pred

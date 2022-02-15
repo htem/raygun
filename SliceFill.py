@@ -76,7 +76,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
             gan_mode='lsgan',
             adam_betas = [0.9, 0.999],
             
-            min_coefvar=0,
+            min_coefvar=0, # set min_coefvar = 0 to exclude batches with empty slices where sum.min() == 0
             side_length=32,
             batch_size=1,
             num_workers=11,
@@ -222,19 +222,15 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                 side_length = result.shape[-1]
                 
         extents = np.ones((len(self.voxel_size)))
-        if array_name.lower() == 'real':
-            extents *= 3 # get 3 slices
+        extents *= 3 # get 3 slices TODO: Make configurable for extra slices
         extents[-2:] = side_length # assumes first dimension is z (i.e. the dimension slices are stacked in)
         return gp.Coordinate(extents)
 
     def get_request(self, side_length=None):
         request = gp.BatchRequest()
         for array in self.arrays:                        
-            if array.identifier.lower() == 'adj_slices':
-                request.add(array, None, self.voxel_size) # get 2 slices on either side of middle   
-            else:
-                extents = self.get_extents(side_length, array_name=array.identifier)
-                request.add(array, self.voxel_size * extents, self.voxel_size)
+            extents = self.get_extents(side_length, array_name=array.identifier)
+            request.add(array, self.voxel_size * extents, self.voxel_size)
         
         return request
 
@@ -355,9 +351,8 @@ class SliceFill(): #TODO: Just pass config file or dictionary
 
         # declare arrays to use in the pipelines
         array_names = [ 'real',
-                        'adj_slices',
-                        'real_mid_slice',
-                        'pred_mid_slice']
+                        'norm_real',
+                        'pred']
         if self.mask_name is not None: 
             array_names += ['mask']
             self.masked = True
@@ -368,7 +363,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
             array_key = gp.ArrayKey(array_name.upper())
             setattr(self, array_name, array_key) # add ArrayKeys to object
             self.arrays += [array_key]
-            if 'slice' in array_name:            
+            if array_name != 'real':            
                 setattr(self, 'normalize_'+array_name, gp.Normalize(array_key)) # add normalizations, if appropriate                       
 
         # setup data sources
@@ -417,14 +412,12 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                                 'input': self.real,
                             },
                             outputs = {
-                                0: self.adj_slices,
-                                1: self.real_mid_slice,
-                                2: self.pred_mid_slice
+                                0: self.norm_real,
+                                1: self.pred
                             },
                             loss_inputs = {
-                                0: self.adj_slices,
-                                1: self.real_mid_slice,
-                                2: self.pred_mid_slice
+                                0: self.norm_real,
+                                1: self.pred
                             },
                             log_dir=self.tensorboard_path,
                             log_every=self.log_every,
@@ -439,17 +432,12 @@ class SliceFill(): #TODO: Just pass config file or dictionary
             self.train_pipe += self.reject
         self.train_pipe += self.augment + gp.Stack(self.batch_size) + self.trainer
         
-        # remove "channel" dimension if neccessary
-        self.train_pipe += gp.Squeeze([ self.real_mid_slice, 
-                                        self.pred_mid_slice
-                                        ], axis=1) # remove channel dimension for grayscale
         if self.batch_size == 1:
             self.train_pipe += gp.Squeeze([self.real, 
-                                            self.adj_slices, 
-                                            self.real_mid_slice, 
-                                            self.pred_mid_slice
+                                            self.norm_real, 
+                                            self.pred
                                             ], axis=0)
-        self.train_pipe += self.normalize_adj_slices + self.normalize_real_mid_slice + self.normalize_pred_mid_slice
+        # self.train_pipe += self.normalize_norm_real + self.normalize_pred
         self.test_train_pipe = self.train_pipe.copy() + self.performance
         self.train_pipe += self.cache
 
@@ -482,9 +470,8 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         #set model into evaluation mode
         self.model.eval()
         # model_outputs = {
-        #     0: self.adj_slices,
-        #     1: self.real_mid_slice,
-        #     2: self.pred_mid_slice
+        #     0: self.norm_real,
+        #     1: self.pred,
         # }        
         
         self.predict_pipe = self.source + gp.RandomLocation() 
@@ -494,24 +481,18 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         self.predict_pipe += gp.torch.Predict(self.model,
                                 inputs = {'input': self.real},
                                 outputs = {
-                                    0: self.adj_slices,
-                                    1: self.real_mid_slice,
-                                    2: self.pred_mid_slice
+                                    0: self.norm_real,
+                                    1: self.pred
                                 },
                                 checkpoint = self.checkpoint
                                 )
         
-        # remove "channel" dimension if neccessary
-        self.predict_pipe += gp.Squeeze([ self.real_mid_slice, 
-                                        self.pred_mid_slice
-                                        ], axis=1) 
         # remove "batch" dimension
         self.predict_pipe += gp.Squeeze([self.real, 
-                                        self.adj_slices, 
-                                        self.real_mid_slice, 
-                                        self.pred_mid_slice
+                                        self.norm_real, 
+                                        self.pred
                                         ], axis=0)
-        self.predict_pipe += self.normalize_adj_slices + self.normalize_real_mid_slice + self.normalize_pred_mid_slice
+        self.predict_pipe += self.normalize_norm_real + self.normalize_pred
 
         self.pred_request = self.get_request(side_length)
 
@@ -525,10 +506,10 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         #set model into evaluation mode
         self.model.eval()
         # model_outputs = {
-        #     0: self.adj_slices,
-        #     1: self.real_mid_slice,
-        #     2: self.pred_mid_slice
+        #     0: self.norm_real,
+        #     1: self.pred,
         # }        
+        
     
         # set prediction spec 
         if self.source.spec is None:
@@ -537,7 +518,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         else:
             pred_spec = self.source.spec[self.real].copy()        
         pred_spec.voxel_size = self.voxel_size
-        pred_spec.dtype = self.normalize_pred_mid_slice.dtype
+        pred_spec.dtype = self.normalize_pred.dtype
 
         scan_request = self.get_request(side_length)
 
@@ -549,8 +530,8 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                 'blocksize': 64
                 }
         
-        dataset_names = {self.pred_mid_slice: 'volumes/'+self.model_name+'_enFAKE'}
-        array_specs = {self.pred_mid_slice: pred_spec.copy()}
+        dataset_names = {self.pred: 'volumes/'+self.model_name+'_enFAKE'}
+        array_specs = {self.pred: pred_spec.copy()}
 
         source_ds = daisy.open_ds(self.src_path, self.src_name)
         self.total_roi = source_ds.data_roi
@@ -560,7 +541,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                 self.out_path,
                 name,
                 self.total_roi,
-                daisy.Coordinate(self.common_voxel_size),
+                daisy.Coordinate(self.voxel_size),
                 np.uint8,
                 write_size=write_size,
                 num_channels=1,
@@ -572,30 +553,23 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         self.render_pipe += gp.torch.Predict(self.model,
                                 inputs = {'input': self.real},
                                 outputs = {
-                                    # 0: self.adj_slices,
-                                    # 1: self.real_mid_slice,
-                                    2: self.pred_mid_slice
+                                    # 0: self.norm_real,
+                                    1: self.pred,
                                 },
                                 checkpoint = self.checkpoint,
                                 array_specs = array_specs, 
                                 spawn_subprocess=self.spawn_subprocess
                                 )
-        
-        # remove "channel" dimension if neccessary
-        self.render_pipe += gp.Squeeze([ 
-                                        # self.real_mid_slice, 
-                                        self.pred_mid_slice
-                                        ], axis=1) 
+
         # remove "batch" dimension
         self.render_pipe += gp.Squeeze([
                                         # self.real, 
-                                        # self.adj_slices, 
-                                        # self.real_mid_slice, 
-                                        self.pred_mid_slice
+                                        # self.norm_real, 
+                                        self.pred
                                         ], axis=0)
-        self.render_pipe += self.normalize_pred_mid_slice # + self.normalize_adj_slices + self.normalize_real_mid_slice
+        self.render_pipe += self.normalize_pred # + self.normalize_norm_real
         
-        self.render_pipe += gp.AsType(self.pred_mid_slice, np.uint8)       
+        self.render_pipe += gp.AsType(self.pred, np.uint8)       
 
         self.render_pipe += gp.ZarrWrite(
                         dataset_names = dataset_names,

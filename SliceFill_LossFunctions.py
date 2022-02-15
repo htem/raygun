@@ -35,9 +35,12 @@ class SliceFill_CARE_Loss(torch.nn.Module):
 
         return x[slices]
 
-    def forward(self, adj_slices, real_mid_slice, pred_mid_slice):
+    def forward(self, norm_real, pred):
         # set G's gradients to zero
         self.optimizer.zero_grad()        
+
+        real_mid_slice = norm_real[:,1,:,:] 
+        pred_mid_slice = pred[:,1,:,:] 
 
         # crop if necessary
         if pred_mid_slice.size()[-2:] != real_mid_slice.size()[-2:]:
@@ -123,36 +126,36 @@ class SliceFill_ConditionalGAN_Loss(torch.nn.Module):
 
         return x[slices]
 
-    def _backward_D(self, test_fake, test_real):        
+    def _backward_D(self, pred, norm_real):        
         # Fake; stop backprop to the generator by detaching fake
-        pred_fake = self.Dnet(test_fake.detach())
+        pred_fake = self.Dnet(pred.detach())
         loss_D_fake = self.gan_loss_fun(pred_fake, False)
         
         # Real
-        pred_real = self.Dnet(test_real)
+        pred_real = self.Dnet(norm_real)
         loss_D_real = self.gan_loss_fun(pred_real, True)
         
         self.loss_D = (loss_D_real + loss_D_fake) * 0.5
         self.loss_D.backward()
         return self.loss_D
 
-    def backward_D(self, test_fake, test_real, n_loop=5):
+    def backward_D(self, pred, norm_real, n_loop=5):
         self.set_requires_grad([self.Dnet], True)  # enable backprop for D
         self.optimizer_D.zero_grad()     # set D's gradients to zero
 
         if self.gan_mode.lower() == 'wgangp': # Wasserstein Loss
             for _ in range(n_loop):
-                self.loss_D = self._backward_D(test_fake, test_real)
+                self.loss_D = self._backward_D(pred, norm_real)
                 self.optimizer_D.step()          # update D's weights
                 self.clamp_weights(self.Dnet)
         else:
-            self.loss_D = self._backward_D(test_fake, test_real)
+            self.loss_D = self._backward_D(pred, norm_real)
             self.optimizer_D.step()          # update D's weights            
         
         #return losses
         return self.loss_D
 
-    def backward_G(self, test_fake, real_mid_slice, pred_mid_slice):
+    def backward_G(self, pred, real_mid_slice, pred_mid_slice):
         self.set_requires_grad([self.netD], False)  # D requires no gradients when optimizing G
         self.optimizer_G.zero_grad()        # set G's gradients to zero
         
@@ -160,7 +163,7 @@ class SliceFill_ConditionalGAN_Loss(torch.nn.Module):
         self.l1_loss = self.l1_fun(real_mid_slice, pred_mid_slice)        
 
         # get discriminator loss
-        self.gan_loss = self.gan_loss_fun(self.Dnet(test_fake), True)
+        self.gan_loss = self.gan_loss_fun(self.Dnet(pred), True)
         
         #Sum all losses
         self.loss_G = self.gan_loss + self.l1_lambda * self.l1_loss
@@ -174,22 +177,22 @@ class SliceFill_ConditionalGAN_Loss(torch.nn.Module):
         #return losses
         return self.gan_loss, self.l1_loss
 
-    def forward(self, adj_slices, real_mid_slice, pred_mid_slice):
+    def forward(self, norm_real, pred):
+        # set G's gradients to zero
+        self.optimizer.zero_grad()        
+
+        real_mid_slice = norm_real[:,:,1,:,:] 
+        pred_mid_slice = pred[:,:,1,:,:] 
 
         # crop if necessary
         if pred_mid_slice.size()[-2:] != real_mid_slice.size()[-2:]:
             real_mid_slice = self.crop(real_mid_slice, pred_mid_slice.size()[-2:])
-            adj_slices = self.crop(adj_slices, pred_mid_slice.size()[-2:])
-
-        # make volumes for Dnet to adjudicate by concatenating slices in channel dimension
-        test_fake = torch.cat([adj_slices[:,0,:,:].unsqueeze(1), pred_mid_slice, adj_slices[:,1,:,:].unsqueeze(1)], 1)
-        test_real = torch.cat([adj_slices[:,0,:,:].unsqueeze(1), real_mid_slice, adj_slices[:,1,:,:].unsqueeze(1)], 1)
 
         # update Gs
-        gan_loss, l1_loss = self.backward_G(test_fake, real_mid_slice, pred_mid_slice)
+        gan_loss, l1_loss = self.backward_G(pred, real_mid_slice, pred_mid_slice)
         
         # # update Ds
-        loss_D = self.backward_D(test_fake, test_real)
+        loss_D = self.backward_D(pred, norm_real)
 
         self.loss_dict = {
             'DiscrimLoss/Gnet': float(gan_loss),
