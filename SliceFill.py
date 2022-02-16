@@ -24,11 +24,10 @@ import numpy as np
 
 torch.backends.cudnn.benchmark = True
 
-# from funlib.learn.torch.models.unet import UNet, ConvPass
 from residual_unet import ResidualUNet
 from unet import UNet, ConvPass
 from tri_utils import *
-from SliceFill_Model import *
+from SliceFill_Models import *
 from SliceFill_LossFunctions import *
 from SliceFill_Optimizers import *
 
@@ -44,8 +43,8 @@ class SliceFill(): #TODO: Just pass config file or dictionary
             
             gnet_type='resnet',
             gnet_kwargs={
-                'input_nc': 1,
-                'output_nc': 1,
+                'input_nc': 2,
+                'output_nc': 1, # should be 2 for 'uncertain' loss
                 # 'num_downs': 3, # unet specific
                 'ngf': 64,
                 'n_blocks': 9, # resnet specific
@@ -72,9 +71,9 @@ class SliceFill(): #TODO: Just pass config file or dictionary
             d_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
             
             l1_lambda=10, # Default from CycleGAN paper
-            loss_style='cycle', # supports 'cycle' or 'split'
+            loss_style='conditionalgan', # supports 'l1' (a.k.a. 'care') or 'conditionalgan' or 'uncertain'
             gan_mode='lsgan',
-            adam_betas = [0.9, 0.999],
+            adam_betas = [0.5, 0.999],
             
             min_coefvar=0, # set min_coefvar = 0 to exclude batches with empty slices where sum.min() == 0
             side_length=32,
@@ -222,7 +221,8 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                 side_length = result.shape[-1]
                 
         extents = np.ones((len(self.voxel_size)))
-        extents *= 3 # get 3 slices TODO: Make configurable for extra slices
+        if array_name.lower() != 'pred_var':
+            extents *= 3 # get 3 slices TODO: Make configurable for extra slices
         extents[-2:] = side_length # assumes first dimension is z (i.e. the dimension slices are stacked in)
         return gp.Coordinate(extents)
 
@@ -313,20 +313,28 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         if not hasattr(self, 'Gnet'):
             self.setup_networks()        
 
-        self.model = SliceFill_Model(self.Gnet)
+        self.optimizer_G = torch.optim.Adam(self.Gnet.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
+
+        if self.loss_style.lower() != 'uncertain':
+            self.model = SliceFill_Model(self.Gnet)
+
+        if self.loss_style.lower() == 'uncertain':
        
-        if self.loss_style.lower()=='l1' or self.loss_style.lower()=='care':
+            self.model = SliceFill_Uncertain_Model(self.Gnet)
+            self.optimizer_D = torch.optim.Adam(self.Dnet.parameters(), lr=self.d_init_learning_rate, betas=self.adam_betas)
+            self.optimizer = SliceFill_GAN_Optimizer(self.optimizer_G, self.optimizer_D)
+
+            self.loss = SliceFill_UncertainGAN_Loss(self.Gnet, self.Dnet, self.optimizer_G, self.optimizer_D, nll_lambda=self.l1_lambda, gan_mode=self.gan_mode)
+
+        elif self.loss_style.lower()=='l1' or self.loss_style.lower()=='care':
             
-            self.optimizer_G = torch.optim.Adam(self.Gnet.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
-            self.optimizer = SliceFill_CARE_Optimizer(self.optimizer_G)
-            
+            self.optimizer = SliceFill_CARE_Optimizer(self.optimizer_G)            
             self.loss = SliceFill_CARE_Loss(self.Gnet, self.optimizer_G)
         
         elif self.loss_style.lower()=='conditionalgan':
         
-            self.optimizer_G = torch.optim.Adam(self.Gnet.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
             self.optimizer_D = torch.optim.Adam(self.Dnet.parameters(), lr=self.d_init_learning_rate, betas=self.adam_betas)
-            self.optimizer = SliceFill_ConditionalGAN_Optimizer(self.optimizer_G, self.optimizer_D)
+            self.optimizer = SliceFill_GAN_Optimizer(self.optimizer_G, self.optimizer_D)
 
             self.loss = SliceFill_ConditionalGAN_Loss(self.Gnet, self.Dnet, self.optimizer_G, self.optimizer_D, l1_lambda=self.l1_lambda, gan_mode=self.gan_mode)
 
@@ -352,6 +360,8 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         # declare arrays to use in the pipelines
         array_names = [ 'real',
                         'pred']
+        if self.loss_style.lower() == 'uncertain':
+            array_names += ['pred_var']
         if self.mask_name is not None: 
             array_names += ['mask']
             self.masked = True
@@ -362,7 +372,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
             array_key = gp.ArrayKey(array_name.upper())
             setattr(self, array_name, array_key) # add ArrayKeys to object
             self.arrays += [array_key]
-            if array_name != 'mask':            
+            if array_name != 'mask' and array_name != 'pred_var':            
                 setattr(self, 'normalize_'+array_name, gp.Normalize(array_key)) # add normalizations, if appropriate                       
 
         # setup data sources
@@ -402,6 +412,18 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                     spatial_dims=2
         )
 
+        self.output_dict = {
+            0: self.pred
+        }
+        self.loss_input_dict = {
+            0: self.real,
+            1: self.pred
+        }
+        self.squeeze_arrays = [self.real, self.pred]
+        if self.loss_style.lower() == 'uncertain':
+            self.output_dict[1] = self.pred_var
+            self.loss_input_dict[2] = self.pred_var
+            self.squeeze_arrays += [self.pred_var]
         # create a train node using our model, loss, and optimizer
         self.trainer = gp.torch.Train(
                             self.model,
@@ -410,13 +432,8 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                             inputs = {
                                 'input': self.real,
                             },
-                            outputs = {
-                                0: self.pred
-                            },
-                            loss_inputs = {
-                                0: self.real,
-                                1: self.pred
-                            },
+                            outputs = self.output_dict,
+                            loss_inputs = self.loss_input_dict,
                             log_dir=self.tensorboard_path,
                             log_every=self.log_every,
                             checkpoint_basename=self.model_path+self.model_name,
@@ -431,9 +448,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         self.train_pipe += self.normalize_real + self.augment + gp.Stack(self.batch_size) + self.trainer
         
         if self.batch_size == 1:
-            self.train_pipe += gp.Squeeze([self.real, 
-                                            self.pred
-                                            ], axis=0)
+            self.train_pipe += gp.Squeeze(self.squeeze_arrays, axis=0)
         self.train_pipe += self.normalize_pred
         self.test_train_pipe = self.train_pipe.copy() + self.performance
         self.train_pipe += self.cache
@@ -476,16 +491,12 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         self.predict_pipe += gp.Unsqueeze([self.real]) # add batch dimension
         self.predict_pipe += gp.torch.Predict(self.model,
                                 inputs = {'input': self.real},
-                                outputs = {
-                                    0: self.pred
-                                },
+                                outputs = self.output_dict,
                                 checkpoint = self.checkpoint
                                 )
         
         # remove "batch" dimension
-        self.predict_pipe += gp.Squeeze([self.real, 
-                                        self.pred
-                                        ], axis=0)
+        self.predict_pipe += gp.Squeeze(self.squeeze_arrays, axis=0)
         self.predict_pipe += self.normalize_pred
 
         self.pred_request = self.get_request(side_length)

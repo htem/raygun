@@ -9,9 +9,9 @@ class SliceFill_CARE_Optimizer(torch.nn.Module):
         """Dummy step pass for Gunpowder's Train node step() call"""
         pass
 
-class SliceFill_ConditionalGAN_Optimizer(torch.nn.Module):
+class SliceFill_GAN_Optimizer(torch.nn.Module):
     def __init__(self, optimizer_G, optimizer_D):
-        super(SliceFill_ConditionalGAN_Optimizer, self).__init__()
+        super(SliceFill_GAN_Optimizer, self).__init__()
         self.optimizer_G = optimizer_G
         self.optimizer_D = optimizer_D
 
