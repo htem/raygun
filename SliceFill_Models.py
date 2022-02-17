@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 
 class SliceFill_Model(torch.nn.Module):
     def __init__(self, Gnet):
@@ -25,5 +24,5 @@ class SliceFill_Uncertain_Model(torch.nn.Module):
         pred_mid_slice = self.Gnet(adj_slices) # predict middle slice [mean, variance] in channel dimension
         #predicted mean:
         pred = torch.cat([adj_slices[:,0,:,:].unsqueeze(1), pred_mid_slice[:,0,:,:].unsqueeze(1), adj_slices[:,1,:,:].unsqueeze(1)], 1)
-
-        return pred, pred_mid_slice[:,1,:,:] # predicted variance
+        pred_var = torch.sigmoid(pred_mid_slice[:,1,:,:]).unsqueeze(1)
+        return pred,  pred_var # predicted variance

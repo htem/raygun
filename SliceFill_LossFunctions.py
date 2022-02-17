@@ -327,7 +327,7 @@ class SliceFill_UncertainGAN_Loss(torch.nn.Module):
             real_mid_slice = self.crop(real_mid_slice, pred_mid_slice.size()[-2:])
 
         # update Gs
-        gan_loss, nll_loss = self.backward_G(pred, real_mid_slice, pred_mid_slice, pred_var)
+        gan_loss, nll_loss = self.backward_G(pred, real_mid_slice, pred_mid_slice, pred_var[:,0,:,:])
         
         # # update Ds
         loss_D = self.backward_D(pred, real)
