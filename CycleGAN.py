@@ -214,6 +214,25 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
                     axes[r, c].set_title(label)
 
+    def write_tBoard_graph(self, batch=None):
+        if batch is None:
+            batch = self.batch
+        
+        ex_inputs = []
+        if self.real_A in batch:
+            ex_inputs += [torch.tensor(batch[self.real_A].data)]
+        if self.real_B in batch:
+            ex_inputs += [torch.tensor(batch[self.real_B].data)]
+
+        for i, ex_input in enumerate(ex_inputs):
+            if self.ndims == len(self.common_voxel_size): # add channel dimension if necessary
+                ex_input = ex_input.unsqueeze(axis=1)
+            if self.batch_size == 1: # ensure batch dimension is present
+                ex_input = ex_input.unsqueeze(axis=0)
+            ex_inputs[i] = ex_input
+        
+        self.trainer.summary_writer.add_graph(self.model, ex_inputs)                
+
     def batch_tBoard_write(self, i=0):
         self.trainer.summary_writer.flush()
         self.n_iter = self.trainer.iteration
@@ -599,6 +618,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         with gp.build(self.training_pipeline):
             for i in tqdm(range(self.num_epochs)):
                 self.batch = self.training_pipeline.request_batch(self.train_request)
+                if i == 1:
+                    self.write_tBoard_graph()
                 if hasattr(self.loss, 'loss_dict'):
                     print(self.loss.loss_dict)
                 if i % self.log_every == 0:

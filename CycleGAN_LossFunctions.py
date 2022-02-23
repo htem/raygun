@@ -333,14 +333,18 @@ class SplitGAN_Loss(torch.nn.Module):
 
     def backward_Gs(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
         self.set_requires_grad([self.netD1, self.netD2], False)  # D requires no gradients when optimizing G
-        self.optimizer_G1.zero_grad()        # set G's gradients to zero
-        self.optimizer_G2.zero_grad()        # set G's gradients to zero
 
         #G1 first
+        self.set_requires_grad([self.netG1], True)  # G1 requires gradients when optimizing
+        self.set_requires_grad([self.netG2], False)  # G2 requires no gradients when optimizing G1
+        self.optimizer_G1.zero_grad()        # set G1's gradients to zero
         loss_G1 = self.backward_G('B', self.netG1, self.netD1, real_B, fake_B, cycled_B)                   # calculate gradient for G
         self.optimizer_G1.step()             # udpate G1's weights
 
         #Then G2
+        self.set_requires_grad([self.netG2], True)  # G2 requires gradients when optimizing
+        self.set_requires_grad([self.netG1], False)  # G1 requires no gradients when optimizing G2
+        self.optimizer_G2.zero_grad()        # set G2's gradients to zero
         loss_G2 = self.backward_G('A', self.netG2, self.netD2, real_A, fake_A, cycled_A)                   # calculate gradient for G
         self.optimizer_G2.step()             # udpate G2's weights
 
