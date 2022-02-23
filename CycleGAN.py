@@ -195,23 +195,24 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         fig, axes = plt.subplots(rows, len(self.col_dict), figsize=(10*len(self.col_dict), 10*rows))
         for array, value in batch.items():
             label = array.identifier
-            c = self.col_dict[label[:4]]
-            r = (int('_B' in label) + int('FAKE' in label)) % 2
-            if len(value.data.shape) > 3: # pick one from the batch
-                img = value.data[i].squeeze()
-            else:
-                img = value.data.squeeze()
-            if len(img.shape) == 3:
-                mid = img.shape[0] // 2 # for 3D volume
-                data = img[mid]
-            else:
-                data = img
-            if rows == 1:
-                axes[c].imshow(data, cmap='gray', vmin=0, vmax=1)
-                axes[c].set_title(label)                
-            else:
-                axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
-                axes[r, c].set_title(label)
+            if label[:4] in self.col_dict:
+                c = self.col_dict[label[:4]]
+                r = (int('_B' in label) + int('FAKE' in label)) % 2
+                if len(value.data.shape) > 3: # pick one from the batch
+                    img = value.data[i].squeeze()
+                else:
+                    img = value.data.squeeze()
+                if len(img.shape) == 3:
+                    mid = img.shape[0] // 2 # for 3D volume
+                    data = img[mid]
+                else:
+                    data = img
+                if rows == 1:
+                    axes[c].imshow(data, cmap='gray', vmin=0, vmax=1)
+                    axes[c].set_title(label)                
+                else:
+                    axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
+                    axes[r, c].set_title(label)
 
     def batch_tBoard_write(self, i=0):
         self.trainer.summary_writer.flush()
@@ -619,6 +620,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         arrays = [datapipe.real, datapipe.fake]
         if cycle:
             arrays += [datapipe.cycled]
+        squeeze_arrays = arrays.copy()
         if datapipe.masked:
             arrays += [datapipe.mask]
 
@@ -648,8 +650,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 checkpoint = self.checkpoint
                                 )
         
-        predict_pipe += gp.Squeeze(arrays, axis=1) # remove "channel" dimension
-        predict_pipe += gp.Squeeze(arrays, axis=0) # remove batch dimension
+        if datapipe.unsqueeze: # remove "channel" dimensions if neccessary
+            predict_pipe += gp.Squeeze(squeeze_arrays, axis=1) 
+        predict_pipe += gp.Squeeze(squeeze_arrays, axis=0) # remove batch dimension
         predict_pipe += datapipe.normalize_fake 
         if cycle:
             predict_pipe += datapipe.normalize_cycled
@@ -751,7 +754,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 spawn_subprocess=self.spawn_subprocess
                                 )
         
-        render_pipe += gp.Squeeze(arrays[1:], axis=1) # remove "channel" dimension
+        
+        if datapipe.unsqueeze: # remove "channel" dimensions if neccessary
+            render_pipe += gp.Squeeze(arrays[1:], axis=1) 
         render_pipe += gp.Squeeze(arrays[1:], axis=0) # remove batch dimension
         
         render_pipe += datapipe.normalize_fake + gp.AsType(datapipe.fake, np.uint8)        
