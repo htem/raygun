@@ -277,50 +277,50 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def get_generator(self): 
         if self.gnet_type == 'unet':
 
-            if self.ndims == 2:
-                generator = UnetGenerator(**self.gnet_kwargs)
+            # if self.ndims == 2:
+            #     generator = UnetGenerator(**self.gnet_kwargs)
             
-            elif self.ndims == 3:
-                generator = UnetGenerator3D(**self.gnet_kwargs)
+            # elif self.ndims == 3:
+            #     generator = UnetGenerator3D(**self.gnet_kwargs)
 
+            # else:
+            #     raise f'Unet generators only specified for 2D or 3D, not {self.ndims}D'
+
+            if self.residual_unet:
+                unet = ResidualUNet(
+                        in_channels=1,
+                        num_fmaps=self.g_num_fmaps,
+                        fmap_inc_factor=self.g_fmap_inc_factor,
+                        downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
+                        padding=self.padding_unet,
+                        constant_upsample=self.g_constant_upsample,
+                        voxel_size=self.common_voxel_size[-self.ndims:],
+                        kernel_size_down=self.g_kernel_size_down,
+                        kernel_size_up=self.g_kernel_size_up,
+                        residual=self.residual_blocks,
+                        activation=self.gnet_activation
+                        )
+                generator = torch.nn.Sequential(
+                                    unet, 
+                                    torch.nn.Tanh())
             else:
-                raise f'Unet generators only specified for 2D or 3D, not {self.ndims}D'
-
-                # if self.residual_unet:
-                #     unet = ResidualUNet(
-                #             in_channels=1,
-                #             num_fmaps=self.g_num_fmaps,
-                #             fmap_inc_factor=self.g_fmap_inc_factor,
-                #             downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                #             padding=self.padding_unet,
-                #             constant_upsample=self.g_constant_upsample,
-                #             voxel_size=self.common_voxel_size[-self.ndims:],
-                #             kernel_size_down=self.g_kernel_size_down,
-                #             kernel_size_up=self.g_kernel_size_up,
-                #             residual=self.residual_blocks,
-                #             activation=self.gnet_activation
-                #             )
-                #     generator = torch.nn.Sequential(
-                #                         unet, 
-                #                         torch.nn.Tanh())
-                # else:
-                #     unet = UNet(
-                #             in_channels=1,
-                #             num_fmaps=self.g_num_fmaps,
-                #             fmap_inc_factor=self.g_fmap_inc_factor,
-                #             downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                #             padding=self.padding_unet,
-                #             constant_upsample=self.g_constant_upsample,
-                #             voxel_size=self.common_voxel_size[-self.ndims:],
-                #             kernel_size_down=self.g_kernel_size_down,
-                #             kernel_size_up=self.g_kernel_size_up,
-                #             residual=self.residual_blocks,
-                #             activation=self.gnet_activation
-                #             )
-                #     generator = torch.nn.Sequential(
-                #                         unet,
-                #                         ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet), 
-                #                         torch.nn.Tanh())
+                unet = UNet(
+                        in_channels=1,
+                        num_fmaps=self.g_num_fmaps,
+                        fmap_inc_factor=self.g_fmap_inc_factor,
+                        downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
+                        padding=self.padding_unet,
+                        constant_upsample=self.g_constant_upsample,
+                        voxel_size=self.common_voxel_size[-self.ndims:],
+                        kernel_size_down=self.g_kernel_size_down,
+                        kernel_size_up=self.g_kernel_size_up,
+                        residual=self.residual_blocks,
+                        activation=self.gnet_activation
+                        )
+                generator = torch.nn.Sequential(
+                                    unet,
+                                    ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet), 
+                                    torch.nn.Tanh())
             
         elif self.gnet_type == 'resnet':
             

@@ -348,6 +348,8 @@ class SplitGAN_Loss(torch.nn.Module):
         loss_G2 = self.backward_G('A', self.netG2, self.netD2, real_A, fake_A, cycled_A)                   # calculate gradient for G
         self.optimizer_G2.step()             # udpate G2's weights
 
+        # Turn gradients back on
+        self.set_requires_grad([self.netG1], True)
         #return losses
         return loss_G1, loss_G2
 
