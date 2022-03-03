@@ -7,18 +7,24 @@ import zarr
 
 
 # %%
-cycleGun.set_device(3)
-cycleGun.load_saved_model()
-# cycleGun.batch_size = 1
+# cycleGun.set_device(0)
+# cycleGun.load_saved_model()
+cycleGun.batch_size = 1
 
 # %%
 batch = cycleGun.test_train()
 
 # %%
-pred_batch = cycleGun.test_prediction('A', side_length=512)
+pred_batch = cycleGun.test_prediction('B', side_length=512, cycle=True)
+
+# %%
+test = cycleGun.model(torch.cuda.FloatTensor(pred_batch[cycleGun.real_A].data).unsqueeze(0))
+plt.figure(figsize=(20,20))
+plt.imshow(test[0].squeeze().detach().cpu(), cmap='gray')
 
 # %%
 cycleGun._get_latest_checkpoint()
+cycleGun.load_saved_model()
 
 # %%
 import zarr

@@ -4,3 +4,5 @@ events.out.tfevents.*
 __pycache__*
 *.zarr
 *Task*.config
+.run_configs*
+.daisy_logs_BlockwiseTask*

@@ -8,10 +8,10 @@ import zarr
 import daisy
 import os
 
-# import gunpowder as gp
-import sys
-sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
-from gunpowder import gunpowder as gp
+import gunpowder as gp
+# import sys
+# sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
+# from gunpowder import gunpowder as gp
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -28,9 +28,9 @@ torch.backends.cudnn.benchmark = True
 from residual_unet import ResidualUNet
 from unet import UNet, ConvPass
 from tri_utils import *
-from CycleGAN_Model import *
-from CycleGAN_LossFunctions import *
-from CycleGAN_Optimizers import *
+from .CycleGAN_Model import *
+from .CycleGAN_LossFunctions import *
+from .CycleGAN_Optimizers import *
 
 class CycleGAN(): #TODO: Just pass config file or dictionary
     def __init__(self,
@@ -190,9 +190,12 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if batch is None:
             batch = self.batch
         if not hasattr(self, 'col_dict'): 
-            self.col_dict = {'REAL':0, 'FAKE':1, 'CYCL':2}#, 'MASK':3}
-        rows = (self.real_A in batch.arrays) + (self.real_B in batch.arrays)        
-        fig, axes = plt.subplots(rows, len(self.col_dict), figsize=(10*len(self.col_dict), 10*rows))
+            self.col_dict = {'REAL':0, 'FAKE':1, 'CYCL':2, 'MASK':3}
+        rows = (self.real_A in batch.arrays) + (self.real_B in batch.arrays)       
+        cols = 0
+        for key in self.col_dict.keys():
+            cols += key in [array.identifier[:4] for array in batch.arrays] 
+        fig, axes = plt.subplots(rows, cols, figsize=(10*cols, 10*rows))
         for array, value in batch.items():
             label = array.identifier
             if label[:4] in self.col_dict:
@@ -637,7 +640,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #     3: self.cycled_A}
 
         #datapipe has: train_pipe, source, reject, resample, augment, unsqueeze, etc.}
-        datapipe = getattr(self, 'datapipe_'+side)        
+        datapipe = getattr(self, 'datapipe_'+side)
         arrays = [datapipe.real, datapipe.fake]
         if cycle:
             arrays += [datapipe.cycled]
