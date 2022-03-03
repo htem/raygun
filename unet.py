@@ -17,7 +17,7 @@ class ConvPass(torch.nn.Module):
             activation,
             padding='valid',
             residual=False,
-            padding_mode='reflect'#default to 'zeros' until 1/28/2022 (Jeff Rhoades)
+            padding_mode='reflect'
             ):
 
         super(ConvPass, self).__init__()
@@ -114,7 +114,9 @@ class Downsample(torch.nn.Module):
     def __init__(
             self,
             downsample_factor,
-            flexible=True):
+            flexible=True): 
+            # flexible=True allows torch.nn.MaxPoolNd to crop the right/bottom of tensors in order to allow pooling of tensors not evenly divisible by the downsample_factor. Alternative implementations could pass 'ceil_mode=True' or 'padding= {# > 0}' to avoid cropping of inputs.
+            # flexible=False forces inputs to be evenly divisible by the downsample_factor, which generally restricts the flexibility of model architectures.
 
         super(Downsample, self).__init__()
 
@@ -131,8 +133,7 @@ class Downsample(torch.nn.Module):
         self.down = pool(
             downsample_factor,
             stride=downsample_factor,
-            # ceil_mode=True
-            ) #ceil_mode added to attempt to increase flexibility
+            )
 
     def forward(self, x):
         if self.flexible:
