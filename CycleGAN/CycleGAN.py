@@ -530,7 +530,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         datapipe.augment += datapipe.normalize_real
         datapipe.augment += datapipe.scaleimg2tanh_real
         datapipe.augment += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-                    control_point_spacing=100//self.common_voxel_size[-self.ndims], # self.side_length//2,
+                    control_point_spacing=100, # self.side_length//2,
                     # jitter_sigma=(5.0,)*self.ndims,
                     jitter_sigma=(0., 5.0, 5.0,)[-self.ndims:],
                     rotation_interval=(0, math.pi/2),
