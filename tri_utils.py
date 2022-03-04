@@ -207,8 +207,7 @@ class ResnetGenerator(nn.Module):
                       nn.ReLU(True)]
         model += [padder]
         model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
-        # model += [nn.Tanh()]
-        model += [nn.Sigmoid()]
+        model += [nn.Tanh()]
 
         self.model = nn.Sequential(*model)
 
@@ -592,8 +591,7 @@ class ResnetGenerator3D(nn.Module):
                       nn.ReLU(True)]
         model += [padder]
         model += [nn.Conv3d(ngf, output_nc, kernel_size=7, padding=0)]
-        # model += [nn.Tanh()]
-        model += [nn.Sigmoid()]
+        model += [nn.Tanh()]
 
         self.model = nn.Sequential(*model)
 
