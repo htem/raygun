@@ -173,7 +173,14 @@ class ResnetGenerator(nn.Module):
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
 
-        model = [nn.ReflectionPad2d(3),
+        if padding_type.lower() == 'reflect':
+            padder = nn.ReflectionPad2d(3)
+        elif padding_type.lower() == 'replicate':
+            padder = nn.ReplicationPad2d(3)
+        elif padding_type.lower() == 'zero':
+            padder = nn.ConstantPad2d(3, 0)                        
+
+        model = [padder,
                  nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
                  norm_layer(ngf),
                  nn.ReLU(True)]
@@ -198,9 +205,10 @@ class ResnetGenerator(nn.Module):
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
                       nn.ReLU(True)]
-        model += [nn.ReflectionPad2d(3)]
+        model += [padder]
         model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
-        model += [nn.Tanh()]
+        # model += [nn.Tanh()]
+        model += [nn.Sigmoid()]
 
         self.model = nn.Sequential(*model)
 
@@ -548,10 +556,16 @@ class ResnetGenerator3D(nn.Module):
             use_bias = norm_layer.func == nn.InstanceNorm3d
         else:
             use_bias = norm_layer == nn.InstanceNorm3d
+        
+        if padding_type.lower() == 'reflect':
+            padder = nn.ReflectionPad3d(3)
+        elif padding_type.lower() == 'replicate':
+            padder = nn.ReplicationPad3d(3)
+        elif padding_type.lower() == 'zero':
+            padder = nn.ConstantPad3d(3, 0)                        
 
         model = [
-                 # nn.ReflectionPad3d(3),
-                 nn.ReplicationPad3d(3),
+                 padder,
                  nn.Conv3d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
                  norm_layer(ngf),
                  nn.ReLU(True)]
@@ -576,10 +590,10 @@ class ResnetGenerator3D(nn.Module):
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
                       nn.ReLU(True)]
-        # model += [nn.ReflectionPad3d(3)]
-        model += [nn.ReplicationPad3d(3)]
+        model += [padder]
         model += [nn.Conv3d(ngf, output_nc, kernel_size=7, padding=0)]
-        model += [nn.Tanh()]
+        # model += [nn.Tanh()]
+        model += [nn.Sigmoid()]
 
         self.model = nn.Sequential(*model)
 

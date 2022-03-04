@@ -18,9 +18,11 @@ batch = cycleGun.test_train()
 pred_batch = cycleGun.test_prediction('B', side_length=512, cycle=True)
 
 # %%
-test = cycleGun.model(torch.cuda.FloatTensor(pred_batch[cycleGun.real_A].data).unsqueeze(0))
+test = cycleGun.model.netG2(torch.cuda.FloatTensor(pred_batch[cycleGun.real_B].data).unsqueeze(0))
+test = test.detach().cpu().squeeze()
+# %%
 plt.figure(figsize=(20,20))
-plt.imshow(test[0].squeeze().detach().cpu(), cmap='gray')
+plt.imshow(test.squeeze().detach().cpu(), cmap='gray', vmin=test.min(), vmax=test.max())
 
 # %%
 cycleGun._get_latest_checkpoint()

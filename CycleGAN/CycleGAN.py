@@ -28,10 +28,14 @@ torch.backends.cudnn.benchmark = True
 from residual_unet import ResidualUNet
 from unet import UNet, ConvPass
 from tri_utils import *
-from .CycleGAN_Model import *
-from .CycleGAN_LossFunctions import *
-from .CycleGAN_Optimizers import *
-
+try:
+    from .CycleGAN_Model import *
+    from .CycleGAN_LossFunctions import *
+    from .CycleGAN_Optimizers import *
+except:
+    from CycleGAN_Model import *
+    from CycleGAN_LossFunctions import *
+    from CycleGAN_Optimizers import *
 class CycleGAN(): #TODO: Just pass config file or dictionary
     def __init__(self,
             src_A, #EXPECTS ZARR VOLUME
@@ -186,11 +190,12 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             logging.basicConfig(level=logging.WARNING)
 
-    def batch_show(self, batch=None, i=0):
+    def batch_show(self, batch=None, i=0, show_mask=False):
         if batch is None:
             batch = self.batch
         if not hasattr(self, 'col_dict'): 
-            self.col_dict = {'REAL':0, 'FAKE':1, 'CYCL':2, 'MASK':3}
+            self.col_dict = {'REAL':0, 'FAKE':1, 'CYCL':2}
+        if show_mask: self.col_dict['MASK'] = 3
         rows = (self.real_A in batch.arrays) + (self.real_B in batch.arrays)       
         cols = 0
         for key in self.col_dict.keys():
@@ -305,7 +310,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                         )
                 generator = torch.nn.Sequential(
                                     unet, 
-                                    torch.nn.Tanh())
+                                    # torch.nn.Tanh()
+                                    torch.nn.Sigmoid()
+                                    )
             else:
                 unet = UNet(
                         in_channels=1,
@@ -323,7 +330,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 generator = torch.nn.Sequential(
                                     unet,
                                     ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet), 
-                                    torch.nn.Tanh())
+                                    # torch.nn.Tanh()
+                                    torch.nn.Sigmoid()
+                                    )
             
         elif self.gnet_type == 'resnet':
             
@@ -456,7 +465,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             datapipe.masked = False
                 
         for array in array_names:
-            if 'cycled' in array:
+            if 'fake' in array:
                 other_side = ['A','B']
                 other_side.remove(side)
                 array_name = array + '_' + other_side[0]
