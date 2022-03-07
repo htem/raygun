@@ -310,8 +310,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                         )
                 generator = torch.nn.Sequential(
                                     unet, 
-                                    # torch.nn.Tanh()
-                                    torch.nn.Sigmoid()
+                                    torch.nn.Tanh()
                                     )
             else:
                 unet = UNet(
@@ -330,8 +329,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 generator = torch.nn.Sequential(
                                     unet,
                                     ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet), 
-                                    # torch.nn.Tanh()
-                                    torch.nn.Sigmoid()
+                                    torch.nn.Tanh()
                                     )
             
         elif self.gnet_type == 'resnet':
@@ -475,9 +473,16 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             setattr(datapipe, array, array_key) # add ArrayKeys to object
             setattr(self, array_name, array_key) 
             self.arrays += [array_key]
+            #add normalizations and scaling, if appropriate        
             if 'mask' not in array:            
-                setattr(datapipe, 'normalize_'+array, gp.Normalize(array_key))#add normalizations, if appropriate        
-                setattr(self, 'normalize_'+array_name, gp.Normalize(array_key))
+                setattr(datapipe, 'scaletanh2img_'+array, gp.IntensityScaleShift(array_key, 0.5, 0.5))
+                setattr(self, 'scaletanh2img_'+array_name, gp.IntensityScaleShift(array_key, 0.5, 0.5))            
+                
+                if 'real' in array:                        
+                    setattr(datapipe, 'normalize_'+array, gp.Normalize(array_key))
+                    setattr(self, 'normalize_'+array_name, gp.Normalize(array_key))
+                    setattr(datapipe, 'scaleimg2tanh_'+array, gp.IntensityScaleShift(array_key, 2, -1))
+                    setattr(self, 'scaleimg2tanh_'+array_name, gp.IntensityScaleShift(array_key, 2, -1))
         
         #Setup sources and resampling nodes
         if self.common_voxel_size != datapipe.src_voxel_size:
@@ -522,9 +527,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 datapipe.reject += gp.RejectConstant(datapipe.real_src, min_coefvar = self.min_coefvar)
 
         datapipe.augment = gp.SimpleAugment(mirror_only = self.augment_axes, transpose_only = self.augment_axes)
-        datapipe.augment += datapipe.normalize_real    
+        datapipe.augment += datapipe.normalize_real
+        datapipe.augment += datapipe.scaleimg2tanh_real
         datapipe.augment += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-                    control_point_spacing=self.side_length//2,
+                    control_point_spacing=100, # self.side_length//2,
                     # jitter_sigma=(5.0,)*self.ndims,
                     jitter_sigma=(0., 5.0, 5.0,)[-self.ndims:],
                     rotation_interval=(0, math.pi/2),
@@ -538,6 +544,20 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             datapipe.unsqueeze = None
 
+        # Make post-net data pipes
+        # remove "channel" dimensions if neccessary
+        datapipe.postnet_pipe = type('SubDataPipe', (object,), {})
+        datapipe.postnet_pipe.nocycle = datapipe.scaletanh2img_real + datapipe.scaletanh2img_fake
+        datapipe.postnet_pipe.cycle = datapipe.scaletanh2img_real + datapipe.scaletanh2img_fake + datapipe.scaletanh2img_cycled
+        if self.ndims == len(self.common_voxel_size):
+            datapipe.postnet_pipe.nocycle += gp.Squeeze([datapipe.real, 
+                                            datapipe.fake, 
+                                            ], axis=1) # remove channel dimension for grayscale
+            datapipe.postnet_pipe.cycle += gp.Squeeze([datapipe.real, 
+                                            datapipe.fake, 
+                                            datapipe.cycled,
+                                            ], axis=1) # remove channel dimension for grayscale
+        
         # Make training datapipe
         datapipe.train_pipe = datapipe.source + gp.RandomLocation()
         if datapipe.reject:
@@ -585,16 +605,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # assemble pipeline
         self.training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
-        self.training_pipeline += self.trainer
-        # remove "channel" dimensions if neccessary
-        if self.ndims == len(self.common_voxel_size):
-            self.training_pipeline += gp.Squeeze([self.real_A, 
-                                            self.fake_A, 
-                                            self.cycled_A, 
-                                            self.real_B, 
-                                            self.fake_B, 
-                                            self.cycled_B
-                                            ], axis=1) # remove channel dimension for grayscale
+        self.training_pipeline += self.trainer        
+        self.training_pipeline += self.datapipe_A.postnet_pipe.cycle + self.datapipe_B.postnet_pipe.cycle
         if self.batch_size == 1:
             self.training_pipeline += gp.Squeeze([self.real_A, 
                                             self.fake_A, 
@@ -603,8 +615,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                             self.fake_B, 
                                             self.cycled_B
                                             ], axis=0)
-        self.training_pipeline += self.normalize_fake_B + self.normalize_cycled_A
-        self.training_pipeline += self.normalize_fake_A + self.normalize_cycled_B
         self.test_training_pipeline = self.training_pipeline.copy() + self.performance
         self.training_pipeline += self.cache
 
@@ -672,6 +682,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if datapipe.reject: predict_pipe += datapipe.reject
         if datapipe.resample: predict_pipe += datapipe.resample
         predict_pipe += datapipe.normalize_real
+        predict_pipe += datapipe.scaleimg2tanh_real
 
         if datapipe.unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
             predict_pipe += datapipe.unsqueeze
@@ -683,12 +694,12 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 checkpoint = self.checkpoint
                                 )
         
-        if datapipe.unsqueeze: # remove "channel" dimensions if neccessary
-            predict_pipe += gp.Squeeze(squeeze_arrays, axis=1) 
-        predict_pipe += gp.Squeeze(squeeze_arrays, axis=0) # remove batch dimension
-        predict_pipe += datapipe.normalize_fake 
         if cycle:
-            predict_pipe += datapipe.normalize_cycled
+            predict_pipe += datapipe.postnet_pipe.cycle
+        else:
+            predict_pipe += datapipe.postnet_pipe.nocycle
+
+        predict_pipe += gp.Squeeze(squeeze_arrays, axis=0) # remove batch dimension
 
         request = gp.BatchRequest()
         for array in arrays:            
@@ -774,6 +785,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         render_pipe = datapipe.source 
         if datapipe.resample: render_pipe += datapipe.resample
         render_pipe += datapipe.normalize_real
+        render_pipe += datapipe.scaleimg2tanh_real
 
         if datapipe.unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
             render_pipe += datapipe.unsqueeze
@@ -785,16 +797,17 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 checkpoint = self.checkpoint,
                                 array_specs = array_specs, 
                                 spawn_subprocess=self.spawn_subprocess
-                                )
+                                )                
         
-        
-        if datapipe.unsqueeze: # remove "channel" dimensions if neccessary
-            render_pipe += gp.Squeeze(arrays[1:], axis=1) 
+        if cycle:
+            predict_pipe += datapipe.postnet_pipe.cycle
+        else:
+            predict_pipe += datapipe.postnet_pipe.nocycle
         render_pipe += gp.Squeeze(arrays[1:], axis=0) # remove batch dimension
         
-        render_pipe += datapipe.normalize_fake + gp.AsType(datapipe.fake, np.uint8)        
+        render_pipe += gp.AsType(datapipe.fake, np.uint8)        
         if cycle:
-            render_pipe += datapipe.normalize_cycled + gp.AsType(datapipe.cycled, np.uint8)        
+            render_pipe += gp.AsType(datapipe.cycled, np.uint8)        
 
         render_pipe += gp.ZarrWrite(
                         dataset_names = dataset_names,

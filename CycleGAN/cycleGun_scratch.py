@@ -1,29 +1,69 @@
 # %%
 import sys
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
-from CycleGun_CBv30nmBottom100um_cb2gcl1_20220215_ import *
+# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220215_ import *
+from CycleGun_CBv30nmBottom100um_cb2gcl1_20220304_train import *
 import matplotlib.pyplot as plt
 import zarr
 
 
 # %%
 # cycleGun.set_device(0)
-# cycleGun.load_saved_model()
 cycleGun.batch_size = 1
-
+cycleGun.build_machine()
+# cycleGun.load_saved_model()
+self = cycleGun
 # %%
 batch = cycleGun.test_train()
 
 # %%
-pred_batch = cycleGun.test_prediction('B', side_length=512, cycle=True)
+batch = cycleGun.test_prediction('A', side_length=512, cycle=True)
 
 # %%
-test = cycleGun.model.netG2(torch.cuda.FloatTensor(pred_batch[cycleGun.real_B].data).unsqueeze(0))
-test = test.detach().cpu().squeeze()
+test = cycleGun.model.netG1(torch.cuda.FloatTensor(batch[cycleGun.real_A].data).unsqueeze(0))
+fake = test.detach().cpu().squeeze()
 # %%
-plt.figure(figsize=(20,20))
-plt.imshow(test.squeeze().detach().cpu(), cmap='gray', vmin=test.min(), vmax=test.max())
+plt.figure(figsize=(10,10))
+plt.imshow(fake, cmap='gray', vmin=fake.min(), vmax=fake.max())
 
+#%%
+request = gp.BatchRequest()
+for array in [self.real_A, self.mask_A]:            
+    extents = self.get_extents(512, array_name=array.identifier)
+    request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
+
+# %%
+datapipe = self.datapipe_A
+predict_pipe = datapipe.source + gp.RandomLocation() 
+if datapipe.reject: predict_pipe += datapipe.reject
+if datapipe.resample: predict_pipe += datapipe.resample
+predict_pipe += datapipe.normalize_real
+predict_pipe += datapipe.scaleimg2tanh_real
+if datapipe.unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
+    predict_pipe += datapipe.unsqueeze
+predict_pipe += gp.Unsqueeze([datapipe.real]) # add batch dimension
+
+with gp.build(predict_pipe):
+    in_batch = predict_pipe.request_batch(request)
+
+# %%
+with gp.build(self.pipe_A):
+    in_batch = self.pipe_A.request_batch(request)
+
+# %%
+plt.figure(figsize=(10,10))
+plt.imshow(in_batch[cycleGun.real_A].data.squeeze(), cmap='gray')
+# %%
+# outs = cycleGun.model(torch.cuda.FloatTensor(in_batch[cycleGun.real_A].data))
+outs = cycleGun.model(torch.FloatTensor(in_batch[cycleGun.real_A].data))
+fake2 = outs[0].detach().cpu().squeeze()
+# %%
+plt.figure(figsize=(10,10))
+plt.imshow(fake2, cmap='gray', vmin=fake2.min(), vmax=fake2.max())
+
+# %%
+plt.figure(figsize=(10,10))
+plt.imshow(test_batch[cycleGun.fake_B].data.squeeze(), cmap='gray')
 # %%
 cycleGun._get_latest_checkpoint()
 cycleGun.load_saved_model()
