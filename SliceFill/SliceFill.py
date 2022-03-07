@@ -160,17 +160,19 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         else:
             logging.basicConfig(level=logging.WARNING)
 
-    def batch_show(self, batch=None, i=0):
+    def batch_show(self, batch=None, i=0, show_mask=False):
         if batch is None:
             batch = self.batch
         if not hasattr(self, 'col_dict'): 
-            self.col_dict = {'REAL':0, 'FAKE':1, 'CYCL':2}#, 'MASK':3}
-        rows = (self.real_A in batch.arrays) + (self.real_B in batch.arrays)        
-        fig, axes = plt.subplots(rows, len(self.col_dict), figsize=(10*len(self.col_dict), 10*rows))
+            self.col_dict = {'REAL':0, 'PRED':1, 'PRED_VAR':2}
+        if show_mask: self.col_dict['MASK'] = 3
+        cols = 0
+        for key in self.col_dict.keys():
+            cols += key in [array.identifier for array in batch.arrays] 
+        fig, axes = plt.subplots(1, cols, figsize=(10*cols, 10))
         for array, value in batch.items():
             label = array.identifier
-            c = self.col_dict[label[:4]]
-            r = (int('_B' in label) + int('FAKE' in label)) % 2
+            c = self.col_dict[label]
             if len(value.data.shape) > 3: # pick one from the batch
                 img = value.data[i].squeeze()
             else:
@@ -180,12 +182,9 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                 data = img[mid]
             else:
                 data = img
-            if rows == 1:
-                axes[c].imshow(data, cmap='gray', vmin=0, vmax=1)
-                axes[c].set_title(label)                
-            else:
-                axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
-                axes[r, c].set_title(label)
+            cmap = 'viridis' if label.lower() == 'pred_var' else 'gray'
+            axes[c].imshow(data, cmap=cmap)#, vmin=0, vmax=1)
+            axes[c].set_title(label)                
 
     def batch_tBoard_write(self, i=0):
         self.trainer.summary_writer.flush()
@@ -237,43 +236,43 @@ class SliceFill(): #TODO: Just pass config file or dictionary
     def get_generator(self): 
         if self.gnet_type == 'unet':
 
-            generator = UnetGenerator(**self.gnet_kwargs)
+            # generator = UnetGenerator(**self.gnet_kwargs)
             
-            # if self.residual_unet:
-            #     unet = ResidualUNet(
-            #             in_channels=2,
-            #             num_fmaps=self.g_num_fmaps,
-            #             fmap_inc_factor=self.g_fmap_inc_factor,
-            #             downsample_factors=[(self.g_downsample_factor,)*2,] * (self.gnet_depth - 1),
-            #             padding=self.padding_unet,
-            #             constant_upsample=self.g_constant_upsample,
-            #             voxel_size=self.voxel_size[-2:],
-            #             kernel_size_down=self.g_kernel_size_down,
-            #             kernel_size_up=self.g_kernel_size_up,
-            #             residual=self.residual_blocks,
-            #             activation=self.gnet_activation
-            #             )
-            #     generator = torch.nn.Sequential(
-            #                         unet, 
-            #                         torch.nn.Tanh())
-            # else:
-            #     unet = UNet(
-            #             in_channels=2,
-            #             num_fmaps=self.g_num_fmaps,
-            #             fmap_inc_factor=self.g_fmap_inc_factor,
-            #             downsample_factors=[(self.g_downsample_factor,)*2,] * (self.gnet_depth - 1),
-            #             padding=self.padding_unet,
-            #             constant_upsample=self.g_constant_upsample,
-            #             voxel_size=self.common_voxel_size[-2:],
-            #             kernel_size_down=self.g_kernel_size_down,
-            #             kernel_size_up=self.g_kernel_size_up,
-            #             residual=self.residual_blocks,
-            #             activation=self.gnet_activation
-            #             )
-            #     generator = torch.nn.Sequential(
-            #                         unet,
-            #                         ConvPass(self.g_num_fmaps, 1, [(1,)*2], activation=None, padding=self.padding_unet), 
-            #                         torch.nn.Tanh())
+            if self.residual_unet:
+                unet = ResidualUNet(
+                        in_channels=2,
+                        num_fmaps=self.g_num_fmaps,
+                        fmap_inc_factor=self.g_fmap_inc_factor,
+                        downsample_factors=[(self.g_downsample_factor,)*2,] * (self.gnet_depth - 1),
+                        padding=self.padding_unet,
+                        constant_upsample=self.g_constant_upsample,
+                        voxel_size=self.voxel_size[-2:],
+                        kernel_size_down=self.g_kernel_size_down,
+                        kernel_size_up=self.g_kernel_size_up,
+                        residual=self.residual_blocks,
+                        activation=self.gnet_activation
+                        )
+                generator = torch.nn.Sequential(
+                                    unet, 
+                                    torch.nn.Tanh())
+            else:
+                unet = UNet(
+                        in_channels=2,
+                        num_fmaps=self.g_num_fmaps,
+                        fmap_inc_factor=self.g_fmap_inc_factor,
+                        downsample_factors=[(self.g_downsample_factor,)*2,] * (self.gnet_depth - 1),
+                        padding=self.padding_unet,
+                        constant_upsample=self.g_constant_upsample,
+                        voxel_size=self.common_voxel_size[-2:],
+                        kernel_size_down=self.g_kernel_size_down,
+                        kernel_size_up=self.g_kernel_size_up,
+                        residual=self.residual_blocks,
+                        activation=self.gnet_activation
+                        )
+                generator = torch.nn.Sequential(
+                                    unet,
+                                    ConvPass(self.g_num_fmaps, 1, [(1,)*2], activation=None, padding=self.padding_unet), 
+                                    torch.nn.Tanh())
             
         elif self.gnet_type == 'resnet':
             
@@ -372,8 +371,13 @@ class SliceFill(): #TODO: Just pass config file or dictionary
             array_key = gp.ArrayKey(array_name.upper())
             setattr(self, array_name, array_key) # add ArrayKeys to object
             self.arrays += [array_key]
-            if array_name != 'mask' and array_name != 'pred_var':            
-                setattr(self, 'normalize_'+array_name, gp.Normalize(array_key)) # add normalizations, if appropriate                       
+            #add normalizations and scaling, if appropriate        
+            if array_name != 'mask' and array_name != 'pred_var':                            
+                setattr(self, 'scaletanh2img_'+array_name, gp.IntensityScaleShift(array_key, 0.5, 0.5))            
+                
+                if 'real' in array_name:                        
+                    setattr(self, 'normalize_'+array_name, gp.Normalize(array_key))
+                    setattr(self, 'scaleimg2tanh_'+array_name, gp.IntensityScaleShift(array_key, 2, -1))
 
         # setup data sources
         self.src_names = {self.real: self.src_name}
@@ -401,11 +405,17 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         self.build_train_parts()
 
     def build_train_parts(self):
+        # add data prep steps
+        self.prep_pipe = self.normalize_real + self.scaleimg2tanh_real
+
+        # add post network steps
+        self.post_pipe = self.scaletanh2img_real + self.scaletanh2img_pred
+
         # define axes for mirroring and transpositions
         self.augment_axes = list(np.arange(3)[-2:])
         self.augment = gp.SimpleAugment(mirror_only = self.augment_axes, transpose_only = self.augment_axes)
         self.augment += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
-                    control_point_spacing=self.side_length//2,
+                    control_point_spacing=100,#self.side_length//2,
                     jitter_sigma=(5.0, 5.0,),
                     rotation_interval=(0, math.pi/2),
                     subsample=4,
@@ -445,11 +455,11 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         self.train_pipe = self.source + gp.RandomLocation()
         if self.reject:
             self.train_pipe += self.reject            
-        self.train_pipe += self.normalize_real + self.augment + gp.Stack(self.batch_size) + self.trainer
+        self.train_pipe += self.prep_pipe + self.augment + gp.Stack(self.batch_size) + self.trainer
         
         if self.batch_size == 1:
             self.train_pipe += gp.Squeeze(self.squeeze_arrays, axis=0)
-        self.train_pipe += self.normalize_pred
+        self.train_pipe += self.post_pipe
         self.test_train_pipe = self.train_pipe.copy() + self.performance
         self.train_pipe += self.cache
 
@@ -487,7 +497,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         
         self.predict_pipe = self.source + gp.RandomLocation() 
         if self.reject: self.predict_pipe += self.reject
-        self.predict_pipe += self.normalize_real
+        self.predict_pipe += self.prep_pipe
         self.predict_pipe += gp.Unsqueeze([self.real]) # add batch dimension
         self.predict_pipe += gp.torch.Predict(self.model,
                                 inputs = {'input': self.real},
@@ -497,7 +507,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         
         # remove "batch" dimension
         self.predict_pipe += gp.Squeeze(self.squeeze_arrays, axis=0)
-        self.predict_pipe += self.normalize_pred
+        self.predict_pipe += self.post_pipe
 
         self.pred_request = self.get_request(side_length)
 
@@ -522,7 +532,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
         else:
             pred_spec = self.source.spec[self.real].copy()        
         pred_spec.voxel_size = self.voxel_size
-        pred_spec.dtype = self.normalize_pred.dtype
+        pred_spec.dtype = self.scaletanh2img_pred.dtype
 
         scan_request = self.get_request(side_length)
 
@@ -534,7 +544,7 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                 'blocksize': 64
                 }
         
-        dataset_names = {self.pred: 'volumes/'+self.model_name+'_enFAKE'}
+        dataset_names = {self.pred: 'volumes/'+self.model_name+'_enPRED'}
         array_specs = {self.pred: pred_spec.copy()}
 
         source_ds = daisy.open_ds(self.src_path, self.src_name)
@@ -577,7 +587,6 @@ class SliceFill(): #TODO: Just pass config file or dictionary
                         dataset_names = dataset_names,
                         output_filename = self.out_path,
                         compression_type = self.compressor
-                        # dataset_dtypes = {fake: pred_spec.dtype}
                         )        
         
         self.render_pipe += gp.Scan(scan_request, num_workers=self.num_workers, cache_size=self.cache_size)
