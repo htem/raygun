@@ -1,30 +1,48 @@
 # %%
+from itertools import cycle
 import sys
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220215_ import *
-from CycleGun_CBv30nmBottom100um_cb2gcl1_20220304_train import *
+# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220304_ import *
+# from CycleGun20220304XNH2EM_apply_cb2SynapseCutout1_ import *
+from SplitCycleGun20220304XNH2EM_apply_cb2SynapseCutout1_ import *
 import matplotlib.pyplot as plt
 import zarr
 
 
 # %%
 # cycleGun.set_device(0)
-cycleGun.batch_size = 1
-cycleGun.build_machine()
+# cycleGun.batch_size = 1
+# cycleGun.build_machine()
 # cycleGun.load_saved_model()
 self = cycleGun
 # %%
 batch = cycleGun.test_train()
 
 # %%
-batch = cycleGun.test_prediction('A', side_length=512, cycle=True)
+batch = cycleGun.test_prediction('B', side_length=200, cycle=True)
+batch = cycleGun.test_prediction('A', side_length=200, cycle=True)
 
 # %%
-test = cycleGun.model.netG1(torch.cuda.FloatTensor(batch[cycleGun.real_A].data).unsqueeze(0))
-fake = test.detach().cpu().squeeze()
+cycleGun.model.eval()
+# cycleGun.model.train()
+
+real_A = batch[cycleGun.real_A].data * 2 - 1
+patch1 = torch.cuda.FloatTensor(real_A[:, :100, :100]).unsqueeze(0)
+patch2 = torch.cuda.FloatTensor(real_A[:, 100:, :100]).unsqueeze(0)
+patch3 = torch.cuda.FloatTensor(real_A[:, :100, 100:]).unsqueeze(0)
+patch4 = torch.cuda.FloatTensor(real_A[:, 100:, 100:]).unsqueeze(0)
+
+patches = [patch1, patch2, patch3, patch4]
+fakes = []
+for patch in patches:
+    test = cycleGun.model.netG1(patch)
+    fakes.append(test.detach().cpu().squeeze())
+
+fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fakes[3]))), axis=1)
 # %%
 plt.figure(figsize=(10,10))
-plt.imshow(fake, cmap='gray', vmin=fake.min(), vmax=fake.max())
+plt.imshow(fake_comb, cmap='gray')#, vmin=fake.min(), vmax=fake.max())
 
 #%%
 request = gp.BatchRequest()
@@ -73,6 +91,24 @@ import zarr
 import numpy as np
 import matplotlib.pyplot as plt
 import daisy
+
+# %%
+z = zarr.open(cycleGun.src_B)
+shape = np.array(z[cycleGun.B_name].shape)
+mid = shape // 2
+im_data = np.array(z[cycleGun.B_name][mid[0], mid[1]-512:mid[1]+512, mid[2]-512:mid[2]+512]).squeeze()
+# im = np.array(z['volumes/raw'][1400:1800, 1400:1800, 1400:1800])[200].squeeze()
+z[cycleGun.B_name].info
+plt.imshow(im_data, cmap='gray')
+
+# %%
+ds = daisy.open_ds(cycleGun.src_B, cycleGun.B_name)
+roi = daisy.Roi((0, 0, 0), (40, 2048, 2048))
+img = ds.to_ndarray(roi)
+
+# %%
+plt.figure(figsize=(30,30))
+plt.imshow(img[0].squeeze(), cmap='gray')
 
 # %%
 z = zarr.open('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/CBxs_lobV_bottomp100um_30nm_rectwopassdb9_.n5')

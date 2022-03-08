@@ -829,11 +829,14 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def load_saved_model(self, checkpoint=None):
         if checkpoint is None:
             checkpoint = self.checkpoint
+        else:
+            self.checkpoint = checkpoint
+
         if checkpoint is not None:
             checkpoint = torch.load(checkpoint)
             if "model_state_dict" in checkpoint:
                 self.model.load_state_dict(checkpoint["model_state_dict"])
             else:
-                self.model.load_state_dict()
+                self.model.load_state_dict(checkpoint)
         else:
             raise('No saved checkpoint found.')
