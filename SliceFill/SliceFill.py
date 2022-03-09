@@ -26,7 +26,7 @@ torch.backends.cudnn.benchmark = True
 
 from residual_unet import ResidualUNet
 from unet import UNet, ConvPass
-from tri_utils import *
+from utils import *
 from SliceFill_Models import *
 from SliceFill_LossFunctions import *
 from SliceFill_Optimizers import *

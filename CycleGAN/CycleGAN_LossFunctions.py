@@ -18,7 +18,6 @@ class CycleGAN_Loss(torch.nn.Module):
                 dims,
                 l1_lambda=100, 
                 identity_lambda=0,
-                padding=None,
                 gan_mode=None
                  ):
         super(CycleGAN_Loss, self).__init__()
@@ -32,14 +31,8 @@ class CycleGAN_Loss(torch.nn.Module):
         self.optimizer_G = optimizer_G
         self.l1_lambda = l1_lambda
         self.identity_lambda = identity_lambda
-        self.padding = padding
         self.gan_mode = gan_mode
         self.dims = dims
-        if (self.padding is not None) and (self.padding.lower() != 'valid'):
-            inds = [...]
-            for pad in self.padding:
-                inds.append(slice(pad, -pad))
-            self.pad_inds = tuple(inds)
         self.loss_dict = {
             'Loss/D1': float(),
             'Loss/D2': float(),
@@ -107,7 +100,8 @@ class CycleGAN_Loss(torch.nn.Module):
         self.optimizer_G.zero_grad()        # set G's gradients to zero
 
         #get cycle loss for both directions (i.e. real == cycled, a.k.a. real_A == netG2(netG1(real_A)) for A and B)
-        if self.padding is not None and self.padding.lower() == 'valid':
+        # crop if necessary
+        if real_A.size()[-self.dims:] != cycled_A.size()[-self.dims:]:
             l1_loss_A = self.l1_loss(self.crop(real_A, cycled_A.size()[-self.dims:]), cycled_A)
             l1_loss_B = self.l1_loss(self.crop(real_B, cycled_B.size()[-self.dims:]), cycled_B)
         else:
@@ -123,12 +117,8 @@ class CycleGAN_Loss(torch.nn.Module):
         if self.identity_lambda > 0:
             identity_B = self.netG1(real_B)
             identity_A = self.netG2(real_A)
-            if self.padding is not None and self.padding.lower() == 'valid':
-                identity_loss_B = self.l1_loss(self.crop(real_B, identity_B.size()[-self.dims:]), identity_B)#TODO: add ability to have unique loss function for identity
-                identity_loss_A = self.l1_loss(self.crop(real_A, identity_A.size()[-self.dims:]), identity_A)
-            else:
-                identity_loss_B = self.l1_loss(real_B, identity_B)#TODO: add ability to have unique loss function for identity
-                identity_loss_A = self.l1_loss(real_A, identity_A)
+            identity_loss_B = self.l1_loss(real_B, identity_B)#TODO: add ability to have unique loss function for identity
+            identity_loss_A = self.l1_loss(real_A, identity_A)
             self.loss_dict.update({
                 'Identity_Loss/A': float(identity_loss_A),                
                 'Identity_Loss/B': float(identity_loss_B),                
@@ -158,13 +148,10 @@ class CycleGAN_Loss(torch.nn.Module):
 
     def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
 
-        if (self.padding is not None) and (self.padding.lower() != 'valid'):
-            real_A = real_A[self.pad_inds]
-            fake_A = fake_A[self.pad_inds]
-            cycled_A = cycled_A[self.pad_inds]
-            real_B = real_B[self.pad_inds]
-            fake_B = fake_B[self.pad_inds]
-            cycled_B = cycled_B[self.pad_inds]
+        # crop if necessary
+        if real_A.size()[-self.dims:] != fake_B.size()[-self.dims:]:
+            real_A = self.crop(real_A, fake_A.size()[-self.dims:])
+            real_B = self.crop(real_B, fake_B.size()[-self.dims:])
 
         # update Gs
         cycle_loss, gan_loss_G1, gan_loss_G2 = self.backward_G(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)
@@ -214,7 +201,6 @@ class SplitGAN_Loss(torch.nn.Module):
                 dims,
                 l1_lambda=100, 
                 identity_lambda=0,
-                padding=None,
                 gan_mode=None
                  ):
         super(SplitGAN_Loss, self).__init__()
@@ -229,14 +215,8 @@ class SplitGAN_Loss(torch.nn.Module):
         self.optimizer_D = optimizer_D
         self.l1_lambda = l1_lambda
         self.identity_lambda = identity_lambda
-        self.padding = padding
         self.gan_mode = gan_mode
         self.dims = dims
-        if (self.padding is not None) and (self.padding.lower() != 'valid'):
-            inds = [...]
-            for pad in self.padding:
-                inds.append(slice(pad, -pad))
-            self.pad_inds = tuple(inds)
         self.loss_dict = {
             'Loss/D1': float(),
             'Loss/D2': float(),
@@ -305,7 +285,8 @@ class SplitGAN_Loss(torch.nn.Module):
         gan_loss = self.gan_loss(pred_fake, True)
         
         # Include L1 loss for forward and reverse cycle consistency
-        if self.padding is not None and self.padding.lower() == 'valid':
+        # crop if necessary
+        if real.size()[-self.dims:] != cycled.size()[-self.dims:]:
             cycle_loss = self.l1_lambda * self.l1_loss(self.crop(real, cycled.size()[-self.dims:]), cycled)
         else:
             cycle_loss = self.l1_lambda * self.l1_loss(real, cycled)                 
@@ -318,10 +299,7 @@ class SplitGAN_Loss(torch.nn.Module):
         #get identity loss (i.e. ||G_A(B) - B|| for G_A(A) --> B) and add if applicable
         if self.identity_lambda > 0:
             identity = Gnet(real)
-            if self.padding is not None and self.padding.lower() == 'valid':
-                identity_loss = self.l1_loss(self.crop(real, identity.size()[-self.dims:]), identity)
-            else:
-                identity_loss = self.l1_loss(real, identity)#TODO: add ability to have unique loss function for identity             
+            identity_loss = self.l1_loss(real, identity)#TODO: add ability to have unique loss function for identity             
             self.loss_dict.update({
                 'Identity_Loss/'+side: float(identity_loss)            
             })
@@ -354,14 +332,11 @@ class SplitGAN_Loss(torch.nn.Module):
         return loss_G1, loss_G2
 
     def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
-
-        if (self.padding is not None) and (self.padding.lower() != 'valid'):
-            real_A = real_A[self.pad_inds]
-            fake_A = fake_A[self.pad_inds]
-            cycled_A = cycled_A[self.pad_inds]
-            real_B = real_B[self.pad_inds]
-            fake_B = fake_B[self.pad_inds]
-            cycled_B = cycled_B[self.pad_inds]
+        
+        # crop if necessary
+        if real_A.size()[-self.dims:] != fake_B.size()[-self.dims:]:
+            real_A = self.crop(real_A, fake_A.size()[-self.dims:])
+            real_B = self.crop(real_B, fake_B.size()[-self.dims:])
 
         # update Gs
         loss_G1, loss_G2 = self.backward_Gs(real_A, fake_A, cycled_A, real_B, fake_B, cycled_B)

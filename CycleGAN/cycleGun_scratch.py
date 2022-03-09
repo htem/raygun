@@ -5,7 +5,9 @@ sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220215_ import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220304_ import *
 # from CycleGun20220304XNH2EM_apply_cb2SynapseCutout1_ import *
-from SplitCycleGun20220304XNH2EM_apply_cb2SynapseCutout1_ import *
+# from SplitCycleGun20220304XNH2EM_apply_cb2SynapseCutout1_ import *
+from SplitCycleGun20220308XNH2EM_apply_cb2SynapseCutout1_ import *
+# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220309seluSplitNoise_train import *
 import matplotlib.pyplot as plt
 import zarr
 

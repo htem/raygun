@@ -27,7 +27,7 @@ torch.backends.cudnn.benchmark = True
 # from funlib.learn.torch.models.unet import UNet, ConvPass
 from residual_unet import ResidualUNet
 from unet import UNet, ConvPass
-from tri_utils import *
+from utils import *
 try:
     from .CycleGAN_Model import *
     from .CycleGAN_LossFunctions import *
@@ -55,19 +55,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             
             gnet_type='unet',
             gnet_kwargs = {},
-            ### below temporarily kept for backward compatibility
-            gnet_depth=3, # number of layers in unets (i.e. generators)
-            g_downsample_factor=2,
-            g_num_fmaps=16,
-            g_fmap_inc_factor=2,
-            g_constant_upsample=True,            
-            g_kernel_size_down=None,
-            g_kernel_size_up=None,
-            gnet_activation='ReLU',
-            residual_unet=False,
-            residual_blocks=False,
-            padding_unet='same',
-            ###
             g_init_learning_rate=1e-5,#0.0004#1e-6 # init_learn_rate = 0.0004
 
             dnet_depth=3, # number of layers in Discriminator networks
@@ -129,16 +116,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.gnet_type = gnet_type.lower()
             self.gnet_kwargs = gnet_kwargs
 
-            self.gnet_depth = gnet_depth
             self.dnet_depth = dnet_depth
-            self.g_downsample_factor = g_downsample_factor
             self.d_downsample_factor = d_downsample_factor
-            self.g_num_fmaps = g_num_fmaps
             self.d_num_fmaps = d_num_fmaps
-            self.g_fmap_inc_factor = g_fmap_inc_factor
-            self.g_constant_upsample = g_constant_upsample
-            self.g_kernel_size_down=g_kernel_size_down
-            self.g_kernel_size_up=g_kernel_size_up
             self.d_kernel_size = d_kernel_size 
             self.num_epochs = num_epochs
             self.batch_size = batch_size
@@ -153,6 +133,12 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.save_every = save_every
             self.tensorboard_path = tensorboard_path
             self.verbose = verbose
+            self.interp_order = interp_order
+            self.loss_style = loss_style
+            self.sampling_bottleneck = sampling_bottleneck
+            self.adam_betas = adam_betas
+            self.min_coefvar = min_coefvar
+            self.gan_mode = gan_mode
             self._set_verbose()
             if checkpoint is None:
                 try:
@@ -162,16 +148,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     self.checkpoint = None
             else:
                 self.checkpoint = checkpoint
-            self.interp_order = interp_order
-            self.loss_style = loss_style
-            self.sampling_bottleneck =sampling_bottleneck
-            self.adam_betas = adam_betas
-            self.min_coefvar = min_coefvar
-            self.gnet_activation = gnet_activation
-            self.residual_unet = residual_unet
-            self.residual_blocks = residual_blocks
-            self.padding_unet = padding_unet
-            self.gan_mode=gan_mode
             self.build_machine()
             self.training_pipeline = None
             self.test_training_pipeline = None
@@ -268,7 +244,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if side_length is None:
             side_length = self.side_length
 
-        if (self.padding_unet is not None) and (self.padding_unet.lower() == 'valid'):
+        if ('padding' in self.gnet_kwargs) and (self.gnet_kwargs['padding'].lower() == 'valid'):
             if array_name is not None and not ('real' in array_name.lower() or 'mask' in array_name.lower()):
                 shape = (1,1) + (side_length,) * self.ndims
                 result = self.netG1(torch.rand(*shape))
@@ -282,6 +258,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
 
+    def get_downsample_factors(self, down_factor=None, num_downs=None):
+        if down_factor is None:
+            down_factor = self.gnet_kwargs['down_factor']
+        if num_downs is None:
+            num_downs = self.gnet_kwargs['num_downs']
+        return [(down_factor,)*self.ndims,] * (num_downs - 1)
+
     def get_generator(self): 
         if self.gnet_type == 'unet':
 
@@ -294,43 +277,27 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             # else:
             #     raise f'Unet generators only specified for 2D or 3D, not {self.ndims}D'
 
-            if self.residual_unet:
-                unet = ResidualUNet(
-                        in_channels=1,
-                        num_fmaps=self.g_num_fmaps,
-                        fmap_inc_factor=self.g_fmap_inc_factor,
-                        downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                        padding=self.padding_unet,
-                        constant_upsample=self.g_constant_upsample,
-                        voxel_size=self.common_voxel_size[-self.ndims:],
-                        kernel_size_down=self.g_kernel_size_down,
-                        kernel_size_up=self.g_kernel_size_up,
-                        residual=self.residual_blocks,
-                        activation=self.gnet_activation
+            unet = UNet(
+                        downsample_factors=self.get_downsample_factors(),
+                        **self.gnet_kwargs
                         )
-                generator = torch.nn.Sequential(
-                                    unet, 
-                                    torch.nn.Tanh()
-                                    )
-            else:
-                unet = UNet(
-                        in_channels=1,
-                        num_fmaps=self.g_num_fmaps,
-                        fmap_inc_factor=self.g_fmap_inc_factor,
-                        downsample_factors=[(self.g_downsample_factor,)*self.ndims,] * (self.gnet_depth - 1),
-                        padding=self.padding_unet,
-                        constant_upsample=self.g_constant_upsample,
-                        voxel_size=self.common_voxel_size[-self.ndims:],
-                        kernel_size_down=self.g_kernel_size_down,
-                        kernel_size_up=self.g_kernel_size_up,
-                        residual=self.residual_blocks,
-                        activation=self.gnet_activation
+
+            generator = torch.nn.Sequential(
+                                unet,
+                                # ConvPass(self.gnet_kwargs['ngf'], self.gnet_kwargs['output_nc'], [(1,)*self.ndims], activation=None, padding=self.gnet_kwargs['padding']), 
+                                torch.nn.Tanh()
+                                )
+        
+        elif self.gnet_type == 'residualunet':
+            
+            unet = ResidualUNet(
+                        downsample_factors=self.get_downsample_factors(),
+                        **self.gnet_kwargs
                         )
-                generator = torch.nn.Sequential(
-                                    unet,
-                                    ConvPass(self.g_num_fmaps, 1, [(1,)*self.ndims], activation=None, padding=self.padding_unet), 
-                                    torch.nn.Tanh()
-                                    )
+            generator = torch.nn.Sequential(
+                                unet, 
+                                torch.nn.Tanh()
+                                )
             
         elif self.gnet_type == 'resnet':
             
@@ -346,9 +313,14 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
 
             raise f'Unknown generator type requested: {self.gnet_type}'
-
-        if self.gnet_activation is not None:
-            init_weights(generator, init_type='kaiming', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
+        
+        activation = self.gnet_kwargs['activation'] if 'activation' in self.gnet_kwargs else nn.ReLU
+        
+        if activation is not None:
+            if activation == nn.SELU:
+                init_weights(generator, init_type='kaiming', nonlinearity='linear') # For Self-Normalizing Neural Networks
+            else:
+                init_weights(generator, init_type='kaiming', nonlinearity=activation.__class__.__name__.lower())
         else:
             init_weights(generator, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
         return generator
@@ -386,19 +358,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.setup_networks()
 
         if self.sampling_bottleneck:
-            # scale_factor_A = (1,1) + tuple(np.divide(self.common_voxel_size, self.A_voxel_size)[-self.ndims:])
             scale_factor_A = tuple(np.divide(self.common_voxel_size, self.A_voxel_size)[-self.ndims:])
             if not any([s < 1 for s in scale_factor_A]): scale_factor_A = None
-            # scale_factor_B = (1,1) + tuple(np.divide(self.common_voxel_size, self.B_voxel_size)[-self.ndims:])
             scale_factor_B = tuple(np.divide(self.common_voxel_size, self.B_voxel_size)[-self.ndims:])
             if not any([s < 1 for s in scale_factor_B]): scale_factor_B = None
         else:
             scale_factor_A, scale_factor_B = None, None
-
-        if self.padding_unet.lower() == 'valid':
-            padding = 'valid'
-        else:
-            padding = None
+        
         # self.l1_loss = torch.nn.SmoothL1Loss() 
         self.l1_loss = torch.nn.L1Loss() 
         self.gan_loss = GANLoss(gan_mode=self.gan_mode)
@@ -409,7 +375,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas)
             self.optimizer = CycleGAN_Optimizer(self.optimizer_G, self.optimizer_D)
             
-            self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D, self.optimizer_G, self.ndims, self.l1_lambda, self.identity_lambda, padding, self.gan_mode)
+            self.loss = CycleGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D, self.optimizer_G, self.ndims, self.l1_lambda, self.identity_lambda, self.gan_mode)
         
         elif self.loss_style.lower()=='split':
         
@@ -419,7 +385,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas)
             self.optimizer = Split_CycleGAN_Optimizer(self.optimizer_G1, self.optimizer_G2, self.optimizer_D)
 
-            self.loss = SplitGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G1, self.optimizer_G2, self.optimizer_D, self.ndims, self.l1_lambda, self.identity_lambda, padding, self.gan_mode)
+            self.loss = SplitGAN_Loss(self.l1_loss, self.gan_loss, self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G1, self.optimizer_G2, self.optimizer_D, self.ndims, self.l1_lambda, self.identity_lambda, self.gan_mode)
 
         else:
 

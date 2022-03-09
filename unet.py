@@ -6,24 +6,29 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from utils import NoiseBlock
 
 class ConvPass(torch.nn.Module):
 
     def __init__(
             self,
-            in_channels,
-            out_channels,
+            input_nc,
+            output_nc,
             kernel_sizes,
             activation,
             padding='valid',
             residual=False,
-            padding_mode='reflect'
+            padding_mode='reflect',
+            norm_layer=None
             ):
 
         super(ConvPass, self).__init__()
 
         if activation is not None:
-            self.activation = getattr(torch.nn, activation)()
+            if isinstance(activation, str):
+                self.activation = getattr(torch.nn, activation)()
+            else:
+                self.activation = activation # assume is function
         else:
             self.activation = nn.Identity()
 
@@ -50,21 +55,21 @@ class ConvPass(torch.nn.Module):
             try:
                 layers.append(
                     conv(
-                        in_channels,
-                        out_channels,
+                        input_nc,
+                        output_nc,
                         kernel_size,
                         padding=padding, 
                         # padding=pad, 
                         padding_mode=padding_mode
                         ))
                 if residual and i == 0:
-                    if in_channels < out_channels: 
-                        groups = in_channels
+                    if input_nc < output_nc: 
+                        groups = input_nc
                     else: 
-                        groups = out_channels
+                        groups = output_nc
                     self.x_init_map = conv(
-                                in_channels,
-                                out_channels,
+                                input_nc,
+                                output_nc,
                                 np.ones(self.dims, dtype=int),
                                 padding=padding, 
                                 # padding=pad, 
@@ -74,11 +79,14 @@ class ConvPass(torch.nn.Module):
                                 )
             except KeyError:
                 raise RuntimeError("%dD convolution not implemented" % self.dims)
-
-            in_channels = out_channels
+            
+            if norm_layer is not None:
+                layers.append(norm_layer(output_nc))
 
             if not (residual and i == (len(kernel_sizes) - 1)):
                 layers.append(self.activation)            
+
+            input_nc = output_nc
 
         self.conv_pass = torch.nn.Sequential(*layers)
 
@@ -163,8 +171,8 @@ class Upsample(torch.nn.Module):
             self,
             scale_factor,
             mode=None,
-            in_channels=None,
-            out_channels=None,
+            input_nc=None,
+            output_nc=None,
             crop_factor=None,
             next_conv_kernel_sizes=None):
 
@@ -185,8 +193,8 @@ class Upsample(torch.nn.Module):
             }[self.dims]
 
             self.up = up(
-                in_channels,
-                out_channels,
+                input_nc,
+                output_nc,
                 kernel_size=scale_factor,
                 stride=scale_factor)
 
@@ -290,21 +298,21 @@ class UNet(torch.nn.Module):
 
     def __init__(
             self,
-            in_channels,
-            num_fmaps,
+            input_nc,
+            ngf,
             fmap_inc_factor,
             downsample_factors,
             kernel_size_down=None,
             kernel_size_up=None,
             activation='ReLU',
-            fov=(1, 1, 1),
-            voxel_size=(1, 1, 1),
-            num_fmaps_out=None,
+            output_nc=None,
             num_heads=1,
             constant_upsample=False,
             padding='valid',
             residual=False,
-            norm_layer=None):
+            norm_layer=None,
+            add_noise=False
+            ):
         '''Create a U-Net::
 
             f_in --> f_left --------------------------->> f_right--> f_out
@@ -330,11 +338,11 @@ class UNet(torch.nn.Module):
 
         Args:
 
-            in_channels:
+            input_nc:
 
                 The number of input channels.
 
-            num_fmaps:
+            ngf:
 
                 The number of feature maps in the first layer. By default, this is also the
                 number of output feature maps. Stored in the ``channels``
@@ -374,15 +382,7 @@ class UNet(torch.nn.Module):
                 of any tensorflow activation function (e.g., ``ReLU`` for
                 ``torch.nn.ReLU``).
 
-            fov (optional):
-
-                Initial field of view in physical units
-
-            voxel_size (optional):
-
-                Size of a voxel in the input data, in physical units
-
-            num_fmaps_out (optional):
+            output_nc (optional):
 
                 The number of feature maps in the output layer. By default, this is the same as the
                 number of feature maps of the input layer. Stored in the ``channels``
@@ -413,9 +413,10 @@ class UNet(torch.nn.Module):
         self.ndims = len(downsample_factors[0])
         self.num_levels = len(downsample_factors) + 1
         self.num_heads = num_heads
-        self.in_channels = in_channels
-        self.out_channels = num_fmaps_out if num_fmaps_out else num_fmaps
+        self.input_nc = input_nc
+        self.output_nc = output_nc if output_nc else ngf
         self.residual = residual
+        self.noise_layer = NoiseBlock if add_noise else None
         # default arguments
 
         if kernel_size_down is None:
@@ -446,14 +447,15 @@ class UNet(torch.nn.Module):
         # left convolutional passes
         self.l_conv = nn.ModuleList([
             ConvPass(
-                in_channels
+                input_nc
                 if level == 0
-                else num_fmaps*fmap_inc_factor**(level - 1),
-                num_fmaps*fmap_inc_factor**level,
+                else ngf*fmap_inc_factor**(level - 1),
+                ngf*fmap_inc_factor**level,
                 kernel_size_down[level],
                 activation=activation,
                 padding=padding,
-                residual=self.residual)
+                residual=self.residual,
+                norm_layer=norm_layer)
             for level in range(self.num_levels)
         ])
         self.dims = self.l_conv[0].dims
@@ -470,8 +472,8 @@ class UNet(torch.nn.Module):
                 Upsample(
                     downsample_factors[level],
                     mode='nearest' if constant_upsample else 'transposed_conv',
-                    in_channels=num_fmaps*fmap_inc_factor**(level + 1),
-                    out_channels=num_fmaps*fmap_inc_factor**(level + 1),
+                    input_nc=ngf*fmap_inc_factor**(level + 1) + (level==1 and add_noise),
+                    output_nc=ngf*fmap_inc_factor**(level + 1),
                     crop_factor=crop_factors[level],
                     next_conv_kernel_sizes=kernel_size_up[level])
                 for level in range(self.num_levels - 1)
@@ -483,15 +485,16 @@ class UNet(torch.nn.Module):
         self.r_conv = nn.ModuleList([
             nn.ModuleList([
                 ConvPass(
-                    num_fmaps*fmap_inc_factor**level +
-                    num_fmaps*fmap_inc_factor**(level + 1),
-                    num_fmaps*fmap_inc_factor**level
-                    if num_fmaps_out is None or level != 0
-                    else num_fmaps_out,
+                    ngf*fmap_inc_factor**level +
+                    ngf*fmap_inc_factor**(level + 1),
+                    ngf*fmap_inc_factor**level
+                    if output_nc is None or level != 0
+                    else output_nc,
                     kernel_size_up[level],
                     activation=activation,
                     padding=padding,
-                    residual=self.residual)
+                    residual=self.residual,
+                    norm_layer=norm_layer)
                 for level in range(self.num_levels - 1)
             ])
             for _ in range(num_heads)
@@ -507,7 +510,9 @@ class UNet(torch.nn.Module):
 
         # end of recursion
         if level == 0:
-
+            
+            if self.noise_layer is not None:
+                f_left = self.noise_layer(f_left)
             fs_out = [f_left]*self.num_heads
 
         else:

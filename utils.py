@@ -4,6 +4,8 @@
 import functools
 import torch
 import torch.nn as nn
+import torch.functional as F
+from torch import Tensor
 from torch.nn import init
 
 class NLayerDiscriminator(nn.Module):
@@ -51,6 +53,26 @@ class NLayerDiscriminator(nn.Module):
 
         sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
         self.model = nn.Sequential(*sequence)
+
+    @property
+    def FOV(self):
+        # Returns the receptive field of one output neuron for a network (written for patch discriminators)
+        # See https://distill.pub/2019/computing-receptive-fields/#solving-receptive-field-region for formula derivation
+        
+        L = 0 # num of layers
+        k = [] # [kernel width at layer l]
+        s = [] # [stride at layer i]
+        for layer in self.model:
+            if hasattr(layer, 'kernel_size'):
+                L += 1
+                k += [layer.kernel_size[-1]]
+                s += [layer.stride[-1]]
+        
+        r = 1
+        for l in range(L-1, 0, -1):
+            r = s[l]*r + (k[l] - s[l])
+
+        return r
 
     def forward(self, input):
         """Standard forward."""
@@ -118,7 +140,7 @@ class GANLoss(nn.Module):
         return loss
 
 
-def init_weights(net, init_type='normal', init_gain=0.02):
+def init_weights(net, init_type='normal', init_gain=0.02, nonlinearity='relu'):
     """Initialize network weights.
     Parameters:
         net (network)   -- network to be initialized
@@ -151,11 +173,11 @@ def init_weights(net, init_type='normal', init_gain=0.02):
 
 
 class ResnetGenerator(nn.Module):
-    """Resnet-based generator that consists of Resnet blocks between a few downsampling/upsampling operations.
+    """Resnet-based generator that consists of Resnet blocks between a few downsampling/upsampling operations, and (optionally) the injection of a feature map of random noise into the first upsampling layer.
     We adapt Torch code and idea from Justin Johnson's neural style transfer project(https://github.com/jcjohnson/fast-neural-style)
     """
 
-    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='reflect'):
+    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='reflect', activation=nn.ReLU, add_noise=False):
         """Construct a Resnet-based generator
         Parameters:
             input_nc (int)      -- the number of channels in input images
@@ -165,6 +187,8 @@ class ResnetGenerator(nn.Module):
             use_dropout (bool)  -- if use dropout layers
             n_blocks (int)      -- the number of ResNet blocks
             padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zero
+            activation          -- non-linearity layer to apply (default is ReLU)
+            add_noise (bool)    -- whether to append a noise feature to the data prior to upsampling layers
         """
         assert(n_blocks >= 0)
         super(ResnetGenerator, self).__init__()
@@ -183,28 +207,32 @@ class ResnetGenerator(nn.Module):
         model = [padder,
                  nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
                  norm_layer(ngf),
-                 nn.ReLU(True)]
+                 activation(True)]
 
         n_downsampling = 2
         for i in range(n_downsampling):  # add downsampling layers
             mult = 2 ** i
             model += [nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
                       norm_layer(ngf * mult * 2),
-                      nn.ReLU(True)]
+                      activation(True)]
 
         mult = 2 ** n_downsampling
         for i in range(n_blocks):       # add ResNet blocks
 
-            model += [ResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
+            model += [ResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias, activation=activation)]
+
+        if add_noise:                   # add noise feature if necessary
+            model += [NoiseBlock()]
 
         for i in range(n_downsampling):  # add upsampling layers
             mult = 2 ** (n_downsampling - i)
-            model += [nn.ConvTranspose2d(ngf * mult, int(ngf * mult / 2),
+            model += [nn.ConvTranspose2d(ngf * mult + (i==0 and add_noise), 
+                                         int(ngf * mult / 2),
                                          kernel_size=3, stride=2,
                                          padding=1, output_padding=1,
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
-                      nn.ReLU(True)]
+                      activation(True)]
         model += [padder]
         model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
         model += [nn.Tanh()]
@@ -216,10 +244,23 @@ class ResnetGenerator(nn.Module):
         return self.model(input)
 
 
+class NoiseBlock(nn.Module):
+    """Definies a block for producing and appending a feature map of gaussian noise with mean=0 and stdev=1"""
+
+    def __init__(self):
+        super(NoiseBlock, self).__init__()
+
+    def forward(self, x):
+        shape = list(x.shape)
+        shape[1] = 1 # only make one noise feature
+        noise = torch.empty(shape, device=x.device).normal_()
+        return torch.cat([x, noise.requires_grad_()], 1)
+
+
 class ResnetBlock(nn.Module):
     """Define a Resnet block"""
 
-    def __init__(self, dim, padding_type, norm_layer, use_dropout, use_bias):
+    def __init__(self, dim, padding_type, norm_layer, use_dropout, use_bias, activation=nn.ReLU):
         """Initialize the Resnet block
         A resnet block is a conv block with skip connections
         We construct a conv block with build_conv_block function,
@@ -227,9 +268,9 @@ class ResnetBlock(nn.Module):
         Original Resnet paper: https://arxiv.org/pdf/1512.03385.pdf
         """
         super(ResnetBlock, self).__init__()
-        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_dropout, use_bias)
+        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_dropout, use_bias, activation)
 
-    def build_conv_block(self, dim, padding_type, norm_layer, use_dropout, use_bias):
+    def build_conv_block(self, dim, padding_type, norm_layer, use_dropout, use_bias, activation=nn.ReLU):
         """Construct a convolutional block.
         Parameters:
             dim (int)           -- the number of channels in the conv layer.
@@ -237,7 +278,8 @@ class ResnetBlock(nn.Module):
             norm_layer          -- normalization layer
             use_dropout (bool)  -- if use dropout layers.
             use_bias (bool)     -- if the conv layer uses bias or not
-        Returns a conv block (with a conv layer, a normalization layer, and a non-linearity layer (ReLU))
+            activation          -- non-linearity layer to apply (default is ReLU)
+        Returns a conv block (with a conv layer, a normalization layer, and a non-linearity layer)
         """
         conv_block = []
         p = 0
@@ -250,7 +292,7 @@ class ResnetBlock(nn.Module):
         else:
             raise NotImplementedError('padding [%s] is not implemented' % padding_type)
 
-        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), nn.ReLU(True)]
+        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation(True)]
         if use_dropout:
             conv_block += [nn.Dropout(0.5)]
 
@@ -534,11 +576,11 @@ class NLayerDiscriminator3D(nn.Module):
 
 
 class ResnetGenerator3D(nn.Module):
-    """Resnet-based generator that consists of Resnet blocks between a few downsampling/upsampling operations.
+    """Resnet-based generator that consists of Resnet blocks between a few downsampling/upsampling operations, and (optionally) the injection of a feature map of random noise into the first upsampling layer.
     We adapt Torch code and idea from Justin Johnson's neural style transfer project(https://github.com/jcjohnson/fast-neural-style)
     """
 
-    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm3d, use_dropout=False, n_blocks=6, padding_type='reflect'):
+    def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm3d, use_dropout=False, n_blocks=6, padding_type='reflect', activation=nn.ReLU, add_noise=False):
         """Construct a Resnet-based generator
         Parameters:
             input_nc (int)      -- the number of channels in input images
@@ -548,6 +590,8 @@ class ResnetGenerator3D(nn.Module):
             use_dropout (bool)  -- if use dropout layers
             n_blocks (int)      -- the number of ResNet blocks
             padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zero
+            activation          -- non-linearity layer to apply (default is ReLU)
+            add_noise (bool)    -- whether to append a noise feature to the data prior to upsampling layers
         """
         assert(n_blocks >= 0)
         super(ResnetGenerator3D, self).__init__()
@@ -567,28 +611,32 @@ class ResnetGenerator3D(nn.Module):
                  padder,
                  nn.Conv3d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
                  norm_layer(ngf),
-                 nn.ReLU(True)]
+                 activation(True)]
 
         n_downsampling = 2
         for i in range(n_downsampling):  # add downsampling layers
             mult = 2 ** i
             model += [nn.Conv3d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
                       norm_layer(ngf * mult * 2),
-                      nn.ReLU(True)]
+                      activation(True)]
 
         mult = 2 ** n_downsampling
         for i in range(n_blocks):       # add ResNet blocks
 
-            model += [ResnetBlock3D(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
+            model += [ResnetBlock3D(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias, activation=activation)]
+
+        if add_noise:                   # add noise feature if necessary
+            model += [NoiseBlock()]
 
         for i in range(n_downsampling):  # add upsampling layers
             mult = 2 ** (n_downsampling - i)
-            model += [nn.ConvTranspose3d(ngf * mult, int(ngf * mult / 2),
+            model += [nn.ConvTranspose3d(ngf * mult + (i==0 and add_noise),
+                                         int(ngf * mult / 2),
                                          kernel_size=3, stride=2,
                                          padding=1, output_padding=1,
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
-                      nn.ReLU(True)]
+                      activation(True)]
         model += [padder]
         model += [nn.Conv3d(ngf, output_nc, kernel_size=7, padding=0)]
         model += [nn.Tanh()]
@@ -603,7 +651,7 @@ class ResnetGenerator3D(nn.Module):
 class ResnetBlock3D(nn.Module):
     """Define a Resnet block"""
 
-    def __init__(self, dim, padding_type, norm_layer, use_dropout, use_bias):
+    def __init__(self, dim, padding_type, norm_layer, use_dropout, use_bias, activation=nn.ReLU):
         """Initialize the Resnet block
         A resnet block is a conv block with skip connections
         We construct a conv block with build_conv_block function,
@@ -611,9 +659,9 @@ class ResnetBlock3D(nn.Module):
         Original Resnet paper: https://arxiv.org/pdf/1512.03385.pdf
         """
         super(ResnetBlock3D, self).__init__()
-        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_dropout, use_bias)
+        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_dropout, use_bias, activation)
 
-    def build_conv_block(self, dim, padding_type, norm_layer, use_dropout, use_bias):
+    def build_conv_block(self, dim, padding_type, norm_layer, use_dropout, use_bias, activation=nn.ReLU):
         """Construct a convolutional block.
         Parameters:
             dim (int)           -- the number of channels in the conv layer.
@@ -621,7 +669,8 @@ class ResnetBlock3D(nn.Module):
             norm_layer          -- normalization layer
             use_dropout (bool)  -- if use dropout layers.
             use_bias (bool)     -- if the conv layer uses bias or not
-        Returns a conv block (with a conv layer, a normalization layer, and a non-linearity layer (ReLU))
+            activation          -- non-linearity layer to apply (default is ReLU)
+        Returns a conv block (with a conv layer, a normalization layer, and a non-linearity layer)
         """
         conv_block = []
         p = 0
@@ -634,7 +683,7 @@ class ResnetBlock3D(nn.Module):
         else:
             raise NotImplementedError('padding [%s] is not implemented' % padding_type)
 
-        conv_block += [nn.Conv3d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), nn.ReLU(True)]
+        conv_block += [nn.Conv3d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation(True)]
         if use_dropout:
             conv_block += [nn.Dropout(0.5)]
 
@@ -655,6 +704,5 @@ class ResnetBlock3D(nn.Module):
         """Forward function (with skip connections)"""
         out = x + self.conv_block(x)  # add skip connections
         return out
-
 
 
