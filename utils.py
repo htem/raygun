@@ -186,7 +186,7 @@ class ResnetGenerator(nn.Module):
             norm_layer          -- normalization layer
             use_dropout (bool)  -- if use dropout layers
             n_blocks (int)      -- the number of ResNet blocks
-            padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zero
+            padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zero | valid
             activation          -- non-linearity layer to apply (default is ReLU)
             add_noise (bool)    -- whether to append a noise feature to the data prior to upsampling layers
         """
@@ -197,29 +197,36 @@ class ResnetGenerator(nn.Module):
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
 
+        p = 0
+        updown_p = 1
+        padder = []
         if padding_type.lower() == 'reflect':
-            padder = nn.ReflectionPad2d(3)
+            padder = [nn.ReflectionPad2d(3)]
         elif padding_type.lower() == 'replicate':
-            padder = nn.ReplicationPad2d(3)
+            padder = [nn.ReplicationPad2d(3)]
         elif padding_type.lower() == 'zero':
-            padder = nn.ConstantPad2d(3, 0)                        
+            p = 3
+        elif padding_type.lower() == 'valid':
+            p = 'valid'
+            updown_p = 0
 
-        model = [padder,
-                 nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
+
+        model = padder
+        model += [nn.Conv2d(input_nc, ngf, kernel_size=7, padding=p, bias=use_bias),
                  norm_layer(ngf),
                  activation(True)]
 
         n_downsampling = 2
         for i in range(n_downsampling):  # add downsampling layers
             mult = 2 ** i
-            model += [nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
+            model += [nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=updown_p, bias=use_bias),
                       norm_layer(ngf * mult * 2),
                       activation(True)]
 
         mult = 2 ** n_downsampling
         for i in range(n_blocks):       # add ResNet blocks
 
-            model += [ResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias, activation=activation)]
+            model += [ResnetBlock(ngf * mult, padding_type=padding_type.lower(), norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias, activation=activation)]
 
         if add_noise:                   # add noise feature if necessary
             model += [NoiseBlock()]
@@ -229,12 +236,12 @@ class ResnetGenerator(nn.Module):
             model += [nn.ConvTranspose2d(ngf * mult + (i==0 and add_noise), 
                                          int(ngf * mult / 2),
                                          kernel_size=3, stride=2,
-                                         padding=1, output_padding=1,
+                                         padding=updown_p, output_padding=updown_p,
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
                       activation(True)]
         model += [padder]
-        model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
+        model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=p)]
         model += [nn.Tanh()]
 
         self.model = nn.Sequential(*model)
@@ -274,37 +281,34 @@ class ResnetBlock(nn.Module):
         """Construct a convolutional block.
         Parameters:
             dim (int)           -- the number of channels in the conv layer.
-            padding_type (str)  -- the name of padding layer: reflect | replicate | zero
+            padding_type (str)  -- the name of padding layer: reflect | replicate | zero | valid
             norm_layer          -- normalization layer
             use_dropout (bool)  -- if use dropout layers.
             use_bias (bool)     -- if the conv layer uses bias or not
             activation          -- non-linearity layer to apply (default is ReLU)
         Returns a conv block (with a conv layer, a normalization layer, and a non-linearity layer)
         """
-        conv_block = []
         p = 0
+        padder = []
         if padding_type == 'reflect':
-            conv_block += [nn.ReflectionPad2d(1)]
+            padder = [nn.ReflectionPad2d(1)]
         elif padding_type == 'replicate':
-            conv_block += [nn.ReplicationPad2d(1)]
+            padder = [nn.ReplicationPad2d(1)]
         elif padding_type == 'zero':
             p = 1
+        elif padding_type == 'valid':
+            p = 'valid'
         else:
             raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+        
+        conv_block = []
+        conv_block += padder
 
         conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation(True)]
         if use_dropout:
             conv_block += [nn.Dropout(0.5)]
-
-        p = 0
-        if padding_type == 'reflect':
-            conv_block += [nn.ReflectionPad2d(1)]
-        elif padding_type == 'replicate':
-            conv_block += [nn.ReplicationPad2d(1)]
-        elif padding_type == 'zero':
-            p = 1
-        else:
-            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+        
+        conv_block += padder
         conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim)]
 
         return nn.Sequential(*conv_block)
