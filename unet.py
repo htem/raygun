@@ -308,7 +308,7 @@ class UNet(torch.nn.Module):
             output_nc=None,
             num_heads=1,
             constant_upsample=False,
-            padding='valid',
+            padding_type='valid',
             residual=False,
             norm_layer=None,
             add_noise=False,
@@ -399,7 +399,7 @@ class UNet(torch.nn.Module):
                 If set to true, perform a constant upsampling instead of a
                 transposed convolution in the upsampling layers.
 
-            padding (optional):
+            padding_type (optional):
 
                 How to pad convolutions. Either 'same' or 'valid' (default).
 
@@ -428,17 +428,17 @@ class UNet(torch.nn.Module):
         crop_factors = []
         factor_product = None
         for factor in downsample_factors[::-1]:
-            if padding.lower() == 'valid':
+            if padding_type.lower() == 'valid':
                 if factor_product is None:
                     factor_product = list(factor)
                 else:
                     factor_product = list(
                         f*ff
                         for f, ff in zip(factor, factor_product))
-            elif padding.lower() == 'same':
+            elif padding_type.lower() == 'same':
                 factor_product = None
             else:
-                raise f'Invalid padding option: {padding}'
+                raise f'Invalid padding_type option: {padding_type}'
             crop_factors.append(factor_product)
         crop_factors = crop_factors[::-1]
 
@@ -453,7 +453,7 @@ class UNet(torch.nn.Module):
                 ngf*fmap_inc_factor**level,
                 kernel_size_down[level],
                 activation=activation,
-                padding=padding,
+                padding=padding_type,
                 residual=self.residual,
                 norm_layer=norm_layer)
             for level in range(self.num_levels)
@@ -492,7 +492,7 @@ class UNet(torch.nn.Module):
                     else output_nc,
                     kernel_size_up[level],
                     activation=activation,
-                    padding=padding,
+                    padding=padding_type,
                     residual=self.residual,
                     norm_layer=norm_layer)
                 for level in range(self.num_levels - 1)
