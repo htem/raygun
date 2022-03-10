@@ -47,11 +47,6 @@ class ConvPass(torch.nn.Module):
                 4: Conv4d
             }[self.dims]
 
-            # if padding == 'same':
-            #     pad = tuple(k//2 for k in kernel_size)
-            # else:
-            #     pad = 0
-
             try:
                 layers.append(
                     conv(
@@ -59,7 +54,6 @@ class ConvPass(torch.nn.Module):
                         output_nc,
                         kernel_size,
                         padding=padding, 
-                        # padding=pad, 
                         padding_mode=padding_mode
                         ))
                 if residual and i == 0:
@@ -72,7 +66,6 @@ class ConvPass(torch.nn.Module):
                                 output_nc,
                                 np.ones(self.dims, dtype=int),
                                 padding=padding, 
-                                # padding=pad, 
                                 padding_mode=padding_mode,
                                 bias=False,
                                 groups=groups
@@ -116,52 +109,90 @@ class ConvPass(torch.nn.Module):
                 init_x = self.x_init_map(x)
             return self.activation(init_x + res)            
 
+class ConvDownsample(torch.nn.Module):
 
-class Downsample(torch.nn.Module):
+    def __init__(
+            self,
+            input_nc,
+            output_nc,
+            kernel_sizes,
+            downsample_factor,
+            activation,
+            padding='valid',
+            padding_mode='reflect',
+            norm_layer=None
+            ):
+
+        super(ConvDownsample, self).__init__()
+
+        if activation is not None:
+            if isinstance(activation, str):
+                self.activation = getattr(torch.nn, activation)()
+            else:
+                self.activation = activation() # assume is function
+        else:
+            self.activation = nn.Identity()
+
+        self.padding = padding
+
+        layers = []
+
+        self.dims = len(kernel_sizes)
+
+        conv = {
+            2: torch.nn.Conv2d,
+            3: torch.nn.Conv3d,
+            4: Conv4d
+        }[self.dims]
+
+        try:
+            layers.append(
+                conv(
+                    input_nc,
+                    output_nc,
+                    kernel_sizes,
+                    stride=downsample_factor,
+                    padding=padding, 
+                    padding_mode=padding_mode
+                    ))
+                    
+        except KeyError:
+            raise RuntimeError("%dD convolution not implemented" % self.dims)
+        
+        if norm_layer is not None:
+            layers.append(norm_layer(output_nc))
+
+        layers.append(self.activation)            
+        self.conv_pass = torch.nn.Sequential(*layers)
+        
+    def forward(self, x):
+        return self.conv_pass(x)
+
+class MaxDownsample(torch.nn.Module):
 
     def __init__(
             self,
             downsample_factor,
-            flexible=True,
-            method='max'): 
+            flexible=True): 
             # flexible=True allows torch.nn.MaxPoolNd to crop the right/bottom of tensors in order to allow pooling of tensors not evenly divisible by the downsample_factor. Alternative implementations could pass 'ceil_mode=True' or 'padding= {# > 0}' to avoid cropping of inputs.
             # flexible=False forces inputs to be evenly divisible by the downsample_factor, which generally restricts the flexibility of model architectures.
 
-        super(Downsample, self).__init__()
+        super(MaxDownsample, self).__init__()
 
         self.dims = len(downsample_factor)
         self.downsample_factor = downsample_factor
         self.flexible = flexible
 
-        if method.lower() == 'max':
+        pool = {
+            2: torch.nn.MaxPool2d,
+            3: torch.nn.MaxPool3d,
+            4: torch.nn.MaxPool3d  # only 3D pooling, even for 4D input
+        }[self.dims]
 
-            pool = {
-                2: torch.nn.MaxPool2d,
-                3: torch.nn.MaxPool3d,
-                4: torch.nn.MaxPool3d  # only 3D pooling, even for 4D input
-            }[self.dims]
-
-            self.down = pool(
-                downsample_factor,
-                stride=downsample_factor,
-                )
-                
-        elif method.lower() == 'convolve':
-            
-            pool = {
-                2: torch.nn.Conv2d,
-                3: torch.nn.Conv3d,
-                4: torch.nn.Conv3d  # only 3D pooling, even for 4D input
-            }[self.dims]
-
-            self.down = pool(
-                kernel_size=downsample_factor+1,
-                stride=downsample_factor,
-                )
-            
-        else:
-
-            raise RuntimeError(f'Downsampling method {method} not supported, use "max" or "convolve"')
+        self.down = pool(
+            downsample_factor,
+            stride=downsample_factor,
+            )
 
     def forward(self, x):
         if self.flexible:
@@ -328,6 +359,7 @@ class UNet(torch.nn.Module):
             output_nc=None,
             num_heads=1,
             constant_upsample=False,
+            downsample_method='max',
             padding_type='valid',
             residual=False,
             norm_layer=None,
@@ -419,6 +451,10 @@ class UNet(torch.nn.Module):
                 If set to true, perform a constant upsampling instead of a
                 transposed convolution in the upsampling layers.
 
+            downsample_method (optional):
+
+                Whether to use max pooling ('max') or strided convolution ('convolve') for downsampling layers. Default is max pooling.
+
             padding_type (optional):
 
                 How to pad convolutions. Either 'same' or 'valid' (default).
@@ -469,7 +505,7 @@ class UNet(torch.nn.Module):
             ConvPass(
                 input_nc
                 if level == 0
-                else ngf*fmap_inc_factor**(level - 1),
+                else ngf*fmap_inc_factor**(level - (downsample_method.lower() == 'max')),
                 ngf*fmap_inc_factor**level,
                 kernel_size_down[level],
                 activation=activation,
@@ -481,10 +517,30 @@ class UNet(torch.nn.Module):
         self.dims = self.l_conv[0].dims
 
         # left downsample layers
-        self.l_down = nn.ModuleList([
-            Downsample(downsample_factors[level])
-            for level in range(self.num_levels - 1)
-        ])
+        if downsample_method.lower() == 'max':
+
+            self.l_down = nn.ModuleList([
+                MaxDownsample(downsample_factors[level])
+                for level in range(self.num_levels - 1)
+            ])
+        
+        elif downsample_method.lower() == 'convolve':
+            
+            self.l_down = nn.ModuleList([
+                ConvDownsample(
+                            ngf*fmap_inc_factor**level,
+                            ngf*fmap_inc_factor**(level + 1),
+                            kernel_size_down[level][0],
+                            downsample_factors[level],
+                            activation=activation,
+                            padding=padding_type,
+                            norm_layer=norm_layer)
+                for level in range(self.num_levels - 1)
+            ])
+        
+        else:
+
+            raise RuntimeError(f'Unknown downsampling method {downsample_method}. Use "max" or "convolve" instead.')
 
         # right up/crop/concatenate layers
         self.r_up = nn.ModuleList([
