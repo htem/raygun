@@ -320,7 +320,7 @@ class ResnetBlock(nn.Module):
         x_target_size = x.size()[:-2] + shape
 
         offset = tuple(
-            (a - b)//2
+            (a - b) // 2
             for a, b in zip(x.size(), x_target_size))
 
         slices = tuple(

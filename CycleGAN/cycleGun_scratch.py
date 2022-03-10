@@ -7,11 +7,12 @@ sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/
 # from CycleGun20220304XNH2EM_apply_cb2SynapseCutout1_ import *
 # from SplitCycleGun20220304XNH2EM_apply_cb2SynapseCutout1_ import *
 # from SplitCycleGun20220308XNH2EM_apply_cb2SynapseCutout1_ import *
-# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220309seluSplitNoise_train import *
+from CycleGun_CBv30nmBottom100um_cb2gcl1_20220309seluSplitNoise_train import *
+# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220309seluSplit_train import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310unetSplitNoise_train import *
-from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310splitUnetConvDown_train import *
+# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310splitUnetConvDown_train import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310unet_train import *
-# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310validSplitResWasser_train import *
+# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310validSplitResWasserSeluNoise_train import *
 import matplotlib.pyplot as plt
 import zarr
 
@@ -19,8 +20,8 @@ import zarr
 batch = cycleGun.test_train()
 
 # %%
-batch = cycleGun.test_prediction('B', side_length=400, cycle=True)
-batch = cycleGun.test_prediction('A', side_length=400, cycle=True)
+batch = cycleGun.test_prediction('B', side_length=401, cycle=True)
+batch = cycleGun.test_prediction('A', side_length=401, cycle=True)
 
 # %%
 # cycleGun.model.eval()
@@ -52,6 +53,27 @@ fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fak
 plt.figure(figsize=(10,10))
 plt.imshow(fake_comb, cmap='gray')#, vmin=fake.min(), vmax=fake.max())
 
+# %% Weight analyses:
+weights = cycleGun.netG1.model[20].weight.detach()
+
+in_hists = []
+for weight in weights:
+    in_hists += [torch.histc(abs(weight))]
+in_hists = torch.cat(in_hists).reshape((len(in_hists), len(in_hists[0])))
+
+plt.figure(figsize=(10,10))
+plt.imshow(in_hists.detach())
+plt.colorbar()
+
+#%% 
+out_hists = []
+for weight in weights.permute((1,0,2,3)):
+    out_hists += [torch.histc(abs(weight))]
+out_hists = torch.cat(out_hists).reshape((len(out_hists), len(out_hists[0])))
+
+plt.figure(figsize=(10,10))
+plt.imshow(out_hists.detach())
+plt.colorbar()
 
 #%%
 request = gp.BatchRequest()
