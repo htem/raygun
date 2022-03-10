@@ -244,7 +244,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if side_length is None:
             side_length = self.side_length
 
-        if ('padding' in self.gnet_kwargs) and (self.gnet_kwargs['padding'].lower() == 'valid'):
+        if ('padding_type' in self.gnet_kwargs) and (self.gnet_kwargs['padding_type'].lower() == 'valid'):
             if array_name is not None and not ('real' in array_name.lower() or 'mask' in array_name.lower()):
                 shape = (1,1) + (side_length,) * self.ndims
                 pars = [par for par in self.netG1.parameters()]
@@ -280,7 +280,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
             generator = torch.nn.Sequential(
                                 UNet(**self.gnet_kwargs),
-                                # ConvPass(self.gnet_kwargs['ngf'], self.gnet_kwargs['output_nc'], [(1,)*self.ndims], activation=None, padding=self.gnet_kwargs['padding']), 
+                                # ConvPass(self.gnet_kwargs['ngf'], self.gnet_kwargs['output_nc'], [(1,)*self.ndims], activation=None, padding=self.gnet_kwargs['padding_type']), 
                                 torch.nn.Tanh()
                                 )
         
@@ -400,7 +400,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.cache = gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)#os.cpu_count())
 
         # define axes for mirroring and transpositions
-        self.augment_axes = list(np.arange(3)[-self.ndims:])
+        self.augment_axes = list(np.arange(3)[-self.ndims:]) #TODO: Maybe limit to xy?
 
         # build datapipes
         self.datapipe_A = self.get_datapipe('A')

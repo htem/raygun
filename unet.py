@@ -122,7 +122,8 @@ class Downsample(torch.nn.Module):
     def __init__(
             self,
             downsample_factor,
-            flexible=True): 
+            flexible=True,
+            method='max'): 
             # flexible=True allows torch.nn.MaxPoolNd to crop the right/bottom of tensors in order to allow pooling of tensors not evenly divisible by the downsample_factor. Alternative implementations could pass 'ceil_mode=True' or 'padding= {# > 0}' to avoid cropping of inputs.
             # flexible=False forces inputs to be evenly divisible by the downsample_factor, which generally restricts the flexibility of model architectures.
 
@@ -132,16 +133,35 @@ class Downsample(torch.nn.Module):
         self.downsample_factor = downsample_factor
         self.flexible = flexible
 
-        pool = {
-            2: torch.nn.MaxPool2d,
-            3: torch.nn.MaxPool3d,
-            4: torch.nn.MaxPool3d  # only 3D pooling, even for 4D input
-        }[self.dims]
+        if method.lower() == 'max':
 
-        self.down = pool(
-            downsample_factor,
-            stride=downsample_factor,
-            )
+            pool = {
+                2: torch.nn.MaxPool2d,
+                3: torch.nn.MaxPool3d,
+                4: torch.nn.MaxPool3d  # only 3D pooling, even for 4D input
+            }[self.dims]
+
+            self.down = pool(
+                downsample_factor,
+                stride=downsample_factor,
+                )
+                
+        elif method.lower() == 'convolve':
+            
+            pool = {
+                2: torch.nn.Conv2d,
+                3: torch.nn.Conv3d,
+                4: torch.nn.Conv3d  # only 3D pooling, even for 4D input
+            }[self.dims]
+
+            self.down = pool(
+                kernel_size=downsample_factor+1,
+                stride=downsample_factor,
+                )
+            
+        else:
+
+            raise RuntimeError(f'Downsampling method {method} not supported, use "max" or "convolve"')
 
     def forward(self, x):
         if self.flexible:

@@ -240,7 +240,7 @@ class ResnetGenerator(nn.Module):
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
                       activation(True)]
-        model += [padder]
+        model += padder
         model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=p)]
         model += [nn.Tanh()]
 
@@ -276,6 +276,7 @@ class ResnetBlock(nn.Module):
         """
         super(ResnetBlock, self).__init__()
         self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_dropout, use_bias, activation)
+        self.padding_type = padding_type
 
     def build_conv_block(self, dim, padding_type, norm_layer, use_dropout, use_bias, activation=nn.ReLU):
         """Construct a convolutional block.
@@ -313,9 +314,28 @@ class ResnetBlock(nn.Module):
 
         return nn.Sequential(*conv_block)
 
+    def crop(self, x, shape):
+        '''Center-crop x to match spatial dimensions given by shape.'''
+
+        x_target_size = x.size()[:-2] + shape
+
+        offset = tuple(
+            (a - b)//2
+            for a, b in zip(x.size(), x_target_size))
+
+        slices = tuple(
+            slice(o, o + s)
+            for o, s in zip(offset, x_target_size))
+
+        return x[slices]
+
     def forward(self, x):
         """Forward function (with skip connections)"""
-        out = x + self.conv_block(x)  # add skip connections
+        if self.padding_type == 'valid': # crop for valid networks
+            res = self.conv_block(x)
+            out = self.crop(x, res.size()[-2:]) + res
+        else:
+            out = x + self.conv_block(x)  # add skip connections
         return out
 
 
@@ -608,9 +628,9 @@ class ResnetGenerator3D(nn.Module):
         updown_p = 1
         padder = []
         if padding_type.lower() == 'reflect':
-            padder = nn.ReflectionPad3d(3)
+            padder = [nn.ReflectionPad3d(3)]
         elif padding_type.lower() == 'replicate':
-            padder = nn.ReplicationPad3d(3)
+            padder = [nn.ReplicationPad3d(3)]
         elif padding_type.lower() == 'zeros':
             p = 3
         elif padding_type.lower() == 'valid':
@@ -647,7 +667,7 @@ class ResnetGenerator3D(nn.Module):
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
                       activation(True)]
-        model += [padder]
+        model += padder
         model += [nn.Conv3d(ngf, output_nc, kernel_size=7, padding=p)]
         model += [nn.Tanh()]
 
@@ -670,6 +690,7 @@ class ResnetBlock3D(nn.Module):
         """
         super(ResnetBlock3D, self).__init__()
         self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_dropout, use_bias, activation)
+        self.padding_type = padding_type
 
     def build_conv_block(self, dim, padding_type, norm_layer, use_dropout, use_bias, activation=nn.ReLU):
         """Construct a convolutional block.
@@ -707,9 +728,28 @@ class ResnetBlock3D(nn.Module):
 
         return nn.Sequential(*conv_block)
 
+    def crop(self, x, shape):
+        '''Center-crop x to match spatial dimensions given by shape.'''
+
+        x_target_size = x.size()[:-3] + shape
+
+        offset = tuple(
+            (a - b)//2
+            for a, b in zip(x.size(), x_target_size))
+
+        slices = tuple(
+            slice(o, o + s)
+            for o, s in zip(offset, x_target_size))
+
+        return x[slices]
+
     def forward(self, x):
         """Forward function (with skip connections)"""
-        out = x + self.conv_block(x)  # add skip connections
+        if self.padding_type == 'valid': # crop for valid networks
+            res = self.conv_block(x)
+            out = self.crop(x, res.size()[-3:]) + res
+        else:
+            out = x + self.conv_block(x)  # add skip connections
         return out
 
 
