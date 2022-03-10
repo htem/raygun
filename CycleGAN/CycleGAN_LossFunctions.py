@@ -117,8 +117,12 @@ class CycleGAN_Loss(torch.nn.Module):
         if self.identity_lambda > 0:
             identity_B = self.netG1(real_B)
             identity_A = self.netG2(real_A)
-            identity_loss_B = self.l1_loss(real_B, identity_B)#TODO: add ability to have unique loss function for identity
-            identity_loss_A = self.l1_loss(real_A, identity_A)
+            if real_A.size()[-self.dims:] != identity_A.size()[-self.dims:]:
+                identity_loss_B = self.l1_loss(self.crop(real_B, identity_B.size()[-self.dims:]), identity_B)
+                identity_loss_A = self.l1_loss(self.crop(real_A, identity_A.size()[-self.dims:]), identity_A)
+            else:
+                identity_loss_B = self.l1_loss(real_B, identity_B)#TODO: add ability to have unique loss function for identity
+                identity_loss_A = self.l1_loss(real_A, identity_A)
             self.loss_dict.update({
                 'Identity_Loss/A': float(identity_loss_A),                
                 'Identity_Loss/B': float(identity_loss_B),                
@@ -299,7 +303,10 @@ class SplitGAN_Loss(torch.nn.Module):
         #get identity loss (i.e. ||G_A(B) - B|| for G_A(A) --> B) and add if applicable
         if self.identity_lambda > 0:
             identity = Gnet(real)
-            identity_loss = self.l1_loss(real, identity)#TODO: add ability to have unique loss function for identity             
+            if real.size()[-self.dims:] != identity.size()[-self.dims:]:
+                identity_loss = self.l1_loss(self.crop(real, identity.size()[-self.dims:]), identity)
+            else:
+                identity_loss = self.l1_loss(real, identity)#TODO: add ability to have unique loss function for identity             
             self.loss_dict.update({
                 'Identity_Loss/'+side: float(identity_loss)            
             })

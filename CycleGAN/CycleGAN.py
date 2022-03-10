@@ -247,7 +247,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if ('padding' in self.gnet_kwargs) and (self.gnet_kwargs['padding'].lower() == 'valid'):
             if array_name is not None and not ('real' in array_name.lower() or 'mask' in array_name.lower()):
                 shape = (1,1) + (side_length,) * self.ndims
-                result = self.netG1(torch.rand(*shape))
+                pars = [par for par in self.netG1.parameters()]
+                result = self.netG1(torch.rand(*shape, device=pars[0].device))
                 if 'fake' in array_name.lower():
                     side_length = result.shape[-1]
                 elif 'cycle' in array_name.lower():
@@ -258,12 +259,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
 
-    def get_downsample_factors(self, down_factor=None, num_downs=None):
-        if down_factor is None:
-            down_factor = self.gnet_kwargs['down_factor']
-        if num_downs is None:
-            num_downs = self.gnet_kwargs['num_downs']
-        return [(down_factor,)*self.ndims,] * (num_downs - 1)
+    def set_downsample_factors(self):
+        if 'downsample_factors' not in self.gnet_kwargs:
+            down_factor = 2 if 'down_factor' not in self.gnet_kwargs else self.gnet_kwargs.pop('down_factor')
+            num_downs = 3 if 'num_downs' not in self.gnet_kwargs else self.gnet_kwargs.pop('num_downs')
+            self.gnet_kwargs.update({'downsample_factors': [(down_factor,)*self.ndims,] * (num_downs - 1)})
 
     def get_generator(self): 
         if self.gnet_type == 'unet':
@@ -276,26 +276,19 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
             # else:
             #     raise f'Unet generators only specified for 2D or 3D, not {self.ndims}D'
-
-            unet = UNet(
-                        downsample_factors=self.get_downsample_factors(),
-                        **self.gnet_kwargs
-                        )
+            self.set_downsample_factors()
 
             generator = torch.nn.Sequential(
-                                unet,
+                                UNet(**self.gnet_kwargs),
                                 # ConvPass(self.gnet_kwargs['ngf'], self.gnet_kwargs['output_nc'], [(1,)*self.ndims], activation=None, padding=self.gnet_kwargs['padding']), 
                                 torch.nn.Tanh()
                                 )
         
         elif self.gnet_type == 'residualunet':
+            self.set_downsample_factors()
             
-            unet = ResidualUNet(
-                        downsample_factors=self.get_downsample_factors(),
-                        **self.gnet_kwargs
-                        )
             generator = torch.nn.Sequential(
-                                unet, 
+                                ResidualUNet(**self.gnet_kwargs), 
                                 torch.nn.Tanh()
                                 )
             
@@ -317,10 +310,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         activation = self.gnet_kwargs['activation'] if 'activation' in self.gnet_kwargs else nn.ReLU
         
         if activation is not None:
-            if activation == nn.SELU:
-                init_weights(generator, init_type='kaiming', nonlinearity='linear') # For Self-Normalizing Neural Networks
-            else:
-                init_weights(generator, init_type='kaiming', nonlinearity=activation.__class__.__name__.lower())
+            # if activation == nn.SELU:
+            #     init_weights(generator, init_type='kaiming', nonlinearity='linear') # For Self-Normalizing Neural Networks
+            # else:
+            init_weights(generator, init_type='kaiming', nonlinearity=activation.__class__.__name__.lower())
         else:
             init_weights(generator, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
         return generator
@@ -805,4 +798,4 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             else:
                 self.model.load_state_dict(checkpoint)
         else:
-            raise('No saved checkpoint found.')
+            logger.warning('No saved checkpoint found.')

@@ -28,7 +28,7 @@ class ConvPass(torch.nn.Module):
             if isinstance(activation, str):
                 self.activation = getattr(torch.nn, activation)()
             else:
-                self.activation = activation # assume is function
+                self.activation = activation() # assume is function
         else:
             self.activation = nn.Identity()
 
@@ -311,7 +311,7 @@ class UNet(torch.nn.Module):
             padding='valid',
             residual=False,
             norm_layer=None,
-            add_noise=False
+            add_noise=False,
             ):
         '''Create a U-Net::
 
@@ -416,7 +416,7 @@ class UNet(torch.nn.Module):
         self.input_nc = input_nc
         self.output_nc = output_nc if output_nc else ngf
         self.residual = residual
-        self.noise_layer = NoiseBlock if add_noise else None
+        self.noise_layer = NoiseBlock() if add_noise else None
         # default arguments
 
         if kernel_size_down is None:

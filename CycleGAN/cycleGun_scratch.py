@@ -6,8 +6,9 @@ sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220304_ import *
 # from CycleGun20220304XNH2EM_apply_cb2SynapseCutout1_ import *
 # from SplitCycleGun20220304XNH2EM_apply_cb2SynapseCutout1_ import *
-from SplitCycleGun20220308XNH2EM_apply_cb2SynapseCutout1_ import *
+# from SplitCycleGun20220308XNH2EM_apply_cb2SynapseCutout1_ import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220309seluSplitNoise_train import *
+from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310unetSplitNoise_train import *
 import matplotlib.pyplot as plt
 import zarr
 
@@ -17,7 +18,7 @@ import zarr
 # cycleGun.batch_size = 1
 # cycleGun.build_machine()
 # cycleGun.load_saved_model()
-self = cycleGun
+# self = cycleGun
 # %%
 batch = cycleGun.test_train()
 
@@ -29,11 +30,12 @@ batch = cycleGun.test_prediction('A', side_length=200, cycle=True)
 cycleGun.model.eval()
 # cycleGun.model.train()
 
-real_A = batch[cycleGun.real_A].data * 2 - 1
-patch1 = torch.cuda.FloatTensor(real_A[:, :100, :100]).unsqueeze(0)
-patch2 = torch.cuda.FloatTensor(real_A[:, 100:, :100]).unsqueeze(0)
-patch3 = torch.cuda.FloatTensor(real_A[:, :100, 100:]).unsqueeze(0)
-patch4 = torch.cuda.FloatTensor(real_A[:, 100:, 100:]).unsqueeze(0)
+real = batch[cycleGun.real_A].data * 2 - 1
+# real = batch[cycleGun.real_B].data * 2 - 1
+patch1 = torch.cuda.FloatTensor(real[:, :100, :100]).unsqueeze(0)
+patch2 = torch.cuda.FloatTensor(real[:, 100:, :100]).unsqueeze(0)
+patch3 = torch.cuda.FloatTensor(real[:, :100, 100:]).unsqueeze(0)
+patch4 = torch.cuda.FloatTensor(real[:, 100:, 100:]).unsqueeze(0)
 
 patches = [patch1, patch2, patch3, patch4]
 fakes = []
@@ -42,6 +44,7 @@ for patch in patches:
     fakes.append(test.detach().cpu().squeeze())
 
 fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fakes[3]))), axis=1)
+
 # %%
 plt.figure(figsize=(10,10))
 plt.imshow(fake_comb, cmap='gray')#, vmin=fake.min(), vmax=fake.max())
