@@ -211,7 +211,7 @@ class ResnetGenerator(nn.Module):
             updown_p = 0
 
         model = []
-        model += padder
+        model += padder.copy()
         model += [nn.Conv2d(input_nc, ngf, kernel_size=7, padding=p, bias=use_bias),
                  norm_layer(ngf),
                  activation(True)]
@@ -240,7 +240,7 @@ class ResnetGenerator(nn.Module):
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
                       activation(True)]
-        model += padder
+        model += padder.copy()
         model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=p)]
         model += [nn.Tanh()]
 
@@ -303,13 +303,13 @@ class ResnetBlock(nn.Module):
             raise NotImplementedError('padding [%s] is not implemented' % padding_type)
         
         conv_block = []
-        conv_block += padder
+        conv_block += padder.copy()
 
         conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation(True)]
         if use_dropout:
             conv_block += [nn.Dropout(0.5)]
         
-        conv_block += padder
+        conv_block += padder.copy()
         conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim)]
 
         return nn.Sequential(*conv_block)
@@ -320,7 +320,7 @@ class ResnetBlock(nn.Module):
         x_target_size = x.size()[:-2] + shape
 
         offset = tuple(
-            (a - b) // 2
+            torch.div((a - b), 2, rounding_mode='trunc')
             for a, b in zip(x.size(), x_target_size))
 
         slices = tuple(
@@ -638,7 +638,7 @@ class ResnetGenerator3D(nn.Module):
             updown_p = 0
 
         model = []
-        model += padder
+        model += padder.copy()
         model += [nn.Conv3d(input_nc, ngf, kernel_size=7, padding=p, bias=use_bias),
                  norm_layer(ngf),
                  activation(True)]
@@ -667,7 +667,7 @@ class ResnetGenerator3D(nn.Module):
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
                       activation(True)]
-        model += padder
+        model += padder.copy()
         model += [nn.Conv3d(ngf, output_nc, kernel_size=7, padding=p)]
         model += [nn.Tanh()]
 
@@ -717,13 +717,13 @@ class ResnetBlock3D(nn.Module):
             raise NotImplementedError('padding [%s] is not implemented' % padding_type)
         
         conv_block = []
-        conv_block += padder
+        conv_block += padder.copy()
 
         conv_block += [nn.Conv3d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation(True)]
         if use_dropout:
             conv_block += [nn.Dropout(0.5)]
 
-        conv_block += padder
+        conv_block += padder.copy()
         conv_block += [nn.Conv3d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim)]
 
         return nn.Sequential(*conv_block)
@@ -734,7 +734,7 @@ class ResnetBlock3D(nn.Module):
         x_target_size = x.size()[:-3] + shape
 
         offset = tuple(
-            (a - b)//2
+            torch.div((a - b), 2, rounding_mode='trunc')
             for a, b in zip(x.size(), x_target_size))
 
         slices = tuple(
