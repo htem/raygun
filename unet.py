@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from utils import NoiseBlock
+from utils import NoiseBlock, ParameterizedNoiseBlock
 
 class ConvPass(torch.nn.Module):
 
@@ -462,6 +462,15 @@ class UNet(torch.nn.Module):
             residual (optional):
 
                 Whether to train convolutional layers to output residuals to add to inputs (as in ResNet) or to directly convolve input data to output. Either 'True' or 'False' (default).
+            
+            norm_layer (optional):
+
+                What, if any, normalization to layer after network layers. Default is none.
+
+            add_noise (optional):
+
+                Whether to add gaussian noise with 0 mean and unit variance ('True'), mean and variance parameterized by the network ('param'), or no noise ('False' <- default).
+
         '''
 
         super(UNet, self).__init__()
@@ -472,7 +481,12 @@ class UNet(torch.nn.Module):
         self.input_nc = input_nc
         self.output_nc = output_nc if output_nc else ngf
         self.residual = residual
-        self.noise_layer = NoiseBlock() if add_noise else None
+        if add_noise == 'param':                   # add noise feature if necessary
+            self.noise_layer = ParameterizedNoiseBlock()
+        elif add_noise:
+            self.noise_layer = NoiseBlock()
+        else:
+            self.noise_layer = None
         # default arguments
 
         if kernel_size_down is None:
@@ -548,7 +562,7 @@ class UNet(torch.nn.Module):
                 Upsample(
                     downsample_factors[level],
                     mode='nearest' if constant_upsample else 'transposed_conv',
-                    input_nc=ngf*fmap_inc_factor**(level + 1) + (level==1 and add_noise),
+                    input_nc=ngf*fmap_inc_factor**(level + 1) + (level==1 and (add_noise is not False)),
                     output_nc=ngf*fmap_inc_factor**(level + 1),
                     crop_factor=crop_factors[level],
                     next_conv_kernel_sizes=kernel_size_up[level])

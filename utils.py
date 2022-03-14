@@ -188,7 +188,7 @@ class ResnetGenerator(nn.Module):
             n_blocks (int)      -- the number of ResNet blocks
             padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zeros | valid
             activation          -- non-linearity layer to apply (default is ReLU)
-            add_noise (bool)    -- whether to append a noise feature to the data prior to upsampling layers
+            add_noise           -- whether to append a noise feature to the data prior to upsampling layers: True | False | 'param'
         """
         assert(n_blocks >= 0)
         super(ResnetGenerator, self).__init__()
@@ -228,12 +228,14 @@ class ResnetGenerator(nn.Module):
 
             model += [ResnetBlock(ngf * mult, padding_type=padding_type.lower(), norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias, activation=activation)]
 
-        if add_noise:                   # add noise feature if necessary
+        if add_noise == 'param':                   # add noise feature if necessary
+            model += [ParameterizedNoiseBlock()]
+        elif add_noise:                   
             model += [NoiseBlock()]
 
         for i in range(n_downsampling):  # add upsampling layers
             mult = 2 ** (n_downsampling - i)
-            model += [nn.ConvTranspose2d(ngf * mult + (i==0 and add_noise), 
+            model += [nn.ConvTranspose2d(ngf * mult + (i==0 and (add_noise is not False)), 
                                          int(ngf * mult / 2),
                                          kernel_size=3, stride=2,
                                          padding=updown_p, output_padding=updown_p,
@@ -263,6 +265,16 @@ class NoiseBlock(nn.Module):
         noise = torch.empty(shape, device=x.device).normal_()
         return torch.cat([x, noise.requires_grad_()], 1)
 
+
+class ParameterizedNoiseBlock(nn.Module):
+    """Definies a block for producing and appending a feature map of gaussian noise with mean and stdev defined by the first two feature maps of the incoming tensor"""
+
+    def __init__(self):
+        super(ParameterizedNoiseBlock, self).__init__()
+
+    def forward(self, x):
+        noise = torch.normal(x[:,0,...], torch.relu(x[:,1,...])).unsqueeze(1)
+        return torch.cat([x, noise.requires_grad_()], 1)
 
 class ResnetBlock(nn.Module):
     """Define a Resnet block"""
@@ -615,7 +627,7 @@ class ResnetGenerator3D(nn.Module):
             n_blocks (int)      -- the number of ResNet blocks
             padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zeros | valid
             activation          -- non-linearity layer to apply (default is ReLU)
-            add_noise (bool)    -- whether to append a noise feature to the data prior to upsampling layers
+            add_noise           -- whether to append a noise feature to the data prior to upsampling layers: True | False | 'param'
         """
         assert(n_blocks >= 0)
         super(ResnetGenerator3D, self).__init__()
@@ -655,12 +667,14 @@ class ResnetGenerator3D(nn.Module):
 
             model += [ResnetBlock3D(ngf * mult, padding_type=padding_type.lower(), norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias, activation=activation)]
 
-        if add_noise:                   # add noise feature if necessary
+        if add_noise == 'param':                   # add noise feature if necessary
+            model += [ParameterizedNoiseBlock()]
+        elif add_noise:                   
             model += [NoiseBlock()]
 
         for i in range(n_downsampling):  # add upsampling layers
             mult = 2 ** (n_downsampling - i)
-            model += [nn.ConvTranspose3d(ngf * mult + (i==0 and add_noise),
+            model += [nn.ConvTranspose3d(ngf * mult + (i==0 and (add_noise is not False)),
                                          int(ngf * mult / 2),
                                          kernel_size=3, stride=2,
                                          padding=updown_p, output_padding=updown_p,

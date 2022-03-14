@@ -13,7 +13,8 @@ sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310splitUnetConvDown_train import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310unet_train import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310validSplitResWasserSeluNoise_train import *
-from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311LinkResSelu_train import *
+# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311LinkResSelu_train import *
+from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311SplitResSelu_train import *
 import matplotlib.pyplot as plt
 import zarr
 
@@ -21,12 +22,12 @@ import zarr
 batch = cycleGun.test_train()
 
 # %%
-batch = cycleGun.test_prediction('B', side_length=401, cycle=True)
-batch = cycleGun.test_prediction('A', side_length=401, cycle=True)
+batch = cycleGun.test_prediction('B', side_length=200, cycle=True)
+batch = cycleGun.test_prediction('A', side_length=200, cycle=True)
 
 # %%
-# cycleGun.model.eval()
-cycleGun.model.train()
+cycleGun.model.eval()
+# cycleGun.model.train()
 
 net = cycleGun.model.netG1
 real = batch[cycleGun.real_A].data * 2 - 1
@@ -35,7 +36,8 @@ real = batch[cycleGun.real_A].data * 2 - 1
 
 mid = real.shape[-1] // 2
 test = net(torch.cuda.FloatTensor(real).unsqueeze(0))
-pad = (real.shape[-1] - test.shape[-1]) // 2
+# pad = (real.shape[-1] - test.shape[-1]) // 2
+pad = 40
 
 patch1 = torch.cuda.FloatTensor(real[:, :mid+pad, :mid+pad]).unsqueeze(0)
 patch2 = torch.cuda.FloatTensor(real[:, mid-pad:, :mid+pad]).unsqueeze(0)
@@ -48,7 +50,8 @@ for patch in patches:
     test = net(patch)
     fakes.append(test.detach().cpu().squeeze())
 
-fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fakes[3]))), axis=1)
+fake_comb = torch.cat((torch.cat((fakes[0][:-pad, :-pad], fakes[1][pad:, :-pad])), torch.cat((fakes[2][:-pad, pad:], fakes[3][pad:, pad:]))), axis=1)
+# fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fakes[3]))), axis=1)
 
 # %%
 plt.figure(figsize=(10,10))

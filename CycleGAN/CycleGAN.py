@@ -40,8 +40,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def __init__(self,
             src_A, #EXPECTS ZARR VOLUME
             src_B,
-            A_voxel_size, # voxel size of src_A (for each dimension)
-            B_voxel_size, # voxel size of src_B (for each dimension)
+            A_voxel_size=(1, 1, 1), # voxel size of src_A (for each dimension)
+            B_voxel_size=(1, 1, 1), # voxel size of src_B (for each dimension)
             common_voxel_size=None, # voxel size to resample A and B into for training
             ndims=None,
             A_name='raw',
