@@ -248,7 +248,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             if array_name is not None and not ('real' in array_name.lower() or 'mask' in array_name.lower()):
                 shape = (1,1) + (side_length,) * self.ndims
                 pars = [par for par in self.netG1.parameters()]
-                result = self.netG1(torch.rand(*shape, device=pars[0].device))
+                result = self.netG1(torch.zeros(*shape, device=pars[0].device))
                 if 'fake' in array_name.lower():
                     side_length = result.shape[-1]
                 elif 'cycle' in array_name.lower():
@@ -259,13 +259,32 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
 
+    def get_valid_crop(self, side_length=None):
+        # returns number of pixels to crop from a side to trim network outputs to valid FOV
+        if side_length is None:
+            side_length = self.side_length
+        
+        gnet_kwargs = self.gnet_kwargs.copy()
+        gnet_kwargs['padding_type'] = 'valid'
+        gnet = self.get_generator(gnet_kwargs=gnet_kwargs)
+        
+        shape = (1,1) + (side_length,) * self.ndims
+        pars = [par for par in gnet.parameters()]
+        result = gnet(torch.zeros(*shape, device=pars[0].device))
+        pad = np.ceil((gp.Coordinate(shape) - gp.Coordinate(result.shape)) / 2)
+
+        return gp.Coordinate(pad[-self.ndims:])
+
     def set_downsample_factors(self):
         if 'downsample_factors' not in self.gnet_kwargs:
             down_factor = 2 if 'down_factor' not in self.gnet_kwargs else self.gnet_kwargs.pop('down_factor')
             num_downs = 3 if 'num_downs' not in self.gnet_kwargs else self.gnet_kwargs.pop('num_downs')
             self.gnet_kwargs.update({'downsample_factors': [(down_factor,)*self.ndims,] * (num_downs - 1)})
 
-    def get_generator(self): 
+    def get_generator(self, gnet_kwargs=None):
+        if gnet_kwargs is None:
+            gnet_kwargs = self.gnet_kwargs
+
         if self.gnet_type == 'unet':
 
             # if self.ndims == 2:
@@ -279,7 +298,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.set_downsample_factors()
 
             generator = torch.nn.Sequential(
-                                UNet(**self.gnet_kwargs),
+                                UNet(**gnet_kwargs),
                                 # ConvPass(self.gnet_kwargs['ngf'], self.gnet_kwargs['output_nc'], [(1,)*self.ndims], activation=None, padding=self.gnet_kwargs['padding_type']), 
                                 torch.nn.Tanh()
                                 )
@@ -288,17 +307,17 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.set_downsample_factors()
             
             generator = torch.nn.Sequential(
-                                ResidualUNet(**self.gnet_kwargs), 
+                                ResidualUNet(**gnet_kwargs), 
                                 torch.nn.Tanh()
                                 )
             
         elif self.gnet_type == 'resnet':
             
             if self.ndims == 2:
-                generator = ResnetGenerator(**self.gnet_kwargs)
+                generator = ResnetGenerator(**gnet_kwargs)
             
             elif self.ndims == 3:
-                generator = ResnetGenerator3D(**self.gnet_kwargs)
+                generator = ResnetGenerator3D(**gnet_kwargs)
 
             else:
                 raise f'Resnet generators only specified for 2D or 3D, not {self.ndims}D'
@@ -307,7 +326,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
             raise f'Unknown generator type requested: {self.gnet_type}'
         
-        activation = self.gnet_kwargs['activation'] if 'activation' in self.gnet_kwargs else nn.ReLU
+        activation = gnet_kwargs['activation'] if 'activation' in gnet_kwargs else nn.ReLU
         
         if activation is not None:
             # if activation == nn.SELU:
@@ -358,8 +377,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             scale_factor_A, scale_factor_B = None, None
         
-        # self.l1_loss = torch.nn.SmoothL1Loss() 
-        self.l1_loss = torch.nn.L1Loss() 
+        self.l1_loss = torch.nn.SmoothL1Loss() 
+        # self.l1_loss = torch.nn.L1Loss() 
         self.gan_loss = GANLoss(gan_mode=self.gan_mode)
         if self.loss_style.lower()=='cycle':
             
@@ -671,7 +690,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.batch_show()
         return self.batch
 
-    def render_full(self, side='A', side_length=None, cycle=False):
+    def render_full(self, side='A', side_length=None, cycle=False, crop_to_valid=False):
         #CYCLED CURRENTLY SAVED IN UPSAMPLED FORM (i.e. not original voxel size)
         #set model into evaluation mode
         self.model.eval()
@@ -681,6 +700,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         #     1: self.cycled_B,
         #     2: self.fake_A,
         #     3: self.cycled_A}
+
+        side_length = self.side_length if side_length is None else side_length
         
         #datapipe has: train_pipe, source, reject, resample, augment, unsqueeze, etc.}
         datapipe = getattr(self, 'datapipe_'+side)        
@@ -691,13 +712,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         input_dict = {'real_'+side: datapipe.real}                
 
         if side=='A':
-            output_dict = {0: datapipe.fake},
+            output_dict = {0: datapipe.fake}
             if cycle:
                 output_dict[3] = datapipe.cycled
         else:        
-            output_dict = {2: datapipe.fake},
+            output_dict = {2: datapipe.fake}
             if cycle:
-                output_dict[1] = datapipe.cycled   
+                output_dict[1] = datapipe.cycled                   
 
         # set prediction spec 
         if datapipe.source.spec is None:
@@ -706,7 +727,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             pred_spec = datapipe.source.spec[datapipe.real].copy()        
         pred_spec.voxel_size = self.common_voxel_size
-        pred_spec.dtype = datapipe.normalize_fake.dtype
+        # pred_spec.dtype = datapipe.normalize_fake.dtype
 
         dataset_names = {datapipe.fake: 'volumes/'+self.model_name+'_enFAKE'}
         array_specs = {datapipe.fake: pred_spec.copy()}
@@ -719,7 +740,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             extents = self.get_extents(side_length, array_name=array.identifier)
             scan_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
 
-        #Declare new array to write to
+        # Declare new array to write to
         if not hasattr(self, 'compressor'):
             self.compressor = {'id': 'blosc', 
                 'clevel': 3,
@@ -759,14 +780,25 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 )                
         
         if cycle:
-            predict_pipe += datapipe.postnet_pipe.cycle
+            render_pipe += datapipe.postnet_pipe.cycle
         else:
-            predict_pipe += datapipe.postnet_pipe.nocycle
+            render_pipe += datapipe.postnet_pipe.nocycle
         render_pipe += gp.Squeeze(arrays[1:], axis=0) # remove batch dimension
         
         render_pipe += gp.AsType(datapipe.fake, np.uint8)        
         if cycle:
             render_pipe += gp.AsType(datapipe.cycled, np.uint8)        
+
+        # Add cropping if necessary
+        if crop_to_valid:
+            pad = self.get_valid_crop(side_length=side_length)
+            for key in dataset_names.keys():
+                req_shape = np.array(scan_request[key].roi.get_shape())
+                crop = np.array((0,)*(len(req_shape) - len(pad)) + pad)
+                # crop_frac = gp.Coordinate(crop / req_shape)
+                # render_pipe += gp.Crop(key, fraction_negative=crop_frac, fraction_positive=crop_frac)
+                render_pipe += gp.Crop(key, abs_negative=crop, abs_positive=crop)
+
 
         render_pipe += gp.ZarrWrite(
                         dataset_names = dataset_names,

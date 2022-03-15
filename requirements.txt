@@ -1,7 +1,7 @@
-daisy @ git+https://github.com/funkelab/daisy.git@c4203951c4f5cbcf34dcce799ce5da49a922efbe
-funlib.learn.torch @ git+https://github.com/funkelab/funlib.learn.torch.git@636813e60d48379d078b5458e40bdf23269631b3
-funlib.math @ git+https://github.com/funkelab/funlib.math.git@0c623f71c083d33184cac40ef7b1b995216be8ef
-gunpowder @ file:///n/groups/htem/users/jlr54/gunpowder
+https://github.com/funkelab/daisy/archive/0.3-dev.zip
+https://github.com/funkelab/funlib.learn.torch/archive/master.zip
+https://github.com/funkelab/funlib.math/archive/master.zip
+https://github.com/rhoadesScholar/gunpowder/archive/raygun-dev2.zip
 matplotlib
 neuroglancer==2.22
 numcodecs==0.9.1

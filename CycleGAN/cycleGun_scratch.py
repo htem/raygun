@@ -14,7 +14,8 @@ sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310unet_train import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310validSplitResWasserSeluNoise_train import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311LinkResSelu_train import *
-from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311SplitResSelu_train import *
+# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311SplitResSelu_train import *
+from SplitCycleGun20220311XNH2EM_apply_cb2SynapseCutout1_ import *
 import matplotlib.pyplot as plt
 import zarr
 
@@ -52,6 +53,7 @@ for patch in patches:
 
 fake_comb = torch.cat((torch.cat((fakes[0][:-pad, :-pad], fakes[1][pad:, :-pad])), torch.cat((fakes[2][:-pad, pad:], fakes[3][pad:, pad:]))), axis=1)
 # fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fakes[3]))), axis=1)
+
 
 # %%
 plt.figure(figsize=(10,10))
@@ -135,6 +137,7 @@ im_data = np.array(z[cycleGun.B_name][mid[0], mid[1]-512:mid[1]+512, mid[2]-512:
 # im = np.array(z['volumes/raw'][1400:1800, 1400:1800, 1400:1800])[200].squeeze()
 z[cycleGun.B_name].info
 plt.imshow(im_data, cmap='gray')
+
 
 # %%
 ds = daisy.open_ds(cycleGun.src_B, cycleGun.B_name)
