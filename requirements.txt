@@ -3,7 +3,7 @@ https://github.com/funkelab/funlib.learn.torch/archive/master.zip
 https://github.com/funkelab/funlib.math/archive/master.zip
 https://github.com/rhoadesScholar/gunpowder/archive/raygun-dev2.zip
 matplotlib
-neuroglancer==2.22
+neuroglancer
 numcodecs==0.9.1
 numpy==1.21.2
 opencv-python
@@ -11,7 +11,7 @@ pandas
 Pillow
 pymongo==3.12.0
 scikit-image==0.18.3
-scipy==1.7.1
+scipy
 tensorboard
 tensorboardX
 torch

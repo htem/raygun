@@ -20,25 +20,33 @@ import matplotlib.pyplot as plt
 import zarr
 
 # %%
+request, pipe = cycleGun.render_full(side_length=172, side='B', cycle=True, crop_to_valid=True, pad_source=False)
+pipe += gp.RandomLocation()
+with gp.build(pipe):
+    batch = pipe.request_batch(request)
+    
+# %%
 batch = cycleGun.test_train()
 
 # %%
-batch = cycleGun.test_prediction('B', side_length=200, cycle=True)
-batch = cycleGun.test_prediction('A', side_length=200, cycle=True)
+side_length=248
+batch = cycleGun.test_prediction('A', side_length=side_length, cycle=True)
+batch = cycleGun.test_prediction('B', side_length=side_length, cycle=True)
 
 # %%
 cycleGun.model.eval()
 # cycleGun.model.train()
 
-net = cycleGun.model.netG1
-real = batch[cycleGun.real_A].data * 2 - 1
-# net = cycleGun.model.netG2
-# real = batch[cycleGun.real_B].data * 2 - 1
+# net = cycleGun.model.netG1
+# real = batch[cycleGun.real_A].data * 2 - 1
+net = cycleGun.model.netG2
+real = batch[cycleGun.real_B].data * 2 - 1
 
 mid = real.shape[-1] // 2
 test = net(torch.cuda.FloatTensor(real).unsqueeze(0))
 # pad = (real.shape[-1] - test.shape[-1]) // 2
-pad = 40
+# pad = 40
+pad = cycleGun.get_valid_crop(side_length)[-1]
 
 patch1 = torch.cuda.FloatTensor(real[:, :mid+pad, :mid+pad]).unsqueeze(0)
 patch2 = torch.cuda.FloatTensor(real[:, mid-pad:, :mid+pad]).unsqueeze(0)
@@ -51,9 +59,10 @@ for patch in patches:
     test = net(patch)
     fakes.append(test.detach().cpu().squeeze())
 
-fake_comb = torch.cat((torch.cat((fakes[0][:-pad, :-pad], fakes[1][pad:, :-pad])), torch.cat((fakes[2][:-pad, pad:], fakes[3][pad:, pad:]))), axis=1)
-# fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fakes[3]))), axis=1)
-
+if pad != 0:
+    fake_comb = torch.cat((torch.cat((fakes[0][:-pad, :-pad], fakes[1][pad:, :-pad])), torch.cat((fakes[2][:-pad, pad:], fakes[3][pad:, pad:]))), axis=1)
+else:
+    fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fakes[3]))), axis=1)
 
 # %%
 plt.figure(figsize=(10,10))
@@ -82,6 +91,7 @@ plt.imshow(out_hists.detach())
 plt.colorbar()
 
 #%%
+self = cycleGun
 request = gp.BatchRequest()
 for array in [self.real_A, self.mask_A]:            
     extents = self.get_extents(512, array_name=array.identifier)
@@ -134,7 +144,7 @@ z = zarr.open(cycleGun.src_B)
 shape = np.array(z[cycleGun.B_name].shape)
 mid = shape // 2
 im_data = np.array(z[cycleGun.B_name][mid[0], mid[1]-512:mid[1]+512, mid[2]-512:mid[2]+512]).squeeze()
-# im = np.array(z['volumes/raw'][1400:1800, 1400:1800, 1400:1800])[200].squeeze()
+# im_data = np.array(z['volumes/CycleGun_CBv30nmBottom100um_cb2gcl1_20220311SplitResSelu_enFAKE'][mid[0], mid[1]-512:mid[1]+512, mid[2]-512:mid[2]+512]).squeeze()
 z[cycleGun.B_name].info
 plt.imshow(im_data, cmap='gray')
 

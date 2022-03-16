@@ -27,3 +27,36 @@
         Overwrite subset offset: (probably leave blank)
 
 3) Double check the path/to/folder/dataset.n5/volumes/name/attributes.json to verify info is correct afterwards
+
+
+example attributes.json:
+{
+    "blockSize": [
+        64,
+        64,
+        64
+    ],
+    "compression": {
+        "blocksize": 64,
+        "clevel": 3,
+        "cname": "blosclz",
+        "shuffle": 1,
+        "type": "blosc"
+    },
+    "dataType": "uint8",
+    "dimensions": [
+        24120,
+        24120,
+        1102
+    ],
+    "offset": [
+        744000,
+        520000,
+        2800
+    ],
+    "resolution": [
+        4,
+        4,
+        40
+    ]
+}

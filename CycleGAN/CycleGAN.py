@@ -271,7 +271,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         shape = (1,1) + (side_length,) * self.ndims
         pars = [par for par in gnet.parameters()]
         result = gnet(torch.zeros(*shape, device=pars[0].device))
-        pad = np.ceil((gp.Coordinate(shape) - gp.Coordinate(result.shape)) / 2)
+        pad = np.floor((gp.Coordinate(shape) - gp.Coordinate(result.shape)) / 2)
 
         return gp.Coordinate(pad[-self.ndims:])
 
@@ -690,7 +690,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.batch_show()
         return self.batch
 
-    def render_full(self, side='A', side_length=None, cycle=False, crop_to_valid=False):
+    def render_full(self, side='A', side_length=None, cycle=False, crop_to_valid=False, pad_source=True):
         #CYCLED CURRENTLY SAVED IN UPSAMPLED FORM (i.e. not original voxel size)
         #set model into evaluation mode
         self.model.eval()
@@ -735,35 +735,28 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             dataset_names[datapipe.cycled] = 'volumes/'+self.model_name+'_enCYCLED'
             array_specs[datapipe.cycled] = pred_spec.copy()
 
+        # Calculate padding if necessary:
+        if crop_to_valid:
+            px_pad = self.get_valid_crop(side_length=side_length)
+            px_pad = gp.Coordinate((0,)*(len(self.common_voxel_size) - len(px_pad)) + px_pad)
+            pad = px_pad * self.common_voxel_size
+
         scan_request = gp.BatchRequest()
         for array in arrays:            
             extents = self.get_extents(side_length, array_name=array.identifier)
+            if pad_source and crop_to_valid and array is datapipe.real:
+                extents += px_pad * 2
+            elif not pad_source and crop_to_valid and array is not datapipe.real:
+                extents -= px_pad * 2        
             scan_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
-
-        # Declare new array to write to
-        if not hasattr(self, 'compressor'):
-            self.compressor = {'id': 'blosc', 
-                'clevel': 3,
-                'cname': 'blosclz',
-                'blocksize': 64
-                }
-        
-        source_ds = daisy.open_ds(datapipe.src_path, datapipe.real_name)
-        datapipe.total_roi = source_ds.data_roi
-        for key, name in dataset_names.items():
-            write_size = scan_request[key].roi.get_shape()
-            daisy.prepare_ds(
-                datapipe.out_path,
-                name,
-                datapipe.total_roi,
-                daisy.Coordinate(self.common_voxel_size),
-                np.uint8,
-                write_size=write_size,
-                num_channels=1,
-                compressor=self.compressor)
 
         render_pipe = datapipe.source 
         if datapipe.resample: render_pipe += datapipe.resample
+        
+        # Pad incoming array for cropping if necessary:
+        if pad_source and crop_to_valid:
+            render_pipe += gp.Pad(datapipe.real, pad)
+        
         render_pipe += datapipe.normalize_real
         render_pipe += datapipe.scaleimg2tanh_real
 
@@ -791,15 +784,32 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         # Add cropping if necessary
         if crop_to_valid:
-            pad = self.get_valid_crop(side_length=side_length)
             for key in dataset_names.keys():
-                req_shape = np.array(scan_request[key].roi.get_shape())
-                crop = np.array((0,)*(len(req_shape) - len(pad)) + pad)
-                # crop_frac = gp.Coordinate(crop / req_shape)
-                # render_pipe += gp.Crop(key, fraction_negative=crop_frac, fraction_positive=crop_frac)
-                render_pipe += gp.Crop(key, abs_negative=crop, abs_positive=crop)
+                render_pipe += gp.Crop(key, roi=scan_request[key].roi)
 
+        return scan_request, render_pipe
 
+        # Declare new array to write to
+        if not hasattr(self, 'compressor'):
+            self.compressor = {'id': 'blosc', 
+                'clevel': 3,
+                'cname': 'blosclz',
+                'blocksize': 64
+                }        
+        source_ds = daisy.open_ds(datapipe.src_path, datapipe.real_name)
+        datapipe.total_roi = source_ds.data_roi
+        for key, name in dataset_names.items():
+            write_size = scan_request[key].roi.get_shape()
+            daisy.prepare_ds(
+                datapipe.out_path,
+                name,
+                datapipe.total_roi,
+                daisy.Coordinate(self.common_voxel_size),
+                np.uint8,
+                write_size=write_size,
+                num_channels=1,
+                compressor=self.compressor)
+                
         render_pipe += gp.ZarrWrite(
                         dataset_names = dataset_names,
                         output_filename = datapipe.out_path,
@@ -816,6 +826,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             print('Starting full volume render...')
             render_pipe.request_batch(request)
             print('Finished.')
+
 
     def load_saved_model(self, checkpoint=None):
         if checkpoint is None:
