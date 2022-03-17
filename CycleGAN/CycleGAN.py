@@ -690,7 +690,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.batch_show()
         return self.batch
 
-    def render_full(self, side='A', side_length=None, cycle=False, crop_to_valid=False, pad_source=True):
+    def render_full(self, side='A', side_length=None, cycle=False, crop_to_valid=False, pad_source=True, test=False):
         #CYCLED CURRENTLY SAVED IN UPSAMPLED FORM (i.e. not original voxel size)
         #set model into evaluation mode
         self.model.eval()
@@ -730,10 +730,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         # pred_spec.dtype = datapipe.normalize_fake.dtype
 
         dataset_names = {datapipe.fake: 'volumes/'+self.model_name+'_enFAKE'}
-        array_specs = {datapipe.fake: pred_spec.copy()}
+        # array_specs = {datapipe.fake: pred_spec.copy()}
         if cycle:
             dataset_names[datapipe.cycled] = 'volumes/'+self.model_name+'_enCYCLED'
-            array_specs[datapipe.cycled] = pred_spec.copy()
+            # array_specs[datapipe.cycled] = pred_spec.copy()
 
         # Calculate padding if necessary:
         if crop_to_valid:
@@ -768,7 +768,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 inputs = input_dict,
                                 outputs = output_dict,
                                 checkpoint = self.checkpoint,
-                                array_specs = array_specs, 
+                                # array_specs = array_specs, 
                                 spawn_subprocess=self.spawn_subprocess
                                 )                
         
@@ -778,16 +778,20 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             render_pipe += datapipe.postnet_pipe.nocycle
         render_pipe += gp.Squeeze(arrays[1:], axis=0) # remove batch dimension
         
+        # # Add cropping if necessary
+        # if crop_to_valid:
+        #     for key in dataset_names.keys():
+        #         render_pipe += gp.Crop(key, roi=scan_request[key].roi.grow(-pad, -pad))#abs_positive=pad, abs_negative=pad)
+
+        # Convert float32 on [0,1] to uint8 on [0,255]
+        render_pipe += gp.IntensityScaleShift(datapipe.fake, 255, 0)        
         render_pipe += gp.AsType(datapipe.fake, np.uint8)        
         if cycle:
-            render_pipe += gp.AsType(datapipe.cycled, np.uint8)        
+            render_pipe += gp.IntensityScaleShift(datapipe.cycled, 255, 0)        
+            render_pipe += gp.AsType(datapipe.cycled, np.uint8)      
 
-        # Add cropping if necessary
-        if crop_to_valid:
-            for key in dataset_names.keys():
-                render_pipe += gp.Crop(key, roi=scan_request[key].roi)
-
-        return scan_request, render_pipe
+        if test:
+            return scan_request, render_pipe
 
         # Declare new array to write to
         if not hasattr(self, 'compressor'):
