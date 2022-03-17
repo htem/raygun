@@ -15,32 +15,38 @@ sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220310validSplitResWasserSeluNoise_train import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311LinkResSelu_train import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311SplitResSelu_train import *
-from SplitCycleGun20220311XNH2EM_apply_cb2SynapseCutout1_ import *
+# from SplitCycleGun20220311XNH2EM_apply_cb2SynapseCutout1_ import *
+from SplitCycleGun20220311XNH2EM_apply_CBx30nm_8um1_ import *
+# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220313SplitResSeluParNoise_train import *
 import matplotlib.pyplot as plt
 import zarr
 
 # %%
-request, pipe = cycleGun.render_full(side_length=172, side='B', cycle=True, crop_to_valid=True, pad_source=False)
-pipe += gp.RandomLocation()
-with gp.build(pipe):
-    batch = pipe.request_batch(request)
-    
+request, pipe = cycleGun.render_full(side_length=248, side='A', cycle=False, crop_to_valid=True, pad_source=False)#, test=True)
+# pipe += gp.RandomLocation()
+# with gp.build(pipe):
+#     batch = pipe.request_batch(request)
+
 # %%
 batch = cycleGun.test_train()
 
 # %%
 side_length=248
 batch = cycleGun.test_prediction('A', side_length=side_length, cycle=True)
-batch = cycleGun.test_prediction('B', side_length=side_length, cycle=True)
+# batch = cycleGun.test_prediction('B', side_length=side_length, cycle=True)
 
 # %%
 cycleGun.model.eval()
 # cycleGun.model.train()
 
-# net = cycleGun.model.netG1
-# real = batch[cycleGun.real_A].data * 2 - 1
-net = cycleGun.model.netG2
-real = batch[cycleGun.real_B].data * 2 - 1
+if cycleGun.real_A in batch:
+    net = cycleGun.model.netG1
+    other_net = cycleGun.model.netG2
+    real = batch[cycleGun.real_A].data * 2 - 1
+else:
+    net = cycleGun.model.netG2
+    other_net = cycleGun.model.netG1
+    real = batch[cycleGun.real_B].data * 2 - 1
 
 mid = real.shape[-1] // 2
 test = net(torch.cuda.FloatTensor(real).unsqueeze(0))
@@ -68,6 +74,37 @@ else:
 plt.figure(figsize=(10,10))
 plt.imshow(fake_comb, cmap='gray')#, vmin=fake.min(), vmax=fake.max())
 
+# %% what happens if we put it through multiple times?
+n = 10
+orient = 'vert'
+if orient == 'horz':
+    fig, axs = plt.subplots(1, n+1, figsize=(10*(n+1),10))
+else:
+    fig, axs = plt.subplots((n+1), 1, figsize=(10,10*(n+1)))
+
+this_test = test.detach()
+for i in range(n+1):
+    axs[i].imshow(this_test.detach().cpu().squeeze(), cmap='gray')
+    axs[i].set_title(f'Round {i}')
+    this_test = other_net(this_test.detach())
+    this_test = net(this_test.detach())
+axs[i].imshow(this_test.detach().cpu().squeeze(), cmap='gray')
+axs[i].set_title(f'Round {i}')
+
+
+# %% Test Variational Outputs
+test_num = 4
+orient = 'horz'
+if orient == 'horz':
+    fig, axs = plt.subplots(1, test_num, figsize=(10*test_num,10))
+else:
+    fig, axs = plt.subplots(test_num, 1, figsize=(10,10*test_num))
+
+cuda_real = torch.cuda.FloatTensor(real).unsqueeze(0)
+for i in range(test_num):
+    var_test = net(cuda_real).detach().cpu().squeeze()
+    axs[i].imshow(var_test, cmap='gray')
+
 # %% Weight analyses:
 weights = cycleGun.netG1.model[20].weight.detach()
 
@@ -77,7 +114,7 @@ for weight in weights:
 in_hists = torch.cat(in_hists).reshape((len(in_hists), len(in_hists[0])))
 
 plt.figure(figsize=(10,10))
-plt.imshow(in_hists.detach())
+plt.imshow(in_hists.detach().cpu())
 plt.colorbar()
 
 #%% 
@@ -139,24 +176,33 @@ import numpy as np
 import matplotlib.pyplot as plt
 import daisy
 
+def get_im_data(array, offset = 0):
+    shape = np.array(array.shape)
+    mid = shape // 2 + offset
+    return np.array(array[mid[0], mid[1]-512:mid[1]+512, mid[2]-512:mid[2]+512]).squeeze()
+
 # %%
-z = zarr.open(cycleGun.src_B)
-shape = np.array(z[cycleGun.B_name].shape)
-mid = shape // 2
-im_data = np.array(z[cycleGun.B_name][mid[0], mid[1]-512:mid[1]+512, mid[2]-512:mid[2]+512]).squeeze()
-# im_data = np.array(z['volumes/CycleGun_CBv30nmBottom100um_cb2gcl1_20220311SplitResSelu_enFAKE'][mid[0], mid[1]-512:mid[1]+512, mid[2]-512:mid[2]+512]).squeeze()
-z[cycleGun.B_name].info
+# datapipe = cycleGun.datapipe_A
+datapipe = cycleGun.datapipe_B
+
+z = zarr.open(datapipe.src_path)
+im_data = get_im_data(z[datapipe.real_name])
+im_data = get_im_data(z['volumes/CycleGun_CBv30nmBottom100um_cb2gcl1_20220311LinkResSelu_enFAKE'], offset=0)
+z[datapipe.real_name].info
 plt.imshow(im_data, cmap='gray')
 
 
 # %%
-ds = daisy.open_ds(cycleGun.src_B, cycleGun.B_name)
-roi = daisy.Roi((0, 0, 0), (40, 2048, 2048))
+# datapipe = cycleGun.datapipe_A
+datapipe = cycleGun.datapipe_B
+ds = daisy.open_ds(datapipe.src_path, datapipe.real_name)
+roi = daisy.Roi((0, 0, 0), (40, 2048, 2048)).shift(ds.data_roi.get_offset()).snap_to_grid(ds.voxel_size, 'shrink')
 img = ds.to_ndarray(roi)
+# img = get_im_data(ds.data)
 
 # %%
 plt.figure(figsize=(30,30))
-plt.imshow(img[0].squeeze(), cmap='gray')
+plt.imshow(img.squeeze(), cmap='gray')
 
 # %%
 z = zarr.open('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/CBxs_lobV_bottomp100um_30nm_rectwopassdb9_.n5')
