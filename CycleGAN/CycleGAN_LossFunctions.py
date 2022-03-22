@@ -486,10 +486,9 @@ class Custom_Loss(torch.nn.Module):
             loss_fcn = getattr(self, fcn_name)
             for key, lambda_ in lambdas:
                 if lambda_ != 0:
-                    if key == 'identity':
-                        pred = Gnet(data_dict['real'])
-                    else:
-                        pred = data_dict[key]
+                    if key == 'identity' and key not in data_dict:
+                        data_dict['identity'] = Gnet(data_dict['real'])
+                    pred = data_dict[key]
 
                     if fcn_name == 'l1_loss':
                         if real.size()[-self.dims:] != pred.size()[-self.dims:]:
