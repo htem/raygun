@@ -16,24 +16,26 @@ sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311LinkResSelu_train import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311SplitResSelu_train import *
 # from SplitCycleGun20220311XNH2EM_apply_cb2SynapseCutout1_ import *
-from SplitCycleGun20220311XNH2EM_apply_CBx30nm_8um1_ import *
+# from SplitCycleGun20220311XNH2EM_apply_CBx30nm_8um1_ import *
+from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220313SplitResSeluParNoise_train import *
+# from CycleGun_CBxFN90nmtile3_CBx30nmBottom100um_20220324SplitValidResSelu_train import *
 import matplotlib.pyplot as plt
 import zarr
 
 # %%
-request, pipe = cycleGun.render_full(side_length=248, side='A', cycle=False, crop_to_valid=True, pad_source=False)#, test=True)
-# pipe += gp.RandomLocation()
-# with gp.build(pipe):
-#     batch = pipe.request_batch(request)
+request, pipe = cycleGun.render_full(side_length=625, side='B', cycle=False, crop_to_valid=True, test=True)
+pipe += gp.RandomLocation()
+with gp.build(pipe):
+    batch = pipe.request_batch(request)
 
 # %%
 batch = cycleGun.test_train()
 
 # %%
-side_length=248
-batch = cycleGun.test_prediction('A', side_length=side_length, cycle=True)
-# batch = cycleGun.test_prediction('B', side_length=side_length, cycle=True)
+side_length=64
+# batch = cycleGun.test_prediction('A', side_length=side_length, cycle=True)
+batch = cycleGun.test_prediction('B', side_length=side_length, cycle=False)
 
 # %%
 cycleGun.model.eval()
