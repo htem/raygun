@@ -33,7 +33,7 @@ with gp.build(pipe):
 batch = cycleGun.test_train()
 
 # %%
-side_length=64
+side_length=624
 # batch = cycleGun.test_prediction('A', side_length=side_length, cycle=True)
 batch = cycleGun.test_prediction('B', side_length=side_length, cycle=False)
 
@@ -189,16 +189,24 @@ datapipe = cycleGun.datapipe_B
 
 z = zarr.open(datapipe.src_path)
 im_data = get_im_data(z[datapipe.real_name])
-im_data = get_im_data(z['volumes/CycleGun_CBv30nmBottom100um_cb2gcl1_20220311LinkResSelu_enFAKE'], offset=0)
-z[datapipe.real_name].info
+# z.info
+arrays = [key for key in z['volumes'].array_keys()]
+plt.figure(figsize=(20,20))
+plt.imshow(im_data, cmap='gray')
+
+# %%
+im_data = get_im_data(z['volumes/'+arrays[1]], offset=10)
+plt.figure(figsize=(20,20))
 plt.imshow(im_data, cmap='gray')
 
 
 # %%
 # datapipe = cycleGun.datapipe_A
 datapipe = cycleGun.datapipe_B
+ds = daisy.open_ds(datapipe.src_path, 'volumes/'+arrays[1])
 ds = daisy.open_ds(datapipe.src_path, datapipe.real_name)
-roi = daisy.Roi((0, 0, 0), (40, 2048, 2048)).shift(ds.data_roi.get_offset()).snap_to_grid(ds.voxel_size, 'shrink')
+# roi = daisy.Roi((0, 0, 0), (40, 2048, 2048)).shift(ds.data_roi.get_offset()).snap_to_grid(ds.voxel_size, 'shrink')
+roi = daisy.Roi((0, 0, 0), (40, 10000, 10000)).shift(ds.data_roi.get_offset()).snap_to_grid(ds.voxel_size, 'shrink')
 img = ds.to_ndarray(roi)
 # img = get_im_data(ds.data)
 
