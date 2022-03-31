@@ -1,3 +1,4 @@
+# %%
 print('Importing dependencies...')
 
 from functools import partial
@@ -13,7 +14,8 @@ from boilerPlate import GaussBlur, Noiser
 
 # Load Trained Discriminator:
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
-from CycleGun_CBv30nmBottom100um_cb2gcl1_20211126_ import *
+# from CycleGun_CBv30nmBottom100um_cb2gcl1_20211126_ import *
+from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
 
 print('Defining functions...')
 def bring_the_noise(src, pipeline, noise_order, noise_dict):
@@ -54,7 +56,7 @@ def update_noise_dict(noise_dict, optim_map, optim_vars):
 def cost_func(ref, pre_pipe, post_pipe, critic, out_array, noise_order, noise_dict, optim_map, optim_vars):
     # Setup Noising
     noise_dict = update_noise_dict(noise_dict, optim_map, optim_vars)
-    pipe, arrays, noise_name = bring_the_noise(ref.real_B_src, pre_pipe, noise_order, noise_dict)
+    pipe, arrays, noise_name = bring_the_noise(ref.real_src, pre_pipe, noise_order, noise_dict)
     arrays.append(out_array)
     pipe += post_pipe
     
@@ -75,6 +77,7 @@ def cost_func(ref, pre_pipe, post_pipe, critic, out_array, noise_order, noise_di
     # print(f'Loss = {loss}')
     return loss.item()
 
+# %%
 print('Setting up pipeline parts...')
 
 #####@@@@@ Setup Noise and other preferences
@@ -116,20 +119,7 @@ optim_map = [
 
 optim_vars = [0, .01, 6, 3]
 
-batch_size = 12
-
-# cycleGun now stores a full CycleGAN model and pipeline
-# cycleGun.netD2 is the Discriminator trained to differentiate real XNH from fake, we'll call it the "critic"
-critic = cycleGun.netD2
-
-# Get the source node for the EM
-source = cycleGun.source_B
-
-# Construct pipe
-pre_pipe = source
-pre_pipe += gp.RandomLocation()
-pre_pipe += cycleGun.reject_B
-pre_pipe += gp.Normalize(cycleGun.real_B_src)
+batch_size = 3
 
 noise_name = ''
 for noise in noise_order:
@@ -137,11 +127,32 @@ for noise in noise_order:
     noise_name += '_'
 noise_name = noise_name[:-1]
 
+# cycleGun now stores a full CycleGAN model and pipeline
+# cycleGun.netD2 is the Discriminator trained to differentiate real XNH from fake, we'll call it the "critic"
+critic = cycleGun.netD2
+
+# Get the source node for the EM
+datapipe = cycleGun.datapipe_B
+datapipe.get_extents = cycleGun.get_extents
+datapipe.common_voxel_size = cycleGun.common_voxel_size
+datapipe.gan_loss = cycleGun.loss.gan_loss
+
+# Construct pipe
+pre_parts = [datapipe.source, 
+        gp.RandomLocation(), 
+        datapipe.reject, 
+        datapipe.normalize_real,
+        datapipe.scaleimg2tanh_real
+        ]
+pre_pipe = None
+for part in pre_parts:
+    if part is not None:
+        pre_pipe = part if pre_pipe is None else pre_pipe + part
+
 # Add rest of pipe
 out_array = gp.ArrayKey(noise_name.upper() + '_COMMONSIZE')
 post_pipe = gp.Resample(gp.ArrayKey(noise_name.upper()), cycleGun.common_voxel_size, out_array)
 
-post_pipe += gp.Normalize(out_array)
 #TODO: ADD CACHE
 
 # add "channel" dimensions if neccessary, else use z dimension as channel
@@ -150,7 +161,7 @@ if cycleGun.ndims == len(cycleGun.common_voxel_size):
 # add "batch" dimensions
 post_pipe += gp.Stack(batch_size)
 
-func = partial(cost_func, cycleGun, pre_pipe, post_pipe, critic, out_array, noise_order, noise_dict, optim_map)
+func = partial(cost_func, datapipe, pre_pipe, post_pipe, critic, out_array, noise_order, noise_dict, optim_map)
 bounds = [
                 [
                     None, None#'noise_speckle','kwargs','mean'
@@ -162,18 +173,20 @@ bounds = [
                     0, None#'gaussBlur' -sigma
                 ],
                 [
-                    0.1, None#'resample','ratio'
+                    0.1, 5#'resample','ratio'
                 ]
             ]
 options = {'disp': True} 
 
+# %%
 print('Testing...')
-print(f'Initial loss: {cost_func(cycleGun, pre_pipe, post_pipe, critic, out_array, noise_order, noise_dict, optim_map, optim_vars)}')
+print(f'Initial loss: {func(optim_vars)}')
 
+# %%
 print('Optimizing...')
-# result = optimize.shgo(func, bounds, options=options)
+result = optimize.shgo(func, bounds, options=options)
 # result = optimize.basinhopping(func, optim_vars, niter=1000, disp=True)
-result = optimize.differential_evolution(func, bounds, disp=True, workers=10, x0=optim_vars)
+# result = optimize.differential_evolution(func, bounds, disp=True)#, workers=10)
 print(f'x = {result.x}, Final loss = {result.fun}, Total # local minima found = {len(result.xl)}')
 
 print('Saving...')
@@ -183,3 +196,5 @@ json.dump(final_dict, f)
 f.close()
 
 print('Done.')
+
+# %%
