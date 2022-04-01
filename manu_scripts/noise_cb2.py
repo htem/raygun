@@ -1,7 +1,7 @@
 # %%
 import sys
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
-from boilerPlate import GaussBlur, Noiser
+from train_noiser import *
 
 # SET CORRECT SCRIPT BELOW
 from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
@@ -41,33 +41,7 @@ noise_dict = {
                 },
             'poissNoise': True
             }
-# %%
-def bring_the_noise(src, pipeline, noise_order, noise_dict):
-    this_array = src
-    noise_name = ''
-    arrays = [src]
-    for noise in noise_order:
-        noise_name += noise
-        new_array = gp.ArrayKey(noise_name.upper())
-        
-        if noise == 'resample':# and not isclose(noise_dict[noise]['ratio'], 1):
-            pipeline += gp.Resample(this_array, noise_dict[noise]['base_voxel_size'] * noise_dict[noise]['ratio'], new_array)
-        elif noise == 'gaussBlur':# and not isclose(noise_dict[noise], 0):
-            pipeline += GaussBlur(this_array, noise_dict[noise], new_array=new_array)
-        elif noise == 'gaussNoise':# and not isclose(noise_dict[noise], 0):
-            pipeline += Noiser(this_array, new_array=new_array, mode='gaussian', var=noise_dict[noise])
-        elif noise == 'poissNoise':# and noise_dict[noise]:
-            pipeline += Noiser(this_array, new_array=new_array, mode='poisson')
-        elif 'noise' in noise:# and noise_dict[noise]:
-            pipeline += Noiser(this_array, new_array=new_array, mode=noise_dict[noise]['mode'], **noise_dict[noise]['kwargs'])
-        
-        noise_name += '_'
-        this_array = new_array
-        arrays.append(new_array)
-    
-    noise_name = noise_name[:-1]
-    return pipeline, arrays, noise_name
-
+            
 # %%
 def test_noise(datapipe, 
             noise_order, 

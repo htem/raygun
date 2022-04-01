@@ -743,7 +743,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 px_pad = self.get_valid_crop(side_length=side_length)
             else:
                 px_pad = crop_to_valid
-            self.model.crop_to_valid = px_pad
+            self.model.crop_pad = px_pad
             px_pad = gp.Coordinate((0,)*(len(self.common_voxel_size) - len(px_pad)) + px_pad)
 
         scan_request = gp.BatchRequest()

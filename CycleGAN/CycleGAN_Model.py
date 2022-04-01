@@ -11,7 +11,7 @@ class CycleGAN_Model(torch.nn.Module):
         self.scale_factor_A = scale_factor_A
         self.scale_factor_B = scale_factor_B
         self.cycle = True
-        self.crop_to_valid = False
+        self.crop_pad = False
     
     def sampling_bottleneck(self, array, scale_factor):
         size = array.shape[-len(scale_factor):]
