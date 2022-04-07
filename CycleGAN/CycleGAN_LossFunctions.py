@@ -1,5 +1,6 @@
 # !conda activate n2v
 import torch
+from utils import *
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -7,8 +8,6 @@ logger = logging.Logger('CycleGAN_Loss', 'INFO')
 
 class CycleGAN_Loss(torch.nn.Module):
     def __init__(self, 
-                l1_loss, 
-                gan_loss, 
                 netD1, 
                 netG1, 
                 netD2, 
@@ -16,13 +15,14 @@ class CycleGAN_Loss(torch.nn.Module):
                 optimizer_D, 
                 optimizer_G, 
                 dims,
+                l1_loss = torch.nn.SmoothL1Loss(), 
                 l1_lambda=100, 
                 identity_lambda=0,
-                gan_mode=None
+                gan_mode='lsgan'
                  ):
         super(CycleGAN_Loss, self).__init__()
         self.l1_loss = l1_loss
-        self.gan_loss = gan_loss
+        self.gan_loss = GANLoss(gan_mode=gan_mode)
         self.netD1 = netD1 # differentiates between fake and real Bs
         self.netG1 = netG1 # turns As into Bs
         self.netD2 = netD2 # differentiates between fake and real As
@@ -193,8 +193,6 @@ class CycleGAN_Loss(torch.nn.Module):
 
 class SplitGAN_Loss(torch.nn.Module):
     def __init__(self, 
-                l1_loss, 
-                gan_loss, 
                 netD1, 
                 netG1, 
                 netD2, 
@@ -203,13 +201,14 @@ class SplitGAN_Loss(torch.nn.Module):
                 optimizer_G2, 
                 optimizer_D, 
                 dims,
+                l1_loss = torch.nn.SmoothL1Loss(), 
                 l1_lambda=100, 
                 identity_lambda=0,
-                gan_mode=None
+                gan_mode='lsgan'
                  ):
         super(SplitGAN_Loss, self).__init__()
         self.l1_loss = l1_loss
-        self.gan_loss = gan_loss
+        self.gan_loss = GANLoss(gan_mode=gan_mode)
         self.netD1 = netD1 # differentiates between fake and real Bs
         self.netG1 = netG1 # turns As into Bs
         self.netD2 = netD2 # differentiates between fake and real As
@@ -382,8 +381,6 @@ class SplitGAN_Loss(torch.nn.Module):
 class Custom_Loss(torch.nn.Module):
     """Hyper-adjustable CycleGAN loss function based on Split-Loss"""
     def __init__(self, 
-                l1_loss, 
-                gan_loss, 
                 netD1, 
                 netG1, 
                 netD2, 
@@ -392,6 +389,7 @@ class Custom_Loss(torch.nn.Module):
                 optimizer_G2, 
                 optimizer_D, 
                 dims,
+                l1_loss = torch.nn.SmoothL1Loss(), 
                 g_lambda_dict= {'A': {'l1_loss': {'cycled': 10, 'identity': 0},
                                     'gan_loss': {'fake': 1, 'cycled': 0},
                                     },
@@ -402,11 +400,11 @@ class Custom_Loss(torch.nn.Module):
                 d_lambda_dict= {'A': {'real': 1, 'fake': 1, 'cycled': 0},
                                 'B': {'real': 1, 'fake': 1, 'cycled': 0},
                             },
-                gan_mode=None
+                gan_mode='lsgan'
                  ):
         super(Custom_Loss, self).__init__()
         self.l1_loss = l1_loss
-        self.gan_loss = gan_loss
+        self.gan_loss = GANLoss(gan_mode=gan_mode)
         self.netD1 = netD1 # differentiates between fake and real Bs
         self.netG1 = netG1 # turns As into Bs
         self.netD2 = netD2 # differentiates between fake and real As
@@ -442,6 +440,7 @@ class Custom_Loss(torch.nn.Module):
                 module.weight.data = temp.clamp(min, max)
 
     def backward_D(self, side, Dnet, data_dict):
+        loss = 0
         for key, lambda_ in self.d_lambda_dict[side].items():
                 if lambda_ != 0:
                     # if key == 'identity': # TODO: ADD IDENTITY SUPPORT
@@ -451,7 +450,7 @@ class Custom_Loss(torch.nn.Module):
         
                     this_loss = self.gan_loss(Dnet(data_dict[key].detach()), key == 'real')
                     
-                    self.loss_dict.update({f'Discriminator_{side}': key})
+                    self.loss_dict.update({f'Discriminator_{side}/{key}': this_loss})
                     loss += lambda_ * this_loss
 
         loss.backward()
@@ -481,10 +480,11 @@ class Custom_Loss(torch.nn.Module):
     def backward_G(self, side, Gnet, Dnet, data_dict):
         """Calculate losses for the generator"""        
         
+        loss = 0
         real = data_dict['real']
         for fcn_name, lambdas in self.g_lambda_dict[side].items():
             loss_fcn = getattr(self, fcn_name)
-            for key, lambda_ in lambdas:
+            for key, lambda_ in lambdas.items():
                 if lambda_ != 0:
                     if key == 'identity' and key not in data_dict:
                         data_dict['identity'] = Gnet(data_dict['real'])
@@ -498,7 +498,7 @@ class Custom_Loss(torch.nn.Module):
                     elif fcn_name == 'gan_loss':
                         this_loss = loss_fcn(Dnet(pred), True)
                     
-                    self.loss_dict.update({fcn_name: f'{key}_{side}'})
+                    self.loss_dict.update({f'{fcn_name}/{key}_{side}': this_loss})
                     loss += lambda_ * this_loss
         
         # calculate gradients

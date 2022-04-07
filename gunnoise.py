@@ -1,5 +1,3 @@
-# !conda activate n2v
-
 import zarr
 import matplotlib.pyplot as plt
 
@@ -8,7 +6,6 @@ import gunpowder as gp
 # logging.basicConfig(level=logging.INFO)
 
 # from this repo
-# from segway.tasks.make_zarr_from_tiff import task_make_zarr_from_tiff_volume as tif2zarr
 from boilerPlate import GaussBlur, Noiser
 
 def bring_the_noise(src, pipeline, noise_order, noise_dict, noise_version=''):
@@ -49,7 +46,7 @@ def bring_the_noise(src, pipeline, noise_order, noise_dict, noise_version=''):
         noise_name += noise_version
     return pipeline, arrays, noise_name
 
-def noise_batch(samples,
+def noise_render(samples,
     src_path,
     raw_name,
     noise_dict,

@@ -1,5 +1,4 @@
 # %%
-from itertools import cycle
 import sys
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220215_ import *
@@ -16,24 +15,26 @@ sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311LinkResSelu_train import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311SplitResSelu_train import *
 # from SplitCycleGun20220311XNH2EM_apply_cb2SynapseCutout1_ import *
-from SplitCycleGun20220311XNH2EM_apply_CBx30nm_8um1_ import *
+# from SplitCycleGun20220311XNH2EM_apply_CBx30nm_8um1_ import *
+from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220313SplitResSeluParNoise_train import *
+# from CycleGun_CBxFN90nmtile3_CBx30nmBottom100um_20220324SplitValidResSelu_train import *
 import matplotlib.pyplot as plt
 import zarr
 
 # %%
-request, pipe = cycleGun.render_full(side_length=248, side='A', cycle=False, crop_to_valid=True, pad_source=False)#, test=True)
-# pipe += gp.RandomLocation()
-# with gp.build(pipe):
-#     batch = pipe.request_batch(request)
+request, pipe = cycleGun.render_full(side_length=625, side='B', cycle=False, crop_to_valid=True, test=True)
+pipe += gp.RandomLocation()
+with gp.build(pipe):
+    batch = pipe.request_batch(request)
 
 # %%
 batch = cycleGun.test_train()
 
 # %%
-side_length=248
-batch = cycleGun.test_prediction('A', side_length=side_length, cycle=True)
-# batch = cycleGun.test_prediction('B', side_length=side_length, cycle=True)
+side_length=624
+# batch = cycleGun.test_prediction('A', side_length=side_length, cycle=True)
+batch = cycleGun.test_prediction('B', side_length=side_length, cycle=False)
 
 # %%
 cycleGun.model.eval()
@@ -187,16 +188,24 @@ datapipe = cycleGun.datapipe_B
 
 z = zarr.open(datapipe.src_path)
 im_data = get_im_data(z[datapipe.real_name])
-im_data = get_im_data(z['volumes/CycleGun_CBv30nmBottom100um_cb2gcl1_20220311LinkResSelu_enFAKE'], offset=0)
-z[datapipe.real_name].info
+# z.info
+arrays = [key for key in z['volumes'].array_keys()]
+plt.figure(figsize=(20,20))
+plt.imshow(im_data, cmap='gray')
+
+# %%
+im_data = get_im_data(z['volumes/'+arrays[1]], offset=10)
+plt.figure(figsize=(20,20))
 plt.imshow(im_data, cmap='gray')
 
 
 # %%
 # datapipe = cycleGun.datapipe_A
 datapipe = cycleGun.datapipe_B
+ds = daisy.open_ds(datapipe.src_path, 'volumes/'+arrays[1])
 ds = daisy.open_ds(datapipe.src_path, datapipe.real_name)
-roi = daisy.Roi((0, 0, 0), (40, 2048, 2048)).shift(ds.data_roi.get_offset()).snap_to_grid(ds.voxel_size, 'shrink')
+# roi = daisy.Roi((0, 0, 0), (40, 2048, 2048)).shift(ds.data_roi.get_offset()).snap_to_grid(ds.voxel_size, 'shrink')
+roi = daisy.Roi((0, 0, 0), (40, 10000, 10000)).shift(ds.data_roi.get_offset()).snap_to_grid(ds.voxel_size, 'shrink')
 img = ds.to_ndarray(roi)
 # img = get_im_data(ds.data)
 
