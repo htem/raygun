@@ -89,7 +89,12 @@ if __name__ == '__main__':
 
     #####@@@@@ Setup Noise and other preferences
     # noise_order = ['noise_speckle', 'noise_gauss', 'gaussBlur', 'resample', 'poissNoise']
-    noise_order = ['noise_speckle', 'gaussBlur', 'resample', 'poissNoise']
+    noise_order = [
+                    'noise_speckle', 
+                    'gaussBlur', 
+                    # 'resample', 
+                    'poissNoise'
+                    ]
     noise_dict = {
                 'noise_speckle': 
                     {
@@ -101,11 +106,11 @@ if __name__ == '__main__':
                             }
                     },
                 'gaussBlur': 6, # Sigma for guassian blur
-                'resample': 
-                    {
-                        'base_voxel_size': gp.Coordinate((4,4,4)),
-                        'ratio': 3
-                    },
+                # 'resample': 
+                #     {
+                #         'base_voxel_size': gp.Coordinate((4,4,4)),
+                #         'ratio': 3
+                #     },
                 'poissNoise': True
                 }
 
@@ -119,12 +124,17 @@ if __name__ == '__main__':
                     [
                         'gaussBlur'
                     ],
-                    [
-                        'resample','ratio'
-                    ]
+                    # [
+                    #     'resample','ratio'
+                    # ]
                 ]
 
-    optim_vars = [0, .01, 6, 3]
+    optim_vars = [
+                    0, 
+                    .01, 
+                    6, 
+                    # 3
+                ]
 
     batch_size = 3
 
@@ -171,17 +181,17 @@ if __name__ == '__main__':
     func = partial(cost_func, datapipe, pre_pipe, post_pipe, critic, out_array, noise_order, noise_dict, optim_map)
     bounds = [
                     [
-                        None, None#'noise_speckle','kwargs','mean'
+                        -1, 1#'noise_speckle','kwargs','mean'
                     ],
                     [
-                        0, None#'noise_speckle','kwargs','var'
+                        0, 1#'noise_speckle','kwargs','var'
                     ],
                     [
-                        0, None#'gaussBlur' -sigma
+                        0, 20#'gaussBlur' -sigma
                     ],
-                    [
-                        0.1, 5#'resample','ratio'
-                    ]
+                    # [
+                    #     0.1, 5#'resample','ratio'
+                    # ]
                 ]
     options = {'disp': True} 
 
@@ -191,10 +201,10 @@ if __name__ == '__main__':
 
     # %%
     print('Optimizing...')
-    result = optimize.shgo(func, bounds, options=options)
+    # result = optimize.shgo(func, bounds, options=options)
     # result = optimize.basinhopping(func, optim_vars, niter=1000, disp=True)
-    # result = optimize.differential_evolution(func, bounds, disp=True)#, workers=10)
-    print(f'x = {result.x}, Final loss = {result.fun}, Total # local minima found = {len(result.xl)}')
+    result = optimize.differential_evolution(func, bounds, disp=True)#, workers=10)
+    print(f'x = {result.x}, Final loss = {result.fun}')#, Total # local minima found = {len(result.xl)}')
 
     print('Saving...')
     final_dict = update_noise_dict(noise_dict, optim_map, result.x)
