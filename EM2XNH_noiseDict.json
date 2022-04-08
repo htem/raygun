@@ -1,0 +1,1 @@
+{"noise_speckle": {"mode": "speckle", "kwargs": {"mean": 0.7993263717553605, "var": 0.2949917943391508}}, "gaussBlur": 1.6901938948269404, "poissNoise": true}
