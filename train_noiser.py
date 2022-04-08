@@ -8,6 +8,7 @@ from scipy import optimize
 import json
 import torch
 import sys
+import matplotlib.pyplot as plt
 
 sys.path.insert(0, '/n/groups/htem/users/jlr54/raygun/')
 from boilerPlate import GaussBlur, Noiser
@@ -48,7 +49,7 @@ def update_noise_dict(noise_dict, optim_map, optim_vars):
         exec(eval_str)
     return noise_dict
 
-def make_noise_pipe(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict, optim_map, optim_vars):
+def make_noise_pipe(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict, optim_map, optim_vars, side_length=128):
     # Setup Noising
     noise_dict = update_noise_dict(noise_dict, optim_map, optim_vars)
     pipe, arrays, noise_name = bring_the_noise(ref.real_src, pre_pipe, noise_order, noise_dict)
@@ -57,9 +58,7 @@ def make_noise_pipe(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict
     
     # Make Batch Request for Training
     request = gp.BatchRequest()
-    extents = ref.get_extents(side_length=128)
-    # for array in arrays:
-    #     request.add(array, ref.common_voxel_size * extents)
+    extents = ref.get_extents(side_length=side_length)
     request.add(out_array, ref.common_voxel_size * extents)
 
     return pipe, request
@@ -77,6 +76,40 @@ def cost_func(ref, pre_pipe, post_pipe, critic, out_array, noise_order, noise_di
     loss = ref.gan_loss(pred_noised, True)
     # print(f'Loss = {loss}')
     return loss.item()
+
+def show_noise_results(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict, optim_map, optim_vars, side_length=512):
+    # Setup Noising
+    pipe, _ = make_noise_pipe(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict, optim_map, optim_vars)
+    if ref.resample is not None:
+        pipe += ref.resample
+
+    # Make Batch Request for Showing
+    request = gp.BatchRequest()
+    extents = ref.get_extents(side_length=side_length)
+    request.add(out_array, ref.common_voxel_size * extents)
+    request.add(ref.real, ref.common_voxel_size * extents)
+
+    # Get Batch
+    with gp.build(pipe):
+        batch = pipe.request_batch(request)
+    
+    reals = batch[ref.real].data.squeeze()
+    noiseds = batch[out_array].data.squeeze()
+    rows = reals.shape[0] if len(reals.shape) > 2 else 1
+    fig, axs = plt.subplots(rows, 2, figsize=(20, 10*rows))
+    if rows == 1:
+        axs[0].imshow(reals, cmap='gray')
+        axs[0].set_title('Original')
+        
+        axs[1].imshow(noiseds, cmap='gray')
+        axs[1].set_title('Noised')
+    else:
+        for real, noised, ax in zip(reals, noiseds, axs):            
+            ax[0].imshow(real, cmap='gray')
+            ax[0].set_title('Original')
+            
+            ax[1].imshow(noised, cmap='gray')
+            ax[1].set_title('Noised')
 
 if __name__ == '__main__':    
     # Load Trained Discriminator:
