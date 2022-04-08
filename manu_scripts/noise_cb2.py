@@ -1,79 +1,88 @@
 # %%
+import numpy as np
+from train_noiser import *
+import daisy
+import json
+
+# Load CycleGAN object:
 import sys
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
-from train_noiser import *
-
-# SET CORRECT SCRIPT BELOW
 from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
+
 # %%
+print('Setting up pipeline parts...')
+#Setup Noise and other preferences
+noise_order = [
+                'noise_speckle', 
+                'gaussBlur', 
+                'poissNoise'
+                ]
+
+with open("EM2XNH_noiseDict.json", "r") as f:
+    noise_dict = json.load(f)
+
+noise_name = ''
+for noise in noise_order:
+    noise_name += noise
+    noise_name += '_'
+noise_name = noise_name[:-1]
+
+# Get the source node for the EM
 datapipe = cycleGun.datapipe_B
+datapipe.get_extents = cycleGun.get_extents
+datapipe.common_voxel_size = cycleGun.common_voxel_size
+datapipe.gan_loss = cycleGun.loss.gan_loss
 
-# noise_dict = {
-#         # 'downX': 8, # cudegy mimic of 30nm pixel size (max uttained) from sensor at ESRF.i16a X-ray source, assuming 4nm voxel size EM source images
-#         'gaussBlur': 30, # cudegy mimic of 30nm resolution of KB mirrors at ESRF.i16a X-ray source
-#         'gaussNoise': None, # ASSUMES MEAN = 0, THIS SETS VARIANCE
-#         'poissNoise': True, # cudegy mimic of sensor shot noise (hot pixels) at ESRF.i16a X-ray source
-#          }
+# Construct pipe
+pre_parts = [datapipe.source, 
+        datapipe.normalize_real,
+        datapipe.scaleimg2tanh_real
+        ]
+pre_pipe = None
+for part in pre_parts:
+    if part is not None:
+        pre_pipe = part if pre_pipe is None else pre_pipe + part
 
-# noise_order = [
-#                 'gaussBlur', 
-#                'downX', 
-#                'gaussNoise', 
-#                'poissNoise'
-#                ]
+# Add rest of pipe
+out_array = gp.ArrayKey(noise_name.upper() + '_COMMONSIZE')
+post_pipe = gp.Resample(gp.ArrayKey(noise_name.upper()), cycleGun.common_voxel_size, out_array)
 
-noise_order = ['noise_speckle', 'gaussBlur', 'resample', 'poissNoise']
-noise_dict = {
-            'noise_speckle': 
-                {
-                    'mode': 'speckle',
-                    'kwargs':
-                        {
-                            'mean': 0,
-                            'var': 0.01
-                        }
-                },
-            'gaussBlur': 6, # Sigma for guassian blur
-            'resample': 
-                {
-                    'base_voxel_size': gp.Coordinate((4,4,4)),
-                    'ratio': 3
-                },
-            'poissNoise': True
-            }
-            
-# %%
-def test_noise(datapipe, 
-            noise_order, 
-            noise_dict, 
-            test_size=(40, 2048, 2048)
-            ):
+post_pipe += gp.IntensityScaleShift(out_array, 0.5, 0.5) # tanh to float32 image
+post_pipe += gp.IntensityScaleShift(out_array, 255, 0) # float32 to uint8
+post_pipe += gp.AsType(out_array, np.uint8)
 
-    parts = [datapipe.source, 
-            gp.RandomLocation(), 
-            datapipe.reject, 
-            datapipe.resample,
-            datapipe.normalize_real
-            ]
-    pipeline = None
-    for part in parts:
-        if part is not None:
-            pipeline = part if pipeline is None else pipeline + part
-    
-    pipeline, arrays, noise_name = bring_the_noise(datapipe.real, pipeline, noise_order, noise_dict)
+pipe, scan_request = make_noise_pipe(datapipe, pre_pipe, post_pipe, out_array, noise_order, noise_dict)
 
-    # request matching the model input and output sizes
-    request = gp.BatchRequest()
-    for array in arrays:
-        request.add(array, test_size)
-    
-    with gp.build(pipeline):
-        batch = pipeline.request_batch(request)
-    
-    fig, axs = plt.subplots(1,len(arrays), figsize=(40, 40*len(arrays)))
-    for i, array in enumerate(arrays):
-        axs[i].imshow(batch[array].data.squeeze(), cmap='gray')
-        axs[i].set_title(array.identifier)
-    
-    return batch, arrays, noise_name
-# %%
+# Declare new array to write to
+compressor = {'id': 'blosc', 
+            'clevel': 3,
+            'cname': 'blosclz',
+            'blocksize': 64
+            }        
+source_ds = daisy.open_ds(datapipe.src_path, datapipe.real_name)
+datapipe.total_roi = source_ds.data_roi
+write_size = scan_request[out_array].roi.get_shape()
+daisy.prepare_ds(
+    datapipe.out_path,
+    'volumes/' + noise_name,
+    datapipe.total_roi,
+    daisy.Coordinate(cycleGun.common_voxel_size),
+    np.uint8,
+    write_size=write_size,
+    num_channels=1,
+    compressor=compressor)
+
+pipe += gp.ZarrWrite(
+        dataset_names = {out_array: 'volumes/' + noise_name},
+        output_filename = datapipe.src_path,
+        compression_type = compressor,
+        #dataset_dtypes = {noisy: np.uint8} # save as 0-255 values (should match raw)
+)
+
+pipe += gp.Scan(scan_request, num_workers=16, cache_size=64)
+
+if __name__ == '__main__':    
+    print('Rendering...')
+    with gp.build(pipe):
+        pipe.request_batch(gp.BatchRequest())
+    print('Done.')

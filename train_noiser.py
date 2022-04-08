@@ -49,9 +49,10 @@ def update_noise_dict(noise_dict, optim_map, optim_vars):
         exec(eval_str)
     return noise_dict
 
-def make_noise_pipe(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict, optim_map, optim_vars, side_length=128):
+def make_noise_pipe(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict, optim_map=None, optim_vars=None, side_length=128):
     # Setup Noising
-    noise_dict = update_noise_dict(noise_dict, optim_map, optim_vars)
+    if optim_map is None or optim_vars is None:
+        noise_dict = update_noise_dict(noise_dict, optim_map, optim_vars)
     pipe, arrays, noise_name = bring_the_noise(ref.real_src, pre_pipe, noise_order, noise_dict)
     arrays.append(out_array)
     pipe += post_pipe
@@ -77,9 +78,9 @@ def cost_func(ref, pre_pipe, post_pipe, critic, out_array, noise_order, noise_di
     # print(f'Loss = {loss}')
     return loss.item()
 
-def show_noise_results(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict, optim_map, optim_vars, side_length=512):
+def show_noise_results(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict, side_length=512):
     # Setup Noising
-    pipe, _ = make_noise_pipe(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict, optim_map, optim_vars)
+    pipe, _ = make_noise_pipe(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict)
     if ref.resample is not None:
         pipe += ref.resample
 
@@ -110,6 +111,8 @@ def show_noise_results(ref, pre_pipe, post_pipe, out_array, noise_order, noise_d
             
             ax[1].imshow(noised, cmap='gray')
             ax[1].set_title('Noised')
+    
+    return batch
 
 if __name__ == '__main__':    
     # Load Trained Discriminator:
@@ -241,7 +244,7 @@ if __name__ == '__main__':
 
     print('Saving...')
     final_dict = update_noise_dict(noise_dict, optim_map, result.x)
-    f = open("EM2XNH_noiseDict.json", "w")
+    f = open("EM2XNH_noiseDict.json", "w") # TODO: fix assuming noise order is in the order of the dictionary
     json.dump(final_dict, f)
     f.close()
 
