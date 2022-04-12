@@ -19,6 +19,7 @@ sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/
 from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220313SplitResSeluParNoise_train import *
 # from CycleGun_CBxFN90nmtile3_CBx30nmBottom100um_20220324SplitValidResSelu_train import *
+# from CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_train import *
 import matplotlib.pyplot as plt
 import zarr
 
@@ -33,8 +34,8 @@ batch = cycleGun.test_train()
 
 # %%
 side_length=624
-# batch = cycleGun.test_prediction('A', side_length=side_length, cycle=True)
-batch = cycleGun.test_prediction('B', side_length=side_length, cycle=False)
+batch = cycleGun.test_prediction('A', side_length=side_length, cycle=False)
+# batch = cycleGun.test_prediction('B', side_length=side_length, cycle=False)
 
 # %%
 cycleGun.model.eval()

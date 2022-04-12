@@ -7,7 +7,8 @@ import json
 # Load CycleGAN object:
 import sys
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
-from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
+from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311SplitResSelu_train import *
+# from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
 
 # %%
 print('Setting up pipeline parts...')
