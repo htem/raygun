@@ -7,19 +7,19 @@ import json
 # Load CycleGAN object:
 import sys
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
-from CycleGun_CBv30nmBottom100um_cb2gcl1_20220311SplitResSelu_train import *
+from CycleGun_CBv30nmBottom100um_cb2gcl1_20220320SplitResSelu_train import *
 # from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
 
 # %%
 print('Setting up pipeline parts...')
 #Setup Noise and other preferences
 noise_order = [
-                'noise_speckle', 
                 'gaussBlur', 
+                'noise_speckle', 
                 'poissNoise'
                 ]
 
-with open("EM2XNH_noiseDict.json", "r") as f:
+with open("/n/groups/htem/users/jlr54/raygun/manu_scripts/EM2XNH_noiseDict.json", "r") as f:
     noise_dict = json.load(f)
 
 noise_name = ''
@@ -36,7 +36,8 @@ datapipe.gan_loss = cycleGun.loss.gan_loss
 
 # Construct pipe
 pre_parts = [datapipe.source, 
-        datapipe.normalize_real,
+        datapipe.resample,
+        datapipe.normalize_real, 
         datapipe.scaleimg2tanh_real
         ]
 pre_pipe = None
@@ -45,10 +46,9 @@ for part in pre_parts:
         pre_pipe = part if pre_pipe is None else pre_pipe + part
 
 # Add rest of pipe
-out_array = gp.ArrayKey(noise_name.upper() + '_COMMONSIZE')
-post_pipe = gp.Resample(gp.ArrayKey(noise_name.upper()), cycleGun.common_voxel_size, out_array)
+out_array = gp.ArrayKey(noise_name.upper())
 
-post_pipe += gp.IntensityScaleShift(out_array, 0.5, 0.5) # tanh to float32 image
+post_pipe = gp.IntensityScaleShift(out_array, 0.5, 0.5) # tanh to float32 image
 post_pipe += gp.IntensityScaleShift(out_array, 255, 0) # float32 to uint8
 post_pipe += gp.AsType(out_array, np.uint8)
 
@@ -82,6 +82,7 @@ pipe += gp.ZarrWrite(
 
 pipe += gp.Scan(scan_request, num_workers=16, cache_size=64)
 
+# %%
 if __name__ == '__main__':    
     print('Rendering...')
     with gp.build(pipe):

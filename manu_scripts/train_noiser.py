@@ -51,9 +51,9 @@ def update_noise_dict(noise_dict, optim_map, optim_vars):
 
 def make_noise_pipe(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict, optim_map=None, optim_vars=None, side_length=128):
     # Setup Noising
-    if optim_map is None or optim_vars is None:
+    if optim_map is not None and optim_vars is not None:
         noise_dict = update_noise_dict(noise_dict, optim_map, optim_vars)
-    pipe, arrays, noise_name = bring_the_noise(ref.real_src, pre_pipe, noise_order, noise_dict)
+    pipe, arrays, noise_name = bring_the_noise(ref.real, pre_pipe, noise_order, noise_dict)
     arrays.append(out_array)
     pipe += post_pipe
     
@@ -81,8 +81,6 @@ def cost_func(ref, pre_pipe, post_pipe, critic, out_array, noise_order, noise_di
 def show_noise_results(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict, side_length=512):
     # Setup Noising
     pipe, _ = make_noise_pipe(ref, pre_pipe, post_pipe, out_array, noise_order, noise_dict)
-    if ref.resample is not None:
-        pipe += ref.resample
 
     # Make Batch Request for Showing
     request = gp.BatchRequest()
@@ -117,8 +115,8 @@ def show_noise_results(ref, pre_pipe, post_pipe, out_array, noise_order, noise_d
 if __name__ == '__main__':    
     # Load Trained Discriminator:
     sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
-    # from CycleGun_CBv30nmBottom100um_cb2gcl1_20211126_ import *
-    from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
+    from CycleGun_CBv30nmBottom100um_cb2gcl1_20220320SplitResSelu_train import *
+    # from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
 
     # %%
     print('Setting up pipeline parts...')
@@ -126,8 +124,8 @@ if __name__ == '__main__':
     #####@@@@@ Setup Noise and other preferences
     # noise_order = ['noise_speckle', 'noise_gauss', 'gaussBlur', 'resample', 'poissNoise']
     noise_order = [
-                    'noise_speckle', 
                     'gaussBlur', 
+                    'noise_speckle', 
                     # 'resample', 
                     'poissNoise'
                     ]
@@ -138,10 +136,10 @@ if __name__ == '__main__':
                         'kwargs':
                             {
                                 'mean': 0,
-                                'var': 0.01
+                                'var': 0.1
                             }
                     },
-                'gaussBlur': 6, # Sigma for guassian blur
+                'gaussBlur': 3, # Sigma for guassian blur
                 # 'resample': 
                 #     {
                 #         'base_voxel_size': gp.Coordinate((4,4,4)),
@@ -172,7 +170,7 @@ if __name__ == '__main__':
                     # 3
                 ]
 
-    batch_size = 3
+    batch_size = 13
 
     noise_name = ''
     for noise in noise_order:
@@ -194,6 +192,7 @@ if __name__ == '__main__':
     pre_parts = [datapipe.source, 
             gp.RandomLocation(), 
             datapipe.reject, 
+            datapipe.resample,
             datapipe.normalize_real,
             datapipe.scaleimg2tanh_real
             ]
@@ -203,16 +202,13 @@ if __name__ == '__main__':
             pre_pipe = part if pre_pipe is None else pre_pipe + part
 
     # Add rest of pipe
-    out_array = gp.ArrayKey(noise_name.upper() + '_COMMONSIZE')
-    post_pipe = gp.Resample(gp.ArrayKey(noise_name.upper()), cycleGun.common_voxel_size, out_array)
+    out_array = gp.ArrayKey(noise_name.upper())
 
-    #TODO: ADD CACHE
-
+    # add "batch" dimensions
+    post_pipe = gp.Stack(batch_size)
     # add "channel" dimensions if neccessary, else use z dimension as channel
     if cycleGun.ndims == len(cycleGun.common_voxel_size):
-        post_pipe += gp.Unsqueeze([out_array])
-    # add "batch" dimensions
-    post_pipe += gp.Stack(batch_size)
+        post_pipe += gp.Unsqueeze([out_array], 1)
 
     func = partial(cost_func, datapipe, pre_pipe, post_pipe, critic, out_array, noise_order, noise_dict, optim_map)
     bounds = [
@@ -223,7 +219,7 @@ if __name__ == '__main__':
                         0, 1#'noise_speckle','kwargs','var'
                     ],
                     [
-                        0, 20#'gaussBlur' -sigma
+                        0, 30#'gaussBlur' -sigma
                     ],
                     # [
                     #     0.1, 5#'resample','ratio'
@@ -239,7 +235,7 @@ if __name__ == '__main__':
     print('Optimizing...')
     # result = optimize.shgo(func, bounds, options=options)
     # result = optimize.basinhopping(func, optim_vars, niter=1000, disp=True)
-    result = optimize.differential_evolution(func, bounds, disp=True)#, workers=10)
+    result = optimize.differential_evolution(func, bounds, disp=True)#, workers=20)
     print(f'x = {result.x}, Final loss = {result.fun}')#, Total # local minima found = {len(result.xl)}')
 
     print('Saving...')
