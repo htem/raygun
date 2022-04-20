@@ -6,3 +6,4 @@ __pycache__*
 *Task*.config
 .run_configs*
 .daisy_logs_BlockwiseTask*
+*.out

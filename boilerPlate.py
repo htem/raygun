@@ -1,8 +1,6 @@
 import numpy as np
 import torch
-import random
 import logging
-from skimage import filters
 from skimage.util import *
 
 import gunpowder as gp
@@ -161,9 +159,9 @@ class GaussBlur(gp.BatchFilter):
         context = gp.Coordinate((self.truncate,)*roi.dims()) * self.sigma
 
         # 2. enlarge the requested ROI by the context
-        context_roi = roi.grow(context, context)
-        context_roi = request[this_array].roi.intersect(context_roi) # make sure it doesn't go out of bounds
-        
+        context_roi = roi.grow(context, context).snap_to_grid(self.spec[self.array].voxel_size)
+        context_roi = context_roi.intersect(self.spec[self.array].roi) # make sure it doesn't go out of bounds
+
         # create a new request with our dependencies
         deps = gp.BatchRequest()
         deps[self.array] = context_roi
