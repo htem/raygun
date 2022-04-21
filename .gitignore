@@ -7,3 +7,4 @@ __pycache__*
 .run_configs*
 .daisy_logs_BlockwiseTask*
 *.out
+.nfs*
