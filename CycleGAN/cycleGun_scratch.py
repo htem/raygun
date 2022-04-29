@@ -1,5 +1,6 @@
 # %%
 import sys
+#%%
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220215_ import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220304_ import *
@@ -19,8 +20,8 @@ sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/
 # from SplitCycleGun20220311XNH2EM_apply_cb2myelWM1_ import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220313SplitResSeluParNoise_train import *
 # from CycleGun_CBxFN90nmtile3_CBx30nmBottom100um_20220324SplitValidResSelu_train import *
-# from CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_train import *
-from CycleGun_CBv30nmBottom100um_cb2gcl1_20220320SplitResSelu_train import *
+from CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_train import *
+# from CycleGun_CBv30nmBottom100um_cb2gcl1_20220320SplitResSelu_train import *
 import matplotlib.pyplot as plt
 import zarr
 
