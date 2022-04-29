@@ -8,3 +8,4 @@ __pycache__*
 .daisy_logs_BlockwiseTask*
 *.out
 .nfs*
+*/igneous_tasks
