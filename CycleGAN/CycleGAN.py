@@ -695,7 +695,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.batch_show()
         return self.batch
 
-    def render_full(self, side='A', side_length=None, cycle=False, crop_to_valid=False, test=False):
+    def render_full(self, side='A', side_length=None, cycle=False, crop_to_valid=False, test=False, label_dict=None):
         #CYCLED CURRENTLY SAVED IN UPSAMPLED FORM (i.e. not original voxel size)
         #set model into evaluation mode
         self.model.eval()
@@ -732,13 +732,16 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             pred_spec = datapipe.source.spec[datapipe.real].copy()        
         pred_spec.voxel_size = self.common_voxel_size
-        # pred_spec.dtype = datapipe.normalize_fake.dtype
 
-        dataset_names = {datapipe.fake: 'volumes/'+self.model_name+'_enFAKE'}
-        # array_specs = {datapipe.fake: pred_spec.copy()}
-        if cycle:
-            dataset_names[datapipe.cycled] = 'volumes/'+self.model_name+'_enCYCLED'
-            # array_specs[datapipe.cycled] = pred_spec.copy()
+        if label_dict is None:
+            dataset_names = {datapipe.fake: 'volumes/'+self.model_name+'_enFAKE'}
+            if cycle:
+                dataset_names[datapipe.cycled] = 'volumes/'+self.model_name+'_enCYCLED'
+        else:
+            dataset_names = {datapipe.fake: 'volumes/'+label_dict['fake']}
+            if cycle:
+                dataset_names[datapipe.cycled] = 'volumes/'+label_dict['cycled']
+
 
         # Calculate padding if necessary:
         if crop_to_valid:
@@ -772,7 +775,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 inputs = input_dict,
                                 outputs = output_dict,
                                 checkpoint = self.checkpoint,
-                                # array_specs = array_specs, 
                                 spawn_subprocess=self.spawn_subprocess
                                 )                
         
@@ -781,11 +783,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         else:
             render_pipe += datapipe.postnet_pipe.nocycle
         render_pipe += gp.Squeeze(arrays[1:], axis=0) # remove batch dimension
-        
-        # # Add cropping if necessary
-        # if crop_to_valid:
-        #     for key in dataset_names.keys():
-        #         render_pipe += gp.Crop(key, roi=scan_request[key].roi.grow(-pad, -pad))#abs_positive=pad, abs_negative=pad)
 
         # Convert float32 on [0,1] to uint8 on [0,255]
         render_pipe += gp.IntensityScaleShift(datapipe.fake, 255, 0)        
@@ -822,7 +819,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                         dataset_names = dataset_names,
                         output_filename = datapipe.out_path,
                         compression_type = self.compressor
-                        # dataset_dtypes = {fake: pred_spec.dtype}
                         )        
         
         render_pipe += gp.Scan(scan_request, num_workers=self.num_workers, cache_size=self.cache_size)
