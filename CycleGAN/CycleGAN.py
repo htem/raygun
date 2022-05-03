@@ -802,7 +802,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 'blocksize': 64
                 }        
         source_ds = daisy.open_ds(datapipe.src_path, datapipe.real_name)
-        datapipe.total_roi = source_ds.data_roi
+        datapipe.total_roi = source_ds.data_roi.snap_to_grid(self.common_voxel_size, 'shrink')
         for key, name in dataset_names.items():
             write_size = scan_request[key].roi.get_shape()
             daisy.prepare_ds(

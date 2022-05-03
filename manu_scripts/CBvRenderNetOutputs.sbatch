@@ -3,7 +3,7 @@
 #SBATCH -p gpu_connectomics
 #SBATCH --gres=gpu:1
 #SBATCH --account=connectomics_contrib
-#SBATCH -t 3-00:00
+#SBATCH -t 3-00:00 
 #SBATCH -c 16
 #SBATCH --mem=50GB
 #SBATCH -o /n/groups/htem/users/jlr54/logs/CBvRenderNetOutputs.out
