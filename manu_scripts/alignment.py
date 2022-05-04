@@ -31,8 +31,12 @@ elx.SetParameter('WriteResultImage', 'false')
 elx.SetParameter('AutomaticScalesEstimation', 'false')
 elx.SetParameter('CheckNumberOfSamples', 'false')
 elx.Execute()
+#%%
 aligned_im = elx.GetResultImage()
 aligned_array = sitk.GetArrayFromImage(aligned_im)
+aligned_array -= aligned_array.min()
+aligned_array /= aligned_array.max()
+aligned_array *= 255
 aligned_array = aligned_array.astype(fixed_array.dtype)
 
 # %%
