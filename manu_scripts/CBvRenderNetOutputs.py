@@ -27,6 +27,7 @@ if __name__ == '__main__':
     for checkpoint in sys.argv[6:]:
         this_checkpoint = f'{cycleGun.model_path}{cycleGun.model_name}_checkpoint_{checkpoint}'
         cycleGun.checkpoint = this_checkpoint
+        cycleGun.load_saved_model(this_checkpoint)
         label_dict = {}
         label_dict['fake'] = f'{label_prefix}_checkpoint{checkpoint}_fake'
         label_dict['cycled'] = f'{label_prefix}_checkpoint{checkpoint}_cycled'
