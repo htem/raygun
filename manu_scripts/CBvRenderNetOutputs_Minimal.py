@@ -3,13 +3,16 @@ import runpy
 sys.path.append('/n/groups/htem/users/jlr54/raygun/')
 from CycleGAN import *
 
-def render(path, raw_name, target_roi, script_path, checkpoints, net='netG1'):
+def render(path, raw_name, target_roi, script_path, checkpoints, net='netG1', as_half=True):
     #Get Data to Render
     source = daisy.open_ds(path, raw_name)
     data = source.to_ndarray(target_roi)
 
     #Put on cuda and scale to [-1,1]
-    data = torch.cuda.FloatTensor(data).unsqueeze(0).unsqueeze(0)
+    if as_half:
+        data = torch.cuda.HalfTensor(data).unsqueeze(0).unsqueeze(0)
+    else:
+        data = torch.cuda.FloatTensor(data).unsqueeze(0).unsqueeze(0)
     data -= data.min()
     data /= data.max()
     data *= 2
@@ -34,6 +37,8 @@ def render(path, raw_name, target_roi, script_path, checkpoints, net='netG1'):
         cycleGun.load_saved_model(this_checkpoint)
         generator = getattr(cycleGun.model, net).cuda()
         generator.eval()
+        if as_half:
+            generator.to(torch.half)
         
         print(f"Rendering checkpoint {this_checkpoint}...")
         out = generator(data).detach().squeeze()

@@ -35,7 +35,7 @@ with gp.build(pipe):
 batch = cycleGun.test_train()
 
 # %%
-side_length=624
+side_length=64
 batch = cycleGun.test_prediction('A', side_length=side_length, cycle=False)
 # batch = cycleGun.test_prediction('B', side_length=side_length, cycle=False)
 
