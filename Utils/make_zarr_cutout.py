@@ -21,6 +21,8 @@ def make_zarr_cutout(source_file,
 
     #Load data
     source = daisy.open_ds(source_file, source_ds)
+    if source.n_channel_dims != 0:
+        num_channels = source.shape[0]
 
     #Prepare new dataset
     total_roi = daisy.Roi(offset, shape)
