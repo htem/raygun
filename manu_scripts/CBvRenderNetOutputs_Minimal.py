@@ -31,7 +31,7 @@ def render(path, raw_name, target_roi, script_path, checkpoints, net='netG1', as
 
     successes = 0
     for checkpoint in checkpoints:
-        out_name = f'volumes/{label_prefix}_checkpoint{checkpoint}_fake'
+        out_name = f'volumes/{label_prefix}_checkpoint{checkpoint}_{net}'
         this_checkpoint = f'{cycleGun.model_path}{cycleGun.model_name}_checkpoint_{checkpoint}'
         cycleGun.checkpoint = this_checkpoint
         cycleGun.load_saved_model(this_checkpoint)

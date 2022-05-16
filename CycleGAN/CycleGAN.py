@@ -270,7 +270,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         pars = [par for par in gnet.parameters()]
         result = gnet(torch.zeros(*shape, device=pars[0].device))
         pad = np.floor((gp.Coordinate(shape) - gp.Coordinate(result.shape)) / 2)
-
+        raise 'get_valid_crop() not fully implemented (in conflict with other usage of cropping'
         return gp.Coordinate(pad[-self.ndims:])
 
     def set_downsample_factors(self):
@@ -749,14 +749,16 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 px_pad = self.get_valid_crop(side_length=side_length)
             else:
                 px_pad = crop_to_valid
-            self.model.crop_pad = px_pad
-            px_pad = gp.Coordinate((0,)*(len(self.common_voxel_size) - len(px_pad)) + px_pad)
+            self.model.set_crop_pad(px_pad, self.ndims)
+            coor_pad = np.zeros((len(self.common_voxel_size)))
+            coor_pad[-self.ndims:] = px_pad # assumes first dimension is z (i.e. the dimension breaking isotropy)
+            coor_pad = gp.Coordinate(coor_pad)
 
         scan_request = gp.BatchRequest()
         for array in arrays:            
             extents = self.get_extents(side_length, array_name=array.identifier)
             if crop_to_valid and array is not datapipe.real:
-                extents -= px_pad * 2
+                extents -= coor_pad * 2
                 if array is datapipe.cycled:
                     extents -= px_pad * 2                    
             scan_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
