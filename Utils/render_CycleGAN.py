@@ -4,6 +4,8 @@ import runpy
 sys.path.append('/n/groups/htem/users/jlr54/raygun/')
 from CycleGAN import *
 
+_def_render_tiled(source, )
+
 def render_tiled(script_path, 
                 side, 
                 src_path, 
@@ -20,20 +22,20 @@ def render_tiled(script_path,
     cycleGun = script_dict['cycleGun']
 
     #Set Dataset to Render
-    ds = daisy.open_ds(src_path, src_name)
-    src_voxel_size = ds.voxel_size
+    source = daisy.open_ds(src_path, src_name)
     side = side.upper()
     if type(checkpoints) is not list:
         checkpoints = [checkpoints]
 
-    setattr(cycleGun, f'src_{side}', src_path)
-    setattr(cycleGun, f'{side}_out_path', src_path)
-    setattr(cycleGun, f'{side}_name', src_name)
-    setattr(cycleGun, f'{side}_voxel_size', src_voxel_size)
-    setattr(cycleGun, f'mask_{side}_name', None)
-    cycleGun.num_workers = num_workers
-
-    cycleGun.build_machine()
+    chunk_size = 64 # TODO: FIX
+    num_channels = 1
+    compressor = {  'id': 'blosc', 
+                    'clevel': 3,
+                    'cname': 'blosclz',
+                    'blocksize': chunk_size
+                    }
+    write_size = source.voxel_size * chunk_size
+    chunk_roi = daisy.Roi([0,0,0], write_size)
 
     if len(cycleGun.model_name.split('-')) > 1:
         parts = cycleGun.model_name.split('-')
@@ -54,14 +56,65 @@ def render_tiled(script_path,
 
     for checkpoint in checkpoints:
         this_checkpoint = f'{cycleGun.model_path}{cycleGun.model_name}_checkpoint_{checkpoint}'
+        print(f"Loading checkpoint {this_checkpoint}...")
         cycleGun.checkpoint = this_checkpoint
-        # cycleGun.load_saved_model(this_checkpoint)
+        cycleGun.load_saved_model(this_checkpoint)
+        generator = getattr(cycleGun.model, net).cuda()
+        generator.eval()
+        print(f"Rendering checkpoint {this_checkpoint}...")
+
         label_dict = {}
         label_dict['fake'] = f'{label_prefix}_checkpoint{checkpoint}_{net}'
         label_dict['cycled'] = f'{label_prefix}_checkpoint{checkpoint}_{net}{other_net}'
         
-        print(f"Rendering checkpoint {this_checkpoint}...")
-        cycleGun.render_full(side_length=int(side_length), side=side, cycle=cycle, crop_to_valid=crop_to_valid, label_dict=label_dict)
+        destination = daisy.prepare_ds(
+            src_path, 
+            label_dict['fake'],
+            source.roi,
+            source.voxel_size,
+            source.dtype,
+            write_size=write_size,
+            write_roi=chunk_roi,
+            num_channels=num_channels,
+            compressor=compressor)
+
+        #Prepare saving function/variables
+        def save_chunk(block:daisy.Roi):
+            try:
+                data = source.to_ndarray(block.read_roi)
+                data = torch.cuda.FloatTensor(data).unsqueeze(0).unsqueeze(0)
+                data -= data.min()
+                data /= data.max()
+                data *= 2
+                data -= 1
+                out = generator(data).detach().squeeze()
+                out += 1.0
+                out /= 2
+                out *= 255
+                out = out.cpu().numpy().astype(source.dtype)
+                #TODO: APPLY SMOOTH
+                destination.__setitem__(block.write_roi, out)
+                return 0 # success
+            except:
+                return 1 # error
+
+        success = daisy.run_blockwise(
+            source.roi,
+            chunk_roi,
+            chunk_roi,
+            process_function=save_chunk,
+            read_write_conflict=False,
+            fit='shrink',
+            num_workers=num_workers,
+            max_retries=2)
+
+        if success:
+            print(f'{source.roi} from {src_path}/{src_name} rendered and written to {src_path}/{label_dict["fake"]}')
+        else:
+            print('Failed to save cutout.')
+        
+        if cycle:
+            ...#TODO
         print(f"Rendered!")
     
     print('Done.')
