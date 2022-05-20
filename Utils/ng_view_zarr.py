@@ -53,7 +53,7 @@ def make_ng_viewer(unsynced=False, public=True):
 
     return viewer
 
-def get_seed_and_check(layer):
+def get_specs(layer):
     s_start = layer.lower().find('seed')
     s_end = layer[s_start:].find('_')
     seed_num = layer[s_start+4:s_start+s_end]
@@ -62,13 +62,18 @@ def get_seed_and_check(layer):
     c_end = layer[c_start:].find('_')
     check_num = layer[c_start+10:c_start+c_end]
 
-    return f's{seed_num}_c{check_num}'
+    label = f's{seed_num}_c{check_num}'
+
+    if 'net' in layer.lower().split('_')[-1]:
+        label += f'_{layer.split("_")[-1]}'
+
+    return label
 
 def get_label(layer):
     if 'split' in layer.lower():
-        return 'Split_' + get_seed_and_check(layer)
+        return 'Split_' + get_specs(layer)
     elif 'link' in layer.lower():
-        return 'Link_' + get_seed_and_check(layer)
+        return 'Link_' + get_specs(layer)
     else:
         return layer
 

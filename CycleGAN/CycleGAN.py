@@ -760,7 +760,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             if crop_to_valid and array is not datapipe.real:
                 extents -= coor_pad * 2
                 if array is datapipe.cycled:
-                    extents -= px_pad * 2                    
+                    extents -= coor_pad * 2 
             scan_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
 
         render_pipe = datapipe.source 
@@ -801,7 +801,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.compressor = {'id': 'blosc', 
                 'clevel': 3,
                 'cname': 'blosclz',
-                'blocksize': 64
+                # 'blocksize': 64
                 }        
         source_ds = daisy.open_ds(datapipe.src_path, datapipe.real_name)
         datapipe.total_roi = source_ds.data_roi.snap_to_grid(self.common_voxel_size, 'shrink')
@@ -815,7 +815,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 np.uint8,
                 write_size=write_size,
                 num_channels=1,
-                compressor=self.compressor)
+                compressor=self.compressor,
+                delete=True)
                 
         render_pipe += gp.ZarrWrite(
                         dataset_names = dataset_names,

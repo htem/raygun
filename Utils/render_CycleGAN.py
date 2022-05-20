@@ -11,7 +11,8 @@ def render_tiled(script_path,
                 checkpoints, 
                 side_length=64, 
                 cycle=False, 
-                crop_to_valid="false", 
+                crop_to_valid="false",
+                num_workers=30, 
                 ):
     
     #Load Model
@@ -30,6 +31,7 @@ def render_tiled(script_path,
     setattr(cycleGun, f'{side}_name', src_name)
     setattr(cycleGun, f'{side}_voxel_size', src_voxel_size)
     setattr(cycleGun, f'mask_{side}_name', None)
+    cycleGun.num_workers = num_workers
 
     cycleGun.build_machine()
 
@@ -75,7 +77,8 @@ if __name__ == '__main__':
     ap.add_argument("checkpoints", type=int, help='Which training checkpoint(s) to render (eg. [300000, 325000, 350000]).', nargs='+')
     ap.add_argument("--side_length", type=int, help='Side length of volumes for rendering (in common voxels).', default=64)
     ap.add_argument("--cycle", type=bool, help='Whether or not to render both network passes.', default=False)
-    ap.add_argument("--crop_to_valid", type=str, help='Whether to crop network outputs and, optionally, by how much (e.g. "false" or "true" or "32".', default='false')
+    ap.add_argument("--crop_to_valid", type=str, help='Whether to crop network outputs and, optionally, by how much (e.g. "false" or "true" or "32").', default='false')
+    ap.add_argument("--num_workers", type=int, help='How many workers to run in parallel.', default=30)
     config = ap.parse_args()
     
     render_tiled(**vars(config))
