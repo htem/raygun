@@ -756,12 +756,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         scan_request = gp.BatchRequest()
         for array in arrays:            
-            extents = self.get_extents(side_length, array_name=array.identifier)
-            if crop_to_valid and array is not datapipe.real:
-                extents -= coor_pad * 2
-                if array is datapipe.cycled:
-                    extents -= coor_pad * 2 
-            scan_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
+            if array is not datapipe.real:
+                extents = self.get_extents(side_length, array_name=array.identifier)
+                if crop_to_valid:
+                    extents -= coor_pad * 2
+                    if array is datapipe.cycled:
+                        extents -= coor_pad * 2 
+                scan_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
 
         render_pipe = datapipe.source 
         if datapipe.resample: render_pipe += datapipe.resample
