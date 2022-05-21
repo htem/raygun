@@ -14,9 +14,11 @@ def smooth_labels(data, method, radius):
         methods = {}
         methods['close'] = partial(smooth_labels, method='closing', radius=radius)
         methods['open'] = partial(smooth_labels, method='opening', radius=radius)
-        part_method = lambda x: x
-        for this_method in method.split('-'):
-            part_method = lambda x: methods[this_method](part_method(x))
+        order = method.split('-')
+        part_method = lambda x: methods[order[1]](methods[order[0]](x))
+        # part_method = lambda x: x
+        # for this_method in method.split('-'):
+        #     part_method = methods[this_method](part_method)
 
     smoothed = np.zeros_like(data)
     for label in labels:
@@ -60,8 +62,7 @@ def smooth_segmentation(source_file, source_ds, destination_ds=None, method='clo
             num_channels=num_channels,
             compressor=compressor)
 
-    footprint = skimage.morphology.ball(radius)
-    smoother = partial(getattr(skimage.morphology, method), footprint=footprint)
+    smoother = partial(smooth_labels, method=method, radius=radius)
 
     def save_chunk(block:daisy.Roi):
         try:

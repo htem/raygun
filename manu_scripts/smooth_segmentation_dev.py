@@ -71,9 +71,9 @@ def smooth_labels(data, method, radius):
         methods['open'] = partial(smooth_labels, method='opening', radius=radius)
         order = method.split('-')
         part_method = lambda x: methods[order[1]](methods[order[0]](x))
-        part_method = lambda x: x
-        for this_method in method.split('-'):
-            part_method = lambda x: methods[this_method](part_method(x))
+        # part_method = lambda x: x
+        # for this_method in method.split('-'):
+        #     part_method = methods[this_method](part_method)
 
     smoothed = np.zeros_like(data)
     for label in labels:
@@ -85,11 +85,11 @@ def smooth_labels(data, method, radius):
 
 
 # %%
-radius = 3
+radius = 2
 footprint = skimage.morphology.ball(radius)
 methods = [
-        # 'closing', 
-        # 'opening',
+        'closing', 
+        'opening',
         'open-close',
         'close-open'
         ]
@@ -100,14 +100,3 @@ for i, method in enumerate(methods):
     this = smooth_labels(data, method, radius)
     axs[i+1].imshow(this[data.shape[0]//2,...])
     axs[i+1].set_title(f'{method} r={radius}')
-# %%
-close = partial(smooth_labels, method='closing', radius=radius)
-open = partial(smooth_labels, method='opening', radius=radius)
-this = []
-this.append(close(open(data)))
-this.append(open(close(data)))
-
-fig, axs = plt.subplots(1, len(this), figsize=(10*len(this),10))
-for i, that in enumerate(this):
-    axs[i].imshow(that[data.shape[0]//2,...])
-# %%
