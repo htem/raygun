@@ -1,8 +1,10 @@
 #%%
 import matplotlib.pyplot as plt
 import daisy
+from scipy.signal.windows import tukey
 import torch
 import sys
+#%%
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
 from CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_train import *
 # from CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_train import *
@@ -29,6 +31,7 @@ raw_name = 'volumes/interpolated_90nm_aligned'
 source = daisy.open_ds(path, raw_name)
 target_roi = source.data_roi.grow(source.voxel_size * -312, source.voxel_size * -312)
 # target_roi = source.data_roi.grow(source.voxel_size * -462, source.voxel_size * -462)
+#%%
 data = source.to_ndarray(target_roi)
 data = torch.cuda.FloatTensor(data).unsqueeze(0).unsqueeze(0)
 data -= data.min()
@@ -41,6 +44,10 @@ out = generator(data).detach().squeeze()
 out += 1.0
 out /= 2
 out *= 255
+
+window = tukey(64, alpha=0.5)
+window = (window[:, None, None] * window[None, :, None]) * window[None, None, :]
+out *= torch.cuda.FloatTensor(window)
 out = out.cpu().numpy().astype(source.dtype)
 
 #%%

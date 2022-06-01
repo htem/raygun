@@ -1,20 +1,22 @@
 import argparse
 import sys
 import runpy
+from scipy.signal.windows import tukey
 sys.path.append('/n/groups/htem/users/jlr54/raygun/')
 from CycleGAN import *
 
-_def_render_tiled(source, )
 
 def render_tiled(script_path, 
                 side, 
                 src_path, 
                 src_name, 
                 checkpoints, 
-                side_length=64, 
+                side_length=64, # needs to be multiple of 4
                 cycle=False, 
                 crop_to_valid="false",
+                smooth=True,
                 num_workers=30, 
+                alpha=0.5
                 ):
     
     #Load Model
@@ -25,17 +27,7 @@ def render_tiled(script_path,
     source = daisy.open_ds(src_path, src_name)
     side = side.upper()
     if type(checkpoints) is not list:
-        checkpoints = [checkpoints]
-
-    chunk_size = 64 # TODO: FIX
-    num_channels = 1
-    compressor = {  'id': 'blosc', 
-                    'clevel': 3,
-                    'cname': 'blosclz',
-                    'blocksize': chunk_size
-                    }
-    write_size = source.voxel_size * chunk_size
-    chunk_roi = daisy.Roi([0,0,0], write_size)
+        checkpoints = [checkpoints]    
 
     if len(cycleGun.model_name.split('-')) > 1:
         parts = cycleGun.model_name.split('-')
@@ -44,12 +36,31 @@ def render_tiled(script_path,
         label_prefix = cycleGun.model_name
     label_prefix += f'_seed{script_dict["seed"]}'
 
+    chunk_size = side_length
+
     if crop_to_valid.lower() == 'true':
         crop_to_valid = True
     elif crop_to_valid.lower() == 'false':
         crop_to_valid = False
     else:
         crop_to_valid = int(crop_to_valid)
+        chunk_size -= crop_to_valid
+
+    if smooth:
+        window = torch.cuda.FloatTensor(tukey(chunk_size, alpha=alpha))
+        window = (window[:, None, None] * window[None, :, None]) * window[None, None, :]
+        chunk_size *= (alpha / 2)
+
+    num_channels = 1
+    compressor = {  'id': 'blosc', 
+                    'clevel': 3,
+                    'cname': 'blosclz',
+                    'blocksize': chunk_size
+                    }
+    write_size = source.voxel_size * chunk_size
+    if smooth:
+        write_size /= (alpha / 2)
+    chunk_roi = daisy.Roi([0,0,0], write_size)
     
     net = 'netG1' if side == 'A' else 'netG2'
     other_net = 'netG1' if side == 'B' else 'netG2'
@@ -90,9 +101,10 @@ def render_tiled(script_path,
                 out = generator(data).detach().squeeze()
                 out += 1.0
                 out /= 2
+                if smooth:
+                    out *= window
                 out *= 255
                 out = out.cpu().numpy().astype(source.dtype)
-                #TODO: APPLY SMOOTH
                 destination.__setitem__(block.write_roi, out)
                 return 0 # success
             except:
@@ -103,7 +115,7 @@ def render_tiled(script_path,
             chunk_roi,
             chunk_roi,
             process_function=save_chunk,
-            read_write_conflict=False,
+            read_write_conflict=True,
             fit='shrink',
             num_workers=num_workers,
             max_retries=2)
@@ -131,6 +143,7 @@ if __name__ == '__main__':
     ap.add_argument("--side_length", type=int, help='Side length of volumes for rendering (in common voxels).', default=64)
     ap.add_argument("--cycle", type=bool, help='Whether or not to render both network passes.', default=False)
     ap.add_argument("--crop_to_valid", type=str, help='Whether to crop network outputs and, optionally, by how much (e.g. "false" or "true" or "32").', default='false')
+    ap.add_argument("--smooth", type=bool, help='Whether to blend edges of network outputs (e.g. "false" or "true").', default=True)
     ap.add_argument("--num_workers", type=int, help='How many workers to run in parallel.', default=30)
     config = ap.parse_args()
     
