@@ -29,8 +29,8 @@ generator.eval()
 path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvBottomGT/CBxs_lobV_bottomp100um_training_0.n5'
 raw_name = 'volumes/interpolated_90nm_aligned'
 source = daisy.open_ds(path, raw_name)
-target_roi = source.data_roi.grow(source.voxel_size * -312, source.voxel_size * -312)
-# target_roi = source.data_roi.grow(source.voxel_size * -462, source.voxel_size * -462)
+# target_roi = source.data_roi.grow(source.voxel_size * -312, source.voxel_size * -312)
+target_roi = source.data_roi.grow(source.voxel_size * -462, source.voxel_size * -462)
 #%%
 data = source.to_ndarray(target_roi)
 data = torch.cuda.FloatTensor(data).unsqueeze(0).unsqueeze(0)
