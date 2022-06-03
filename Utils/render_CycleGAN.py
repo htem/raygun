@@ -9,6 +9,8 @@ from scipy.signal.windows import tukey
 # sys.path.append('/n/groups/htem/users/jlr54/raygun/')
 # from CycleGAN import *
 
+import logging
+
 
 def render_tiled(script_path, 
                 side, 
@@ -22,7 +24,8 @@ def render_tiled(script_path,
                 num_workers=30, 
                 alpha=0.5
                 ):
-    
+    logger = logging.getLogger(__name__)
+
     #Load Model
     script_dict = runpy.run_path(script_path)
     cycleGun = script_dict['cycleGun']
@@ -50,7 +53,8 @@ def render_tiled(script_path,
         write_size -= crop*2
 
     if smooth:
-        window = torch.cuda.FloatTensor(tukey(write_size, alpha=alpha))
+        # window = torch.cuda.FloatTensor(tukey(write_size, alpha=alpha))
+        window = torch.FloatTensor(tukey(write_size, alpha=alpha))
         window = (window[:, None, None] * window[None, :, None]) * window[None, None, :]
         chunk_size = int(write_size * (alpha / 2))
         write_pad = (source.voxel_size * write_size * (alpha / 2)) / 2
@@ -72,18 +76,19 @@ def render_tiled(script_path,
 
     for checkpoint in checkpoints:
         this_checkpoint = f'{cycleGun.model_path}{cycleGun.model_name}_checkpoint_{checkpoint}'
-        print(f"Loading checkpoint {this_checkpoint}...")
+        logger.info(f"Loading checkpoint {this_checkpoint}...")
         cycleGun.checkpoint = this_checkpoint
         cycleGun.load_saved_model(this_checkpoint)
-        generator = getattr(cycleGun.model, net).cuda()
+        # generator = getattr(cycleGun.model, net).cuda()
+        generator = getattr(cycleGun.model, net).cpu()
         generator.eval()
-        print(f"Rendering checkpoint {this_checkpoint}...")
+        logger.info(f"Rendering checkpoint {this_checkpoint}...")
 
         label_dict = {}
         label_dict['fake'] = f'volumes/{label_prefix}_checkpoint{checkpoint}_{net}'
         label_dict['cycled'] = f'volumes/{label_prefix}_checkpoint{checkpoint}_{net}{other_net}'
         
-        print(f"Preparing dataset {label_dict['fake']} at {src_path}")
+        logger.info(f"Preparing dataset {label_dict['fake']} at {src_path}")
         destination = daisy.prepare_ds(
             src_path, 
             label_dict['fake'],
@@ -99,25 +104,41 @@ def render_tiled(script_path,
 
         #Prepare saving function/variables
         def save_chunk(block:daisy.Roi):
+            logger.debug(f'Attempting to save chunk for block ID {block.block_id}...')
             try:
-                write_roi = block.write_roi
+                this_write = block.write_roi
+                logger.debug(f'Loading data for block ID {block.block_id}...')
                 data = source.to_ndarray(block.read_roi)
-                data = torch.cuda.FloatTensor(data).unsqueeze(0).unsqueeze(0)
+                logger.debug(f'Putting data on GPU for block ID {block.block_id}...')
+                # data = torch.cuda.FloatTensor(data).unsqueeze(0).unsqueeze(0)
+                data = torch.FloatTensor(data).unsqueeze(0).unsqueeze(0)
+                logger.debug(f'Normalizing data for block ID {block.block_id}...')
                 data -= np.iinfo(source.dtype).min
                 data /= np.iinfo(source.dtype).max
                 data *= 2
                 data -= 1
+                logger.debug(f'Getting network output for block ID {block.block_id}...')
                 out = generator(data).detach().squeeze()
                 if crop:
+                    logger.debug(f'Cropping for block ID {block.block_id}...')
                     out = out[crop:-crop, crop:-crop, crop:-crop]
+                logger.debug(f'Normalizing output for block ID {block.block_id}...')
                 out += 1.0
                 out /= 2
-                if smooth:
-                    out *= window
-                    write_roi = write_roi.grow(write_pad, write_pad)
                 out *= 255 #TODO: This is written assuming dtype = uint8
-                out = out.cpu().numpy().astype(uint8)
-                destination[write_roi] = destination[write_roi].to_ndarray() + out
+                if smooth:
+                    logger.debug(f'Smoothing edges for block ID {block.block_id}...')
+                    out *= window
+                    logger.debug(f'Adjusting write ROI for block ID {block.block_id}...')
+                    this_write = this_write.grow(write_pad, write_pad)
+                logger.debug(f'Pulling to CPU for block ID {block.block_id}...')
+                # out = out.cpu().numpy().astype(uint8)
+                out = out.numpy().astype(uint8)
+                # logger.debug(f'Getting existing data for block ID {block.block_id}...')
+                # current = destination.__getitem__(this_write).to_ndarray()
+                logger.debug(f'Summing and writing for block ID {block.block_id}...')
+                # destination.__setitem__(this_write, current + out)                
+                destination[this_write] = destination.to_ndarray(this_write) + out
                 return 0 # success
             except:
                 return 1 # error
@@ -133,9 +154,9 @@ def render_tiled(script_path,
             max_retries=2)
 
         if success:
-            print(f'{source.roi} from {src_path}/{src_name} rendered and written to {src_path}/{label_dict["fake"]}')
+            logger.info(f'{source.roi} from {src_path}/{src_name} rendered and written to {src_path}/{label_dict["fake"]}')
         else:
-            print('Failed to save cutout.')
+            logger.info('Failed to save cutout.')
         
         if cycle:
             ...#TODO: read from the one just rendered and write to a new zarr

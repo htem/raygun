@@ -3,6 +3,9 @@ import sys
 sys.path.append('/n/groups/htem/users/jlr54/raygun/Utils')
 from render_CycleGAN import render_tiled
 
+# import logging
+# logging.basicConfig(level=logging.DEBUG)
+
 #%%
 if __name__ == '__main__':
     side = 'B'
@@ -32,4 +35,5 @@ if __name__ == '__main__':
                 src_path,
                 src_name,
                 checkpoints,
-                crop=crop)
+                crop=crop,
+                num_workers=2000)
