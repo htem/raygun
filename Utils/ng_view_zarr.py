@@ -102,13 +102,21 @@ def ng_view_zarr(src, layers=None): #src should be zarr data file (i.e. "/path/t
         for layer in layers:
             if type(layer) == list:
                 daisy_arrays = [daisy.open_ds(src, prepend+groups[g]+'/'+level) for level in layer]         
-                add_layer(s, daisy_arrays, groups[g])                
+                add_layer(s, 
+                    daisy_arrays, 
+                    groups[g], 
+                    # opacity=1, 
+                    visible=False)                
                 print(f'Showing layer {groups[g]}')
                 g += 1
             else:
                 daisy_array = daisy.open_ds(src, prepend+layer)            
                 label = get_label(layer)
-                add_layer(s, [daisy_array], label)
+                add_layer(s, 
+                    [daisy_array], 
+                    label, 
+                    # opacity=1, 
+                    visible=False)
                 print(f'Showing layer {label}')
 
     print_ng_link(viewer)

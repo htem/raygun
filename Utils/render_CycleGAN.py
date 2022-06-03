@@ -3,7 +3,6 @@ import runpy
 import numpy as np
 import daisy
 import torch
-from numpy import uint8
 from scipy.signal.windows import tukey
 # import sys
 # sys.path.append('/n/groups/htem/users/jlr54/raygun/')
@@ -20,6 +19,7 @@ def render_tiled(script_path,
                 side_length=None, # needs to be multiple of 4
                 cycle=False, 
                 crop=0,
+                total_roi_crop=0,
                 smooth=True,
                 num_workers=30, 
                 alpha=0.5
@@ -53,8 +53,8 @@ def render_tiled(script_path,
         write_size -= crop*2
 
     if smooth:
-        # window = torch.cuda.FloatTensor(tukey(write_size, alpha=alpha))
-        window = torch.FloatTensor(tukey(write_size, alpha=alpha))
+        # window = torch.cuda.FloatTensor(tukey(write_size, alpha=alpha, sym=False))
+        window = torch.FloatTensor(tukey(write_size, alpha=alpha, sym=False))
         window = (window[:, None, None] * window[None, :, None]) * window[None, None, :]
         chunk_size = int(write_size * (alpha / 2))
         write_pad = (source.voxel_size * write_size * (alpha / 2)) / 2
@@ -89,10 +89,15 @@ def render_tiled(script_path,
         label_dict['cycled'] = f'volumes/{label_prefix}_checkpoint{checkpoint}_{net}{other_net}'
         
         logger.info(f"Preparing dataset {label_dict['fake']} at {src_path}")
+        
+        total_roi = source.roi
+        if total_roi_crop:
+            total_roi = total_roi.grow(source.voxel_size * -total_roi_crop, source.voxel_size * -total_roi_crop)
+
         destination = daisy.prepare_ds(
             src_path, 
             label_dict['fake'],
-            source.roi,
+            total_roi,
             source.voxel_size,
             source.dtype,
             write_size=write_roi.get_shape() if not smooth else write_pad*2,
@@ -125,26 +130,24 @@ def render_tiled(script_path,
                 logger.debug(f'Normalizing output for block ID {block.block_id}...')
                 out += 1.0
                 out /= 2
-                out *= 255 #TODO: This is written assuming dtype = uint8
+                out *= 255 #TODO: This is written assuming dtype = np.uint8
                 if smooth:
                     logger.debug(f'Smoothing edges for block ID {block.block_id}...')
                     out *= window
                     logger.debug(f'Adjusting write ROI for block ID {block.block_id}...')
                     this_write = this_write.grow(write_pad, write_pad)
                 logger.debug(f'Pulling to CPU for block ID {block.block_id}...')
-                # out = out.cpu().numpy().astype(uint8)
-                out = out.numpy().astype(uint8)
-                # logger.debug(f'Getting existing data for block ID {block.block_id}...')
-                # current = destination.__getitem__(this_write).to_ndarray()
-                logger.debug(f'Summing and writing for block ID {block.block_id}...')
-                # destination.__setitem__(this_write, current + out)                
-                destination[this_write] = destination.to_ndarray(this_write) + out
+                # out = out.cpu().numpy()#.astype(np.uint8)
+                out = out.numpy()#.astype(np.uint8)
+                logger.debug(f'Getting existing data and summing for block ID {block.block_id}...')
+                logger.debug(f'Writing for block ID {block.block_id}...')
+                destination[this_write] = np.uint8(destination.to_ndarray(this_write) + out)
                 return 0 # success
             except:
                 return 1 # error
 
         success = daisy.run_blockwise(
-            source.roi,
+            total_roi,
             read_roi,
             write_roi,
             process_function=save_chunk,

@@ -5,8 +5,8 @@ import daisy
 import torch
 from numpy import uint8
 from scipy.signal.windows import tukey
-
-
+from scipy.signal import windows
+import matplotlib.pyplot as plt
 # %%
 side = 'B'
 src_path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvBottomGT/CBxs_lobV_bottomp100um_training_0.n5'
@@ -17,6 +17,7 @@ src_name = 'volumes/raw_30nm'
 # src_name = 'volumes/interpolated_90nm_aligned'
 
 crop = 16
+total_roi_crop=312
 
 checkpoints = [310000, 320000, 330000, 340000, 350000]
 script_base_path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/'
@@ -130,12 +131,22 @@ if crop:
     out = out[crop:-crop, crop:-crop, crop:-crop]
 out += 1.0
 out /= 2
+out *= 255 #TODO: This is written assuming dtype = uint8
 if smooth:
     out *= window
-out *= 255 #TODO: This is written assuming dtype = uint8
 out = out.cpu().numpy().astype(uint8)
-destination[this_write] = destination[this_write].to_ndarray() + out
+# destination[this_write] = destination[this_write].to_ndarray() + out
 
 
 
 # %%
+win = tukey(window.shape[0], alpha=alpha, sym=False)
+win = win[:, None] * win[None, :]
+test = np.zeros((int(write_size*2)+chunk_size, int(write_size*2)+chunk_size))
+test[:32, :32] += win
+test[24:, :32] += win
+test[:32, 24:] += win
+test[24:, 24:] += win
+
+plt.imshow(test)
+plt.colorbar()

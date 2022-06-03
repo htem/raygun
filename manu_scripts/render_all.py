@@ -17,6 +17,7 @@ if __name__ == '__main__':
     # src_name = 'volumes/interpolated_90nm_aligned'
 
     crop = 16
+    total_roi_crop=312
 
     checkpoints = [310000, 320000, 330000, 340000, 350000]
     script_base_path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/'
@@ -36,4 +37,5 @@ if __name__ == '__main__':
                 src_name,
                 checkpoints,
                 crop=crop,
-                num_workers=2000)
+                num_workers=30,
+                total_roi_crop=total_roi_crop)
