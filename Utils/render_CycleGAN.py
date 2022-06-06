@@ -146,7 +146,8 @@ def render_tiled(script_path,
             except:
                 return 1 # error
 
-        success = daisy.run_blockwise(
+        task = daisy.Task(
+            f'{__name__}---{src_path}/{label_dict["fake"]}',
             total_roi,
             read_roi,
             write_roi,
@@ -155,6 +156,7 @@ def render_tiled(script_path,
             # fit='shrink',
             num_workers=num_workers,
             max_retries=2)
+        success = daisy.run_blockwise([task])
 
         if success:
             logger.info(f'{source.roi} from {src_path}/{src_name} rendered and written to {src_path}/{label_dict["fake"]}')
