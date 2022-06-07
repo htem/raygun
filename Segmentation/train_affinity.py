@@ -7,6 +7,7 @@ from gunpowder.jax import Train as JaxTrain
 
 import os
 from gunpowder import *
+import daisy
 from reject import Reject
 import os
 import math
@@ -16,24 +17,7 @@ import logging
 from mknet import create_network
 import jax
 
-global cache_size
-global snapshot_every
-cache_size = 40
-snapshot_every = 1000
-
 logging.basicConfig(level=logging.INFO)
-
-n_devices = jax.local_device_count()
-# n_devices = 1
-
-dense_samples = [
-   '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvBottomGT/CBxs_lobV_bottomp100um_training_0.n5',
-]
-
-raw_ds = 'volumes/raw_30nm'
-labels_ds = 'volumes/gt_CBvBottomGT_training_0_BrianReicher_20220521_close-open_r2'
-labels_mask_ds = 'volumes/trainingMask_center400'
-unlabeled_mask_ds = 'volumes/gt_CBvBottomGT_training_0_BrianReicher_20220521_close-open_r2_foreground_mask'
 
 raw = ArrayKey('RAW')
 labels = ArrayKey('GT_LABELS')
@@ -62,7 +46,17 @@ neighborhood = np.array([
 ])
 
 
-def train_until(max_iteration, num_workers, model, batch_size):
+def train_affinity(dense_samples,
+                raw_ds,
+                labels_ds,
+                labels_mask_ds,
+                unlabeled_mask_ds,
+                max_iteration,
+                num_workers,
+                batch_size,
+                model=None):
+    if model is None:
+        model = create_network()
 
     print(f'cache_size={cache_size}')
 
@@ -73,7 +67,7 @@ def train_until(max_iteration, num_workers, model, batch_size):
     with open('train_net.json', 'r') as f:
         config = json.load(f)
 
-    voxel_size = Coordinate((30, 30, 30))
+    voxel_size = daisy.open_ds(dense_samples[0], raw_ds).voxel_size #Coordinate((30, 30, 30))
     input_size = Coordinate(config['input_shape'])*voxel_size
     output_size = Coordinate(config['output_shape'])*voxel_size
 
@@ -194,7 +188,8 @@ def train_until(max_iteration, num_workers, model, batch_size):
                 'affs': affs,
                 'grad': affs_gradient
             },
-            log_dir='log',
+            log_dir=f'log/{raw_ds.split("/")[-1]}',
+            checkpoint_basename=f'checkpoints/{raw_ds.split("/")[-1]}',
             # save_every=50,
             # save_every=2500,
             save_every=10000,
@@ -215,8 +210,8 @@ def train_until(max_iteration, num_workers, model, batch_size):
             # },
             every=snapshot_every,
             output_filename='batch_{iteration}.hdf',
-            additional_request=snapshot_request) +
-        PrintProfilingStats(every=100)
+            additional_request=snapshot_request) #+
+        # PrintProfilingStats(every=100)
     )
 
     print("Starting training...")
@@ -228,28 +223,26 @@ def train_until(max_iteration, num_workers, model, batch_size):
 
 if __name__ == "__main__":
 
-    model = create_network()
-
     if 'debug' in sys.argv:
         # iteration = 5
         # num_workers = 6
         # cache_size = 5
         # snapshot_every = 1
-        iteration = 10
+        max_iteration = 10
         num_workers = 2
         cache_size = 1
         snapshot_every = 1
     elif 'debug_perf' in sys.argv:
-        iteration = 1000
+        max_iteration = 1000
         num_workers = 24
         # num_workers = 36
         snapshot_every = 10
     else:
         try:
-            iteration = int(sys.argv[1])
+            max_iteration = int(sys.argv[1])
             num_workers = int(sys.argv[2])
         except:
-            iteration = 100000
+            max_iteration = 100000
             num_workers = 16*n_devices
             # cache_size = 24*n_devices
             # num_workers = 24
@@ -260,4 +253,4 @@ if __name__ == "__main__":
         # cache_size = 80
 
     batch_size = 1*n_devices
-    train_until(iteration, num_workers, model, batch_size)
+    train_affinity(max_iteration, num_workers, batch_size)

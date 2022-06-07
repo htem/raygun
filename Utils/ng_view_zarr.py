@@ -124,6 +124,13 @@ def ng_view_zarr(src, layers=None): #src should be zarr data file (i.e. "/path/t
     return viewer
 
 if __name__ == "__main__":
-    viewer = ng_view_zarr(*sys.argv[1:])
+    
+    src = sys.argv[1]
+    if len(sys.argv) > 2:
+        layers = sys.argv[2:]
+    else:
+        layers = None
+
+    viewer = ng_view_zarr(src, layers)
     while True:
         continue
