@@ -30,6 +30,9 @@ gt_affs_mask = ArrayKey('GT_AFFINITIES_MASK')
 gt_affs_scale = ArrayKey('GT_AFFINITIES_SCALE')
 affs_gradient = ArrayKey('AFFS_GRADIENT')
 
+global cache_size
+global snapshot_every
+
 neighborhood = np.array([
     [-1, 0, 0],
     [0, -1, 0],
@@ -54,7 +57,10 @@ def train_affinity(dense_samples,
                 max_iteration,
                 num_workers,
                 batch_size,
-                model=None):
+                model=None,                
+                cache_size=40,
+                snapshot_every=1000,
+                ):
     if model is None:
         model = create_network()
 
@@ -223,34 +229,5 @@ def train_affinity(dense_samples,
 
 if __name__ == "__main__":
 
-    if 'debug' in sys.argv:
-        # iteration = 5
-        # num_workers = 6
-        # cache_size = 5
-        # snapshot_every = 1
-        max_iteration = 10
-        num_workers = 2
-        cache_size = 1
-        snapshot_every = 1
-    elif 'debug_perf' in sys.argv:
-        max_iteration = 1000
-        num_workers = 24
-        # num_workers = 36
-        snapshot_every = 10
-    else:
-        try:
-            max_iteration = int(sys.argv[1])
-            num_workers = int(sys.argv[2])
-        except:
-            max_iteration = 100000
-            num_workers = 16*n_devices
-            # cache_size = 24*n_devices
-            # num_workers = 24
-
-        # cache_size = 40*batch_size
-        cache_size = num_workers*2
-        # cache_size = 1
-        # cache_size = 80
-
-    batch_size = 1*n_devices
-    train_affinity(max_iteration, num_workers, batch_size)
+    kwargs = json.loads(sys.argv[1])
+    train_affinity(*kwargs)
