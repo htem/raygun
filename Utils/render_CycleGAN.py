@@ -10,6 +10,30 @@ from scipy.signal.windows import tukey
 
 import logging
 
+def copy_pre_rendered(new_ds, old_ds, rw_roi, num_workers=30):
+    def save_chunk(block:daisy.Roi):
+        try:
+            new_ds.__setitem__(block.write_roi, old_ds.__getitem__(block.read_roi))
+            return 0 # success
+        except:
+            return 1 # error
+    
+    task = daisy.Task(
+            f'{__name__}---copying_prerendered',
+            old_ds.roi,
+            rw_roi,
+            rw_roi,
+            process_function=save_chunk,
+            read_write_conflict=False,
+            # fit='shrink',
+            num_workers=num_workers,
+            max_retries=2)
+    success = daisy.run_blockwise([task])
+    if success:
+        print(f'Copied pre-rendered data.')
+    else:
+        print('Failed to save cutout.')
+    return success
 
 def render_tiled(script_path, 
                 side, 
@@ -22,7 +46,9 @@ def render_tiled(script_path,
                 total_roi_crop=0,
                 smooth=True,
                 num_workers=30, 
-                alpha=0.5
+                alpha=0.5,
+                pre_rendered_suffix=None,
+                ds_suffix=''
                 ):
     logger = logging.getLogger(__name__)
 
@@ -45,20 +71,20 @@ def render_tiled(script_path,
         label_prefix = cycleGun.model_name
     label_prefix += f'_seed{script_dict["seed"]}'
 
-    read_size = side_length
+    read_size = side_length #e.g. 64
     read_roi = daisy.Roi([0,0,0], source.voxel_size * read_size)
     write_size = read_size
 
-    if crop:
-        write_size -= crop*2
+    if crop: #e.g. 16
+        write_size -= crop*2 #e.g. --> 32
 
     if smooth:
         # window = torch.cuda.FloatTensor(tukey(write_size, alpha=alpha, sym=False))
         window = torch.FloatTensor(tukey(write_size, alpha=alpha, sym=False))
         window = (window[:, None, None] * window[None, :, None]) * window[None, None, :]
-        chunk_size = int(write_size * (alpha / 2))
-        write_pad = (source.voxel_size * write_size * (alpha / 2)) / 2
-        write_size -= write_size * (alpha / 2)
+        chunk_size = int(write_size * (alpha / 2)) #e.g. 8
+        write_pad = (source.voxel_size * write_size * (alpha / 2)) / 2  #e.g. voxel_size * 4
+        write_size -= write_size * (alpha / 2) #e.g. --> 24
         write_roi = daisy.Roi(source.voxel_size * crop + write_pad, source.voxel_size * write_size)
     else:
         write_roi = daisy.Roi(source.voxel_size * crop, source.voxel_size * write_size)
@@ -74,19 +100,20 @@ def render_tiled(script_path,
     net = 'netG1' if side == 'A' else 'netG2'
     other_net = 'netG1' if side == 'B' else 'netG2'
 
-    for checkpoint in checkpoints:
+    for checkpoint in checkpoints:        
+                      
         this_checkpoint = f'{cycleGun.model_path}{cycleGun.model_name}_checkpoint_{checkpoint}'
         logger.info(f"Loading checkpoint {this_checkpoint}...")
         cycleGun.checkpoint = this_checkpoint
         cycleGun.load_saved_model(this_checkpoint)
-        # generator = getattr(cycleGun.model, net).cuda()
-        generator = getattr(cycleGun.model, net).cpu()
+        generator = getattr(cycleGun.model, net).cuda()
+        # generator = getattr(cycleGun.model, net).cpu()
         generator.eval()
         logger.info(f"Rendering checkpoint {this_checkpoint}...")
 
         label_dict = {}
-        label_dict['fake'] = f'volumes/{label_prefix}_checkpoint{checkpoint}_{net}'
-        label_dict['cycled'] = f'volumes/{label_prefix}_checkpoint{checkpoint}_{net}{other_net}'
+        label_dict['fake'] = f'volumes/{label_prefix}_checkpoint{checkpoint}_{net}{ds_suffix}'
+        label_dict['cycled'] = f'volumes/{label_prefix}_checkpoint{checkpoint}_{net}{other_net}{ds_suffix}'
         
         logger.info(f"Preparing dataset {label_dict['fake']} at {src_path}")
         
@@ -106,17 +133,34 @@ def render_tiled(script_path,
             delete=True,
             # force_exact_write_size=True
             )
+        
+        if pre_rendered_suffix is not None:
+            pre_rendered_ds = f'volumes/{label_prefix}_checkpoint{checkpoint}_{net}{pre_rendered_suffix}'
+            pre_rendered_src = daisy.open_ds(src_path, pre_rendered_ds)
+            #copy pre-rendered into new ds
+            success = copy_pre_rendered(destination, pre_rendered_src, read_roi, num_workers=num_workers)
+            if not success:
+                logger.info(f'Failed to copy pre-rendered data for {src_path}/{label_dict["fake"]}')
+                continue
+            pad = pre_rendered_src.voxel_size * -write_size
+            pre_rendered_roi = pre_rendered_src.roi.grow(pad, pad)
+        else:
+            pre_rendered_roi = None
 
         #Prepare saving function/variables
         def save_chunk(block:daisy.Roi):
+            if pre_rendered_roi is not None and pre_rendered_roi.contains(block.write_roi):
+                logger.debug(f'Chunk for block ID {block.block_id} pre-rendered.')
+                return 0
+                
             logger.debug(f'Attempting to save chunk for block ID {block.block_id}...')
             try:
                 this_write = block.write_roi
                 logger.debug(f'Loading data for block ID {block.block_id}...')
                 data = source.to_ndarray(block.read_roi)
                 logger.debug(f'Putting data on GPU for block ID {block.block_id}...')
-                # data = torch.cuda.FloatTensor(data).unsqueeze(0).unsqueeze(0)
-                data = torch.FloatTensor(data).unsqueeze(0).unsqueeze(0)
+                data = torch.cuda.FloatTensor(data).unsqueeze(0).unsqueeze(0)
+                # data = torch.FloatTensor(data).unsqueeze(0).unsqueeze(0)
                 logger.debug(f'Normalizing data for block ID {block.block_id}...')
                 data -= np.iinfo(source.dtype).min
                 data /= np.iinfo(source.dtype).max
@@ -137,8 +181,8 @@ def render_tiled(script_path,
                     logger.debug(f'Adjusting write ROI for block ID {block.block_id}...')
                     this_write = this_write.grow(write_pad, write_pad)
                 logger.debug(f'Pulling to CPU for block ID {block.block_id}...')
-                # out = out.cpu().numpy()#.astype(np.uint8)
-                out = out.numpy()#.astype(np.uint8)
+                out = out.cpu().numpy()#.astype(np.uint8)
+                # out = out.numpy()#.astype(np.uint8)
                 logger.debug(f'Getting existing data and summing for block ID {block.block_id}...')
                 logger.debug(f'Writing for block ID {block.block_id}...')
                 destination[this_write] = np.uint8(destination.to_ndarray(this_write) + out)

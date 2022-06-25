@@ -7,7 +7,10 @@ import zarr
 import daisy
 import os
 
-import gunpowder as gp
+import sys
+sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
+from gunpowder import gunpowder as gp
+# import gunpowder as gp
 
 import logging
 logging.basicConfig(level=logging.INFO)
