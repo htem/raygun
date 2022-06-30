@@ -838,14 +838,20 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             render_pipe.request_batch(request)
             print('Finished.')
 
-    def load_saved_model(self, checkpoint=None):
+    def load_saved_model(self, checkpoint=None, cuda_available=None):
+        if cuda_available is None:
+            cuda_available = torch.cuda.is_available()
         if checkpoint is None:
             checkpoint = self.checkpoint
         else:
             self.checkpoint = checkpoint
 
         if checkpoint is not None:
-            checkpoint = torch.load(checkpoint)
+            if not cuda_available:
+                checkpoint = torch.load(checkpoint, map_location=torch.device('cpu'))
+            else:
+                checkpoint = torch.load(checkpoint)
+
             if "model_state_dict" in checkpoint:
                 self.model.load_state_dict(checkpoint["model_state_dict"])
             else:

@@ -21,15 +21,15 @@ sbatch_base = [
 
 #%%
 if __name__ == '__main__':
-    side = 'B'
-    src_path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvBottomGT/CBxs_lobV_bottomp100um_training_0.n5'
+    # side = 'B'
+    # src_path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvBottomGT/CBxs_lobV_bottomp100um_training_0.n5'
+    # src_name = 'volumes/raw_30nm'
+
+    side = 'A'
+    src_path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvTopGT/CBxs_lobV_topm100um_eval_1.n5'
+    src_name = 'volumes/interpolated_90nm_aligned'
+
     src_path_name = src_path.split('/')[-1][:-3]
-    src_name = 'volumes/raw_30nm'
-
-    # side = 'A'
-    # src_path = '/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvTopGT/CBxs_lobV_topm100um_eval_0.n5'
-    # src_name = 'volumes/interpolated_90nm_aligned'
-
     crop = 16
     total_roi_crop=184
 
@@ -59,7 +59,8 @@ if __name__ == '__main__':
         'crop': crop,
         'total_roi_crop': total_roi_crop,
         'num_workers': 34, 
-        'pre_rendered_suffix': '',
+        # 'pre_rendered_suffix': '',
+        'pre_rendered_suffix': None,
         'ds_suffix': f'_{total_roi_crop}tCrp'
     }
 
