@@ -1,0 +1,13 @@
+{
+    "dense_samples": ["/n/groups/htem/Segmentation/shared-nondev/cbx_fn/gt_xnh/CBxs_lobV/CBxs_lobV_bottomp100um_cutout0/gt_mk_bugfix.zarr"],
+    "raw_ds": "",
+    "labels_ds": "volumes/segmentation_0.500_skeleton",
+    "labels_mask_ds": "volumes/labels/labels_mask",
+    "unlabeled_mask_ds": "volumes/labels/unlabeled_mask_skeleton",
+    "max_iteration": 300000,
+    "num_workers": 6,
+    "batch_size": 1,
+    "cache_size": 32,
+    "snapshot_every": 1000,
+    "save_every": 20000
+}

@@ -101,4 +101,13 @@ def plot_scores(model_logs):
 def show_best_steps(model_logs):
     for model_name in model_logs.keys():
         print(f'{model_name} best step: {model_logs[model_name]["best_step"]}')
+
+def get_best_layer(type, seed, step,
+            net_raw_prefix='CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407',
+            net_raw_suffix = '_netG2_184tCrp',
+            type_dict = {
+                'split': 'SplitNoBottle',
+                'link': 'LinkNoBottle'
+            }):
+    return f'volumes/{net_raw_prefix}{type_dict[type]}_seed{seed}_checkpoint{step}{net_raw_suffix}'
 # %%

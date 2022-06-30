@@ -9,6 +9,45 @@ import tempfile
 from glob import glob
 import os
 
+def download_wk_skeleton(
+        annotation_ID,
+        save_path,
+        wk_url = 'http://catmaid2.hms.harvard.edu:9000',
+        annotation_url_prefix = 'http://catmaid2.hms.harvard.edu:9000/annotations/',
+        wk_token = "Q9OpWh1PPwHYfH9BsnoM2Q",
+        overwrite=None,
+        zip_suffix=None
+    ):
+    if 'http' in annotation_ID:
+        annotation_url = annotation_ID
+    else:
+        annotation_url = annotation_url_prefix + annotation_ID
+    print(f"Downloading {annotation_url}...")
+    with wk.webknossos_context(token=wk_token, url=wk_url):
+        annotation = wk.Annotation.download(annotation_url)
+    
+    time_str = strftime("%Y%m%d", gmtime())
+    annotation_name = f'{annotation.dataset_name}_{annotation.username.replace(" ","")}_{time_str}'
+    if save_path[-1] != os.sep: save_path += os.sep
+    zip_path = save_path + annotation_name + '.zip'
+    print(f"Saving as {zip_path}...")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    if os.path.exists(zip_path):
+        if overwrite is None:
+            overwrite = input(f'{zip_path} already exists. Overwrite it? (y/n)')
+        if overwrite.lower() == 'y' or overwrite is True:
+            os.remove(zip_path)
+        else:
+            if zip_suffix is None:
+                zip_suffix = f'Save with new suffix? (Enter suffix, or leave blank to abort.)'
+            if zip_suffix != '':
+                zip_path = save_path + annotation_name + '_' + zip_suffix + '.zip'
+            else:
+                print('Aborting...')
+    annotation.save(zip_path)
+    return zip_path
+
 # Extracts and saves volume annotations as a uint32 layer alongside the zarr used for making GT (>> assumes same ROI)
 def wkw_seg_to_zarr(
         annotation_ID,
@@ -20,11 +59,13 @@ def wkw_seg_to_zarr(
         wk_token = "Q9OpWh1PPwHYfH9BsnoM2Q",
         gt_name_prefix = 'volumes/',
     ):
-    print(f"Downloading {annotation_url_prefix + annotation_ID}...")
+    if 'http' in annotation_ID:
+        annotation_url = annotation_ID
+    else:
+        annotation_url = annotation_url_prefix + annotation_ID
+    print(f"Downloading {annotation_url}...")
     with wk.webknossos_context(token=wk_token, url=wk_url):
-        annotation = wk.Annotation.download(
-            annotation_url_prefix + annotation_ID
-        )
+        annotation = wk.Annotation.download(annotation_url)
     
     time_str = strftime("%Y%m%d", gmtime())
     annotation_name = f'{annotation.dataset_name}_{annotation.username.replace(" ","")}_{time_str}'
