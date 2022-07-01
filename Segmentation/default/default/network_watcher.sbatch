@@ -63,8 +63,7 @@ do
         
         # Evaluate
 
-        . /n/groups/htem/users/mkn5/venv/daisy-2/bin/activate
-        python /n/groups/htem/users/mkn5/repos/jeff_scripts/rasterize_skeleton.py $config_json "./metrics/$curr_iteration.json" "./metrics/best_metric.json" $increment
+        . /n/groups/htem/users/jlr54/raygun/Segmentation/rasterize_skeleton.py $config_json $increment
         
         # Increment
         curr_iteration=$((curr_iteration+increment))

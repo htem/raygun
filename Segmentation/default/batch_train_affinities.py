@@ -134,18 +134,16 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None):
             if not os.path.exists(f'{source_file}/{labels_ds}_foreground_mask'):
                 make_foreground_mask(source_file, labels_ds)
         default_kwargs['unlabeled_mask_ds'] = f'{labels_ds}_foreground_mask'
-        with open('default/train_kwargs.json', 'w') as default_file:
-             json.dump(default_kwargs, default_file)
     
     #get skeleton for validation
     if not os.path.exists(segment_config['SkeletonConfig']['file']):
         files = glob('./skeletons/*')
         if len(files) == 0 or segment_config['SkeletonConfig']['file'] == 'update':
             segment_config['SkeletonConfig']['file'] = download_wk_skeleton(
-                                            segment_config['SkeletonConfig']['url'].split('/')[-1], 
-                                            os.getcwd() + '/skeletons/',
-                                            overwrite=True,
-                                        )
+                        segment_config['SkeletonConfig']['url'].split('/')[-1], 
+                        f'{os.getcwd()}/skeletons/',
+                        overwrite=True,
+                    )
         else:
             segment_config['SkeletonConfig']['file'] = max(files, key=os.path.getctime)
 

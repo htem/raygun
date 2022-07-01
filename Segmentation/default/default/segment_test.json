@@ -36,7 +36,7 @@
              "overwrite": 2,
              "experiment": "{script_name}",
              "output_file" : "{script_dir}/{script_name}.zarr",
-             "raw_file" : "/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvTopGT/CBxs_lobV_topm100um_eval_0.n5",
+             "raw_file" : "/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvTopGT/CBxs_lobV_topm100um_eval_1.n5",
              "raw_dataset": "volumes/raw_30nm",
  
              "db_host": "mongodb://10.117.28.250:27017/",
@@ -48,7 +48,7 @@
              "size_in_pix": true,
              "voxel_size": [30, 30, 30],
              "roi_shape": [400, 400, 400],     // 64pix of context
-             "roi_offset": [1753,1696,1097],
+             "roi_offset": [1737, 600, 1118],
  
              "zyx_downsample": [1, 1, 1]
          },

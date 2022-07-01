@@ -95,16 +95,7 @@ def get_train_foldername(name, net_res={'netg1': '30nm', 'netg2': '90nm'}):
     return f'train_{source}{id[0]}{id[1]}{id[2]}_{res}'
 
 def batch_predict_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None):
-    with open('default/train_kwargs.json', 'r') as default_file:
-        default_kwargs = json.load(default_file)
-
-    if raw_srcs is None:
-        check_raws = False
-        raw_srcs = default_kwargs["dense_samples"]
-    else:
-        check_raws = True
-        
-    with open('default/segment.json', 'r') as default_file:
+    with open('default/segment_test.json', 'r') as default_file:
         segment_config = json.load(StringIO(jsmin(default_file.read())))
 
     temp = []
