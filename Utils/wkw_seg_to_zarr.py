@@ -13,18 +13,13 @@ def download_wk_skeleton(
         annotation_ID,
         save_path,
         wk_url = 'http://catmaid2.hms.harvard.edu:9000',
-        annotation_url_prefix = 'http://catmaid2.hms.harvard.edu:9000/annotations/',
         wk_token = "Q9OpWh1PPwHYfH9BsnoM2Q",
         overwrite=None,
         zip_suffix=None
     ):
-    if 'http' in annotation_ID:
-        annotation_url = annotation_ID
-    else:
-        annotation_url = annotation_url_prefix + annotation_ID
-    print(f"Downloading {annotation_url}...")
+    print(f"Downloading {wk_url}/annotations/Explorational/{annotation_ID}...")
     with wk.webknossos_context(token=wk_token, url=wk_url):
-        annotation = wk.Annotation.download(annotation_url)
+        annotation = wk.Annotation.download(annotation_ID, annotation_type='Explorational')
     
     time_str = strftime("%Y%m%d", gmtime())
     annotation_name = f'{annotation.dataset_name}_{annotation.username.replace(" ","")}_{time_str}'
@@ -55,17 +50,12 @@ def wkw_seg_to_zarr(
         zarr_path,
         raw_name,
         wk_url = 'http://catmaid2.hms.harvard.edu:9000',
-        annotation_url_prefix = 'http://catmaid2.hms.harvard.edu:9000/annotations/Explorational/',
         wk_token = "Q9OpWh1PPwHYfH9BsnoM2Q",
         gt_name_prefix = 'volumes/',
     ):
-    if 'http' in annotation_ID:
-        annotation_url = annotation_ID
-    else:
-        annotation_url = annotation_url_prefix + annotation_ID
-    print(f"Downloading {annotation_url}...")
+    print(f"Downloading {wk_url}/annotations/Explorational/{annotation_ID}...")
     with wk.webknossos_context(token=wk_token, url=wk_url):
-        annotation = wk.Annotation.download(annotation_url)
+        annotation = wk.Annotation.download(annotation_ID, annotation_type='Explorational')
     
     time_str = strftime("%Y%m%d", gmtime())
     annotation_name = f'{annotation.dataset_name}_{annotation.username.replace(" ","")}_{time_str}'
