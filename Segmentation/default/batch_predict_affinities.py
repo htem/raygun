@@ -94,7 +94,7 @@ def get_train_foldername(name, net_res={'netg1': '30nm', 'netg2': '90nm'}):
         i -= 1
     return f'train_{source}{id[0]}{id[1]}{id[2]}_{res}'
 
-def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None):
+def batch_predict_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None):
     with open('default/train_kwargs.json', 'r') as default_file:
         default_kwargs = json.load(default_file)
 
@@ -142,9 +142,9 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None):
         files = glob('./skeletons/*')
         if len(files) == 0 or segment_config['SkeletonConfig']['file'] == 'update':
             segment_config['SkeletonConfig']['file'] = download_wk_skeleton(
-                                            segment_config['SkeletonConfig']['url'].split('/')[-1], 
+                                            segment_config['SkeletonConfig']['url'], 
                                             os.getcwd() + '/skeletons/',
-                                            overwrite=True,
+                                            overwrite=True
                                         )
         else:
             segment_config['SkeletonConfig']['file'] = max(files, key=os.path.getctime)
@@ -163,7 +163,7 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None):
             with open(f"segment.json", "w") as config_file:
                 json.dump(segment_config, config_file)
             os.system('sbatch train.sbatch')
-            os.system(f'sbatch network_watcher.sbatch \
+            os.system(f'bash network_watcher.sh \
                 {kwargs["save_every"]} \
                 {kwargs["max_iteration"]} \
                 {kwargs["save_every"]} \
