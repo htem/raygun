@@ -5,12 +5,11 @@ import sys
 import os
 import json
 sys.path.append('/n/groups/htem/Segmentation/shared-nondev/cbx_fn/segway2/gt_scripts')
+from skeleton import parse_skeleton
 sys.path.insert(0, '/n/groups/htem/Segmentation/shared-nondev')
-
 import gt_tools
 import numpy as np
 from skimage.draw import line_nd
-from skeleton import parse_skeleton
 from funlib import evaluate
 
 def nm2px(coord, voxel_size, offset):
@@ -72,7 +71,7 @@ if __name__=="__main__":
         json.dump(metrics, f)
 
     # Save best 
-    if not os.path.isfile(METRIC_OUT_JSON):
+    if not os.path.isfile(BEST_METRIC_JSON):
         with open(BEST_METRIC_JSON, 'w') as f:
             json.dump({current_iteration: evaluation})
     else:
@@ -89,8 +88,8 @@ if __name__=="__main__":
     with open(config_file,'r+') as f:
         config=json.loads(f.read())
 
+    # Save config file
     with open(config_file,'w+') as f:       
         config["Network"]["iteration"] = current_iteration + increment
         json.dump(config, f, indent=4)
         
-    # Save config file

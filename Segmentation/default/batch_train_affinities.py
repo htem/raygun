@@ -7,7 +7,6 @@ from glob import glob
 from distutils.dir_util import copy_tree, remove_tree
 import os
 import logging
-# import jax
 import sys
 sys.path.append('/n/groups/htem/users/jlr54/raygun/Utils')
 from make_foreground_mask import *
@@ -94,7 +93,7 @@ def get_train_foldername(name, net_res={'netg1': '30nm', 'netg2': '90nm'}):
         i -= 1
     return f'train_{source}{id[0]}{id[1]}{id[2]}_{res}'
 
-def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None):
+def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None, start_watchers=False):
     with open('default/train_kwargs.json', 'r') as default_file:
         default_kwargs = json.load(default_file)
 
@@ -157,15 +156,17 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None):
                 json.dump(kwargs, kwargs_file)
             segment_config['Input']['raw_dataset'] = seg_ds_dict[foldername.split('_')[-1]]
             segment_config['Network']['name'] = foldername
-            segment_config['Network']['train_dir'] = os.getcwd()
+            segment_config['Network']['train_dir'] = os.getcwd() +'/'
             with open(f"segment.json", "w") as config_file:
                 json.dump(segment_config, config_file)
-            os.system('sbatch train.sbatch')
-            os.system(f'sbatch network_watcher.sbatch \
-                {kwargs["save_every"]} \
-                {kwargs["max_iteration"]} \
-                {kwargs["save_every"]} \
-                segment.json')
+            os.system('sbatch train.sbatch', shell=True, text=True))
+            if start_watchers:
+                os.system(f'sbatch network_watcher.sbatch \
+                    {kwargs["save_every"]} \
+                    {kwargs["max_iteration"]} \
+                    {kwargs["save_every"]} \
+                    {os.getcwd()}/segment.json \
+                    {raw_ds.split("/")[-1]}', shell=True, text=True))
             os.chdir('../')
 
         if len(glob(foldername)) == 0: 
@@ -190,7 +191,8 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None):
             elif len(glob(f'{foldername}/.done')) > 0:
                 print(f'Skipping {raw_ds} because it has already trained.')
 
-        os.symlink(f'{os.getcwd()}/{foldername}/log/{raw_ds.split("/")[-1]}', f'{os.getcwd()}/logs/{foldername}', target_is_directory=True)
+        if not os.path.islink(f'{os.getcwd()}/logs/{foldername}'):
+            os.symlink(f'{os.getcwd()}/{foldername}/log/{raw_ds.split("/")[-1]}', f'{os.getcwd()}/logs/{foldername}', target_is_directory=True)
 
 #%%
 #Should be run from folder where batch_train_affinities.py is
