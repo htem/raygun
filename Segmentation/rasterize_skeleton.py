@@ -40,22 +40,19 @@ def rasterize_and_evaluate(config, cube_size=1024, thresh_list='volumes/segmenta
         for i in range(0,len(tree)-1,2):
             line = line_nd(px(tree[i]), px(tree[i+1]))    
             image[line] = id
-
-    # Metrics
-    pad = daisy.Coordinate(cube_size - np.array(segment_array.shape)) // 2
     
-    #Save GT rasterization
-    with zarr.open('segment.zarr', 'w') as f:
-        f['skel_image/gt'] = image
-        f['skel_image/gt'].attrs['resolution'] = config["SkeletonConfig"]["voxel_size_xyz"]
-        f['skel_image/gt'].attrs['offset'] = tuple(config["Input"]["roi_offset"] - pad * daisy.Coordinate(config["SkeletonConfig"]["voxel_size_xyz"]))
+    # #Save GT rasterization
+    # with zarr.open('segment.zarr', 'w') as f:
+    #     f['skel_image/gt'] = image
+    #     f['skel_image/gt'].attrs['resolution'] = config["SkeletonConfig"]["voxel_size_xyz"]
+    #     f['skel_image/gt'].attrs['offset'] = tuple(config["Input"]["roi_offset"] - pad * daisy.Coordinate(config["SkeletonConfig"]["voxel_size_xyz"]))
 
     # load segmentation
     segment_file = config["Input"]["output_file"]
     if thresh_list is False:
         segment_datasets = [config["segment_ds"]]
     elif isinstance(thresh_list, str):
-        segment_datasets = [ds.split('/')[-2:] for ds in glob(os.path.join(segment_file, thresh_list))]
+        segment_datasets = [os.path.join(*ds.strip('/').split('/')[-2:]) for ds in glob(os.path.join(segment_file, thresh_list))]
     else:
         segment_datasets = thresh_list
 
@@ -63,6 +60,7 @@ def rasterize_and_evaluate(config, cube_size=1024, thresh_list='volumes/segmenta
     for segment_dataset in segment_datasets:
         segment_ds = daisy.open_ds(segment_file, segment_dataset)
         segment_array = segment_ds[segment_ds.roi].to_ndarray()
+        pad = daisy.Coordinate(cube_size - np.array(segment_array.shape)) // 2
         evaluation[segment_dataset] = evaluate.rand_voi(image[pad[0]:-pad[0], pad[1]:-pad[1], pad[2]:-pad[2]], segment_array)
 
     return evaluation
@@ -81,11 +79,11 @@ def get_score(metrics, keys=['nvi_split', 'nvi_merge']):
 #%%
 if __name__=="__main__":
     config_file = sys.argv[1]
-    thresh_list = None
+    thresh_list = 'volumes/segmentation_*'
     if len(sys.argv) > 2:
         increment = int(sys.argv[2])
     else:
-        increment = config_file.split('/')[-1].replace('segment_', '')
+        increment = config_file.strip('/').split('/')[-1].replace('segment_', '').replace('.json', '')
         thresh_list = False
 
     METRIC_OUT_JSON = "./metrics/metrics.json"
@@ -97,7 +95,7 @@ if __name__=="__main__":
     evaluation = rasterize_and_evaluate(config, thresh_list=thresh_list)
     best_eval = {}
     for thresh, metrics in evaluation.items():
-        if len(best_eval)==0 or get_score(best_eval) > get_score(metrics):
+        if len(best_eval)==0 or get_score(best_eval[current_iteration]) > get_score(metrics):
             best_eval[current_iteration] = metrics
             best_eval[current_iteration]['segment_ds'] = thresh
 

@@ -31,7 +31,7 @@ def download_wk_skeleton(
     if os.path.exists(zip_path):
         if overwrite is None:
             overwrite = input(f'{zip_path} already exists. Overwrite it? (y/n)')
-        if overwrite.lower() == 'y' or overwrite is True:
+        if overwrite is True or overwrite.lower() == 'y':
             os.remove(zip_path)
         else:
             if zip_suffix is None:
