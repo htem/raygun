@@ -1,14 +1,12 @@
 #%%
 from collections import defaultdict
-from operator import mod
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 from glob import glob
 import os
 
-def parse_events_file(path: str, tags: list) -> pd.DataFrame:
+def parse_events_file(path: str, tags: list):
     metrics = defaultdict(list)
     for e in tf.compat.v1.train.summary_iterator(path):
         for v in e.summary.value:
@@ -17,7 +15,7 @@ def parse_events_file(path: str, tags: list) -> pd.DataFrame:
                     metrics['step'].append(e.step)
                 metrics[v.tag].append(v.simple_value)
     for k, v in metrics.items():
-        metrics[k] = np.array(metrics[k])
+        metrics[k] = np.array(v)
     return metrics
 
 # %%
