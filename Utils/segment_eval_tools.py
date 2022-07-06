@@ -73,18 +73,154 @@ def plot_metrics(all_metrics):
             for train in trains:
                 if (train, predict) in keys:
                     legend.add(train)
-                    this_x = x + (i * width) / 2
+                    this_x = x + (i * width)
                     axs[a].barh(this_x, 
                                 metrics[train, predict], 
                                 width, 
                                 label=train, 
-                                color=color_dict[train])
+                                # color=color_dict[train]
+                                )
                     i += 1
+            x += i * width
         #Predict as axis tick
         axs[a].set_yticks(xs)
         axs[a].set_yticklabels(predicts)
-        axs[a].legend(legend)
-        print(xs)
+        # axs[a].legend(legend)
+        axs[a].legend()
+    plt.show()
+
+def plot_metric_pairs_scatters(all_metrics):
+    mets = set()
+    for met in all_metrics.keys():
+        mets.add(met.split('_')[0])
+
+    colors = list(TABLEAU_COLORS.values())
+    color_dict = get_color_dict(all_metrics)
+    
+    fig, axs = plt.subplots(len(mets), 1, figsize=(10, 10*len(mets)))
+    for a, met in enumerate(mets):
+        axs[a].set_xlabel(met)
+        keys = set(all_metrics[f'{met}_split'].keys())
+        for key in set(all_metrics[f'{met}_merge'].keys()):
+            keys.add(key)
+        #Train as bar color        
+        legend = set()
+        for train, predict in keys:
+                    split = all_metrics[f'{met}_split'][train, predict]
+                    merge = all_metrics[f'{met}_merge'][train, predict]
+                    legend.add(train)
+                    # color=color_dict[train]
+                    if 'split' in train:
+                        marker = 'v'
+                        color = 'blue'#colors[0]
+                    elif 'link' in train:
+                        marker = '>'
+                        color = 'red'#colors[1]
+                    elif 'split' in predict:
+                        marker = '^'
+                        color = 'green'#colors[2]
+                    elif 'link' in predict:
+                        marker = '<'
+                        color = 'orange'#colors[3]
+                    elif '90nm' in train and '90nm' in predict:
+                        marker = 'o'
+                        color = 'magenta'
+                    elif '30nm' in train and '90nm' in predict:
+                        marker = 'X'
+                        color = 'brown'
+                    elif '30nm' in train and '30nm' in predict:
+                        marker = 'D'
+                        color = 'black'
+                    axs[a].scatter(split, 
+                                merge, 
+                                label = f'{train}_{predict}', 
+                                # color=color,
+                                marker=marker
+                                )
+                    
+        axs[a].set_xlabel("Split")
+        axs[a].set_ylabel("Merge")
+        axs[a].set_title(met)
+        axs[a].set_xlim([0,4])
+        axs[a].set_ylim([0,4])
+        # axs[a].legend(legend)
+        axs[a].legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
+        axs[a].legend()
+    plt.show()
+
+def plot_metric_pairs_bar(all_metrics):
+    width = 0.35  # the width of the bars
+    pad = 0.2
+    mets = set()
+    for met in all_metrics.keys():
+        mets.add(met.split('_')[0])
+
+    colors = list(TABLEAU_COLORS.values())
+    color_dict = get_color_dict(all_metrics)
+    
+    fig, axs = plt.subplots(len(mets), 1, figsize=(10, 10*len(mets)))
+    for a, met in enumerate(mets):
+        axs[a].set_xlabel(met)
+        keys = set(all_metrics[f'{met}_split'].keys())
+        for key in set(all_metrics[f'{met}_merge'].keys()):
+            keys.add(key)
+        trains, predicts, predict_counts = get_train_predict(keys)
+        #Train as bar color        
+        x = 0
+        xs = []
+        legend = set()
+        for predict, count in zip(predicts, predict_counts):
+            x += pad
+            x += (count * width) / 2
+            xs.append(x)
+            i = 0 - (count // 2)
+            for train in trains:
+                if (train, predict) in keys:
+                    split = all_metrics[f'{met}_split'][train, predict]
+                    merge = all_metrics[f'{met}_merge'][train, predict]
+                    legend.add(train)
+                    this_x = x + (i * width)
+                    # color=color_dict[train]
+                    if 'split' in train:
+                        color = 'blue'#colors[0]
+                    elif 'link' in train:
+                        color = 'red'#colors[1]
+                    elif 'split' in predict:
+                        color = 'green'#colors[2]
+                    elif 'link' in predict:
+                        color = 'orange'#colors[3]
+                    elif '90nm' in train and '90nm' in predict:
+                        color = 'magenta'
+                    elif '30nm' in train and '90nm' in predict:
+                        color = 'brown'
+                    elif '30nm' in train and '30nm' in predict:
+                        color = 'black'
+                    axs[a].scatter(split, merge, label = f'{train}{predict}', color=color)
+                    # axs[a].barh(this_x, 
+                    #             split, 
+                    #             width, 
+                    #             label=train, 
+                    #             # color=color_dict[train]
+                    #             )
+                    # axs[a].barh(this_x, 
+                                # merge, 
+                                # width, 
+                                # label=train, 
+                                # # color=color_dict[train],
+                                # bottom=split
+                                # )
+                    i += 1
+            x += i * width
+        #Predict as axis tick
+        # axs[a].set_yticks(xs)
+        # axs[a].set_yticklabels(predicts)
+        axs[a].set_xlabel("Split")
+        axs[a].set_ylabel("Merge")
+        axs[a].set_title(met)
+        axs[a].set_xlim([0,4])
+        axs[a].set_ylim([0,4])
+        # axs[a].legend(legend)
+        axs[a].legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
     plt.show()
 
 def get_color_dict(all):
