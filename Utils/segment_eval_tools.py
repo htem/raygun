@@ -3,6 +3,7 @@ from collections import defaultdict
 from glob import glob
 import json
 import os
+import sys
 import matplotlib.pyplot as plt
 from matplotlib.colors import TABLEAU_COLORS
 import numpy as np
@@ -89,63 +90,118 @@ def plot_metrics(all_metrics):
         axs[a].legend()
     plt.show()
 
-def plot_metric_pairs_scatters(all_metrics):
-    mets = set()
-    for met in all_metrics.keys():
-        mets.add(met.split('_')[0])
+def get_thresh_line(thresh_metrics, met, base='volumes/segmentation_'):
+    split = []
+    merge = []
+    threshes = sorted([ds.replace(base, '') for ds in thresh_metrics.keys()])
+    for thresh in threshes:
+        split.append(thresh_metrics[base+thresh][met+'_split'])
+        merge.append(thresh_metrics[base+thresh][met+'_merge'])
+    return split, merge
 
-    colors = list(TABLEAU_COLORS.values())
-    color_dict = get_color_dict(all_metrics)
+def plot_metric_pairs_scatters(all_metrics, thresh_metrics=None, bests=[], mets=None):
+    if mets is None:
+        mets = set()
+        for met in all_metrics.keys():
+            mets.add(met.split('_')[0])
+
+    # colors = list(TABLEAU_COLORS.values())
+    # color_dict = get_color_dict(all_metrics)
     
-    fig, axs = plt.subplots(len(mets), 1, figsize=(10, 10*len(mets)))
+    fig, axs = plt.subplots(len(mets), 1, figsize=(20, 20*len(mets)))
+    try:
+        len(axs)
+    except:
+        axs = [axs]
     for a, met in enumerate(mets):
         axs[a].set_xlabel(met)
         keys = set(all_metrics[f'{met}_split'].keys())
         for key in set(all_metrics[f'{met}_merge'].keys()):
             keys.add(key)
-        #Train as bar color        
-        legend = set()
+        lim = 0
+        if thresh_metrics is not None:
+            for train, predict in keys:
+                if 'split' in train:
+                    marker = 'v'
+                    color = 'blue'#colors[0]
+                elif 'link' in train:
+                    marker = 'v'
+                    color = 'red'#colors[1]
+                elif 'split' in predict:
+                    marker = '^'
+                    color = 'green'#colors[2]
+                elif 'link' in predict:
+                    marker = '^'
+                    color = 'orange'#colors[3]
+                elif '90nm' in train and '90nm' in predict:
+                    marker = 'o'
+                    color = 'magenta'
+                elif '30nm' in train and '90nm' in predict:
+                    marker = 'X'
+                    color = 'brown'
+                elif '30nm' in train and '30nm' in predict:
+                    marker = 'D'
+                    color = 'black'
+                try:
+                    this_thresh_metric = thresh_metrics[train, predict]
+                except:
+                    this_thresh_metric = thresh_metrics[train, predict+'.']
+                split, merge = get_thresh_line(this_thresh_metric, met)
+                if (train,predict) in bests or len(bests) == 0:
+                    kwargs = {'linewidth': 2}
+                else:
+                    kwargs = {'linestyle': 'dashed', 'linewidth': .5, 'alpha': 0.5}
+                axs[a].plot(split, 
+                        merge, 
+                        color=color,
+                        **kwargs                        
+                        )                        
+                lim = max([max(split), max(merge), lim])
+        
         for train, predict in keys:
-                    split = all_metrics[f'{met}_split'][train, predict]
-                    merge = all_metrics[f'{met}_merge'][train, predict]
-                    legend.add(train)
-                    # color=color_dict[train]
-                    if 'split' in train:
-                        marker = 'v'
-                        color = 'blue'#colors[0]
-                    elif 'link' in train:
-                        marker = '>'
-                        color = 'red'#colors[1]
-                    elif 'split' in predict:
-                        marker = '^'
-                        color = 'green'#colors[2]
-                    elif 'link' in predict:
-                        marker = '<'
-                        color = 'orange'#colors[3]
-                    elif '90nm' in train and '90nm' in predict:
-                        marker = 'o'
-                        color = 'magenta'
-                    elif '30nm' in train and '90nm' in predict:
-                        marker = 'X'
-                        color = 'brown'
-                    elif '30nm' in train and '30nm' in predict:
-                        marker = 'D'
-                        color = 'black'
-                    axs[a].scatter(split, 
-                                merge, 
-                                label = f'{train}_{predict}', 
-                                # color=color,
-                                marker=marker
-                                )
-                    
+            # color=color_dict[train]
+            if 'split' in train:
+                marker = 'v'
+                color = 'blue'#colors[0]
+            elif 'link' in train:
+                marker = 'v'
+                color = 'red'#colors[1]
+            elif 'split' in predict:
+                marker = '^'
+                color = 'green'#colors[2]
+            elif 'link' in predict:
+                marker = '^'
+                color = 'orange'#colors[3]
+            elif '90nm' in train and '90nm' in predict:
+                marker = 'o'
+                color = 'magenta'
+            elif '30nm' in train and '90nm' in predict:
+                marker = 'X'
+                color = 'brown'
+            elif '30nm' in train and '30nm' in predict:
+                marker = 'D'
+                color = 'black'
+                
+            split = all_metrics[f'{met}_split'][train, predict]
+            merge = all_metrics[f'{met}_merge'][train, predict]
+            lim = max([split, merge, lim])
+            if (train,predict) in bests or len(bests) == 0:
+                kwargs = {'color': color, 's': 80}
+            else:
+                kwargs = {'facecolors': 'none', 'edgecolors':color, 's': 50}
+            axs[a].scatter(split, 
+                        merge, 
+                        label = f'{train}_{predict}', 
+                        marker=marker,
+                        **kwargs
+                        )
         axs[a].set_xlabel("Split")
         axs[a].set_ylabel("Merge")
         axs[a].set_title(met)
-        axs[a].set_xlim([0,4])
-        axs[a].set_ylim([0,4])
+        axs[a].set_xlim([0, lim])
+        axs[a].set_ylim([0, lim])
         # axs[a].legend(legend)
-        axs[a].legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
-        axs[a].legend()
+        axs[a].legend(bbox_to_anchor=(a, 1))
     plt.show()
 
 def plot_metric_pairs_bar(all_metrics):
@@ -195,20 +251,19 @@ def plot_metric_pairs_bar(all_metrics):
                         color = 'brown'
                     elif '30nm' in train and '30nm' in predict:
                         color = 'black'
-                    axs[a].scatter(split, merge, label = f'{train}{predict}', color=color)
-                    # axs[a].barh(this_x, 
-                    #             split, 
-                    #             width, 
-                    #             label=train, 
-                    #             # color=color_dict[train]
-                    #             )
-                    # axs[a].barh(this_x, 
-                                # merge, 
-                                # width, 
-                                # label=train, 
-                                # # color=color_dict[train],
-                                # bottom=split
-                                # )
+                    axs[a].barh(this_x, 
+                                split, 
+                                width, 
+                                label=train, 
+                                # color=color_dict[train]
+                                )
+                    axs[a].barh(this_x, 
+                                merge, 
+                                width, 
+                                label=train, 
+                                # color=color_dict[train],
+                                bottom=split
+                                )
                     i += 1
             x += i * width
         #Predict as axis tick
@@ -238,3 +293,26 @@ def get_color_dict(all):
         color_dict[train] = colors[i]
     return color_dict
 # %%
+if __name__=='__main__':
+    #MUST CALL FROM SETUP DIRECTORY
+    metric_dict = get_metric_dict()
+    all_metrics = compare_metrics(metric_dict)
+    train_dirs = glob(f'{os.path.join(os.getcwd(), "train_*")}/')
+    seg_dict = {}
+    for train_dir in train_dirs:
+        seg_dict[train_dir] = glob(os.path.join(train_dir, 'segment_train*.json'))
+    
+    sys.path.append(os.getcwd)
+    from batch_evaluate import *
+    thresh_metrics = batch_evaluate(seg_dict) #TODO: replace with loading from saved: 'metrics/test_thresh_metrics.json'
+#%%
+    bests = [('train_real_30nm', 'predict_real_30nm'),
+            ('train_real_90nm', 'predict_real_90nm'),
+            ('train_link20220407s42c310000_90nm', 'predict_real_90nm'),
+            ('train_split20220407s42c340000_90nm', 'predict_real_90nm'),
+            ('train_real_30nm', 'predict_link20220407s42c310000_30nm'),
+            ('train_real_30nm', 'predict_split20220407s42c340000_30nm')
+            ]
+    plot_metric_pairs_scatters(all_metrics, thresh_metrics=thresh_metrics, bests=bests)
+# %%
+plot_metric_pairs_scatters(all_metrics, thresh_metrics=thresh_metrics, bests=bests, mets=['voi'])

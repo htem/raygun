@@ -21,7 +21,7 @@ def nm2px(coord, voxel_size, offset):
 
 def rasterize_and_evaluate(config, cube_size=1024, thresh_list='volumes/segmentation_*'):
     if isinstance(config, str):
-        config = gt_tools.load_config(config_file)
+        config = gt_tools.load_config(config)
 
     # Skel=tree_id:[Node_id], nodes=Node_id:{x,y,z}
     skeletons, nodes = parse_skeleton(config['SkeletonConfig'])
@@ -80,8 +80,13 @@ def get_score(metrics, keys=['nvi_split', 'nvi_merge']):
 if __name__=="__main__":
     config_file = sys.argv[1]
     thresh_list = 'volumes/segmentation_*'
+    update_best = False
     if len(sys.argv) > 2:
-        increment = int(sys.argv[2])
+        if sys.argv[2] == 'update_best':
+            update_best = True
+            increment = config_file.strip('/').split('/')[-1].replace('segment_', '').replace('.json', '')
+        else:
+            increment = int(sys.argv[2])
     else:
         increment = config_file.strip('/').split('/')[-1].replace('segment_', '').replace('.json', '')
         thresh_list = False
@@ -105,7 +110,7 @@ if __name__=="__main__":
     else:        
         with open(METRIC_OUT_JSON,'r') as f:
             metrics = json.load(f)
-        if isinstance(increment, str): #for evaluating best threshold/iteration on different raw_datasets
+        if isinstance(increment, str) and not update_best: #for evaluating best threshold/iteration on different raw_datasets
             best_eval[current_iteration]['iteration'] = current_iteration
             metrics[increment] = best_eval[current_iteration]
         else:
@@ -114,7 +119,11 @@ if __name__=="__main__":
         json.dump(metrics, f)
 
     # Increment config
-    if increment is not None and not isinstance(increment, str):
+    if update_best:
+        print(f'New best = {best_eval}')            
+        with open(BEST_METRIC_JSON, 'w') as f:
+            json.dump(best_eval, f)
+    elif increment is not None and not isinstance(increment, str):
         # Save best 
         if not os.path.isfile(BEST_METRIC_JSON):
             with open(BEST_METRIC_JSON, 'w') as f:
