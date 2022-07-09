@@ -101,8 +101,9 @@ if __name__=="__main__":
     best_eval = {}
     for thresh, metrics in evaluation.items():
         if len(best_eval)==0 or get_score(best_eval[current_iteration]) > get_score(metrics):
-            best_eval[current_iteration] = metrics
-            best_eval[current_iteration]['segment_ds'] = thresh
+            best_eval = metrics
+            best_eval['segment_ds'] = thresh
+            best_eval['iteration'] = current_iteration
 
     #check append
     if not os.path.isfile(METRIC_OUT_JSON):
@@ -111,32 +112,33 @@ if __name__=="__main__":
         with open(METRIC_OUT_JSON,'r') as f:
             metrics = json.load(f)
         if isinstance(increment, str) and not update_best: #for evaluating best threshold/iteration on different raw_datasets
-            best_eval[current_iteration]['iteration'] = current_iteration
-            metrics[increment] = best_eval[current_iteration]
+            # best_eval[current_iteration]['iteration'] = current_iteration
+            # metrics[increment] = best_eval[current_iteration]
+            evaluation['iteration'] = current_iteration
+            metrics[increment] = evaluation
         else:
             metrics[current_iteration] = evaluation
     with open(METRIC_OUT_JSON,'w') as f:
-        json.dump(metrics, f)
+        json.dump(metrics, f, indent=4)
 
     # Increment config
     if update_best:
         print(f'New best = {best_eval}')            
         with open(BEST_METRIC_JSON, 'w') as f:
-            json.dump(best_eval, f)
+            json.dump(best_eval, f, indent=4)
     elif increment is not None and not isinstance(increment, str):
         # Save best 
         if not os.path.isfile(BEST_METRIC_JSON):
             with open(BEST_METRIC_JSON, 'w') as f:
-                json.dump(best_eval, f)
+                json.dump(best_eval, f, indent=4)
         else:
             with open(BEST_METRIC_JSON, 'r') as f:
-                best_metric = json.load(f)
-            curr_best = list(best_metric.values())[0]
+                curr_best = json.load(f)
             
-            if get_score(curr_best) > get_score(list(best_eval.values())[0]):
+            if get_score(curr_best) > get_score(best_eval):
                 print(f'New best = {best_eval}')            
                 with open(BEST_METRIC_JSON, 'w') as f:
-                    json.dump(best_eval, f)
+                    json.dump(best_eval, f, indent=4)
 
         # print(config_file)
         with open(config_file,'r+') as f:

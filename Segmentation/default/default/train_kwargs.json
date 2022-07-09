@@ -8,6 +8,6 @@
     "num_workers": 6,
     "batch_size": 1,
     "cache_size": 32,
-    "snapshot_every": 1000,
+    "snapshot_every": 5000,
     "save_every": 20000
 }

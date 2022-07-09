@@ -41,7 +41,7 @@
                 "raw_dataset": "volumes/raw_30nm",
     
                 "db_host": "mongodb://10.117.28.250:27017/",
-                "db_name": "gt_xnh_{experiment}_{network}", // must be unique
+                "db_name": "{experiment}_{network}", // must be unique
                 "log_dir": ".logs/{script_folder}/{experiment}_{network}_{iteration}",
     
                 "size_in_pix": true,

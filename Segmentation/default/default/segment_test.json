@@ -2,8 +2,8 @@
     // CATMAID project ID to pull skeleton from
     // "skeleton_project_id": 18,
     "SkeletonConfig": {
-       "file": "",
-       "url": "http://catmaid2.hms.harvard.edu:9000/annotations/62bd9b7b0100009e00fe614e",
+       "file": "update",
+       "url": "http://catmaid2.hms.harvard.edu:9000/annotations/62c50847010000b000fe61f4",
        "coord_in_pix": true,
        "coord_in_zyx": true,
        "voxel_size_xyz": [30, 30, 30],
@@ -14,7 +14,7 @@
  
     // Choosing which segmentation to make GT on.
     // Options: 0.7, 0.8, 0.9...
-    "segment_ds": "volumes/segmentation_0.500",
+    "segment_ds": "volumes/segmentation_0.500", 
  
     // Manual list of fragments to mask out
     "ignored_fragments": [],
@@ -40,8 +40,7 @@
              "raw_dataset": "volumes/raw_30nm",
  
              "db_host": "mongodb://10.117.28.250:27017/",
-             "db_name": "gt_xnh_{experiment}_{network}", // must be unique
-             // "db_name": "{experiment}",
+             "db_name": "{experiment}", // must be unique
              "log_dir": ".logs/{script_folder}/{experiment}_{network}_{iteration}",
              // "use_global_roi":true,       
  
@@ -66,36 +65,56 @@
              "iteration" : 20000,
              "net_voxel_size": [30, 30, 30]
          },
- 
-     // "FindSegmentsGetLocalLUTsTask":
-     // {
-     //     "overwrite": 2,
-     //     "no_check_dependency": 1,
-     //     // "no_launch_workers": 1,
-     //     "max_retries": 3
-     // }
- 
-    
      
-     "PredictTask":
-     {
-        "predict_file":"predict_jax.py"
+    "PredictTask":
+        {
+            "predict_file":"predict_jax.py",
+            "out_dataset" : "volumes/affs" 
+        },
+
+       
+    "ExtractFragmentTask":
+        {
+            "affs_dataset": "/volumes/affs", 
+            "fragments_dataset": "/volumes/fragments" 
+        },
+ 
+    "AgglomerateTask":
+        {
+            "affs_dataset": "/volumes/affs",
+            "fragments_dataset": "/volumes/fragments"
+        },
+
+ 
+    "FindSegmentsGetLocalLUTsTask":
+        {
+            "lut_dir": "luts/fragment_segment",
+            "fragments_dataset": "/volumes/fragments"
+        },
+
+    "FindSegmentsGetLocalEdgesTask":
+        {
+            "lut_dir": "luts/fragment_segment",
+            "fragments_dataset": "/volumes/fragments"
+        },
+     
+    "FindSegmentsGetGlobalLUTsTask":
+    {
+        "lut_dir": "luts/fragment_segment",
+        "fragments_dataset": "/volumes/fragments"
+    },
+
+    "FindSegmentsGetChunkedGlobalLUTsTask":
+        {
+            "lut_dir": "luts/fragment_segment",
+            "fragments_dataset": "/volumes/fragments"
+        },
+
+    "ExtractSegmentationTask":
+        {
+            "lut_dir": "luts/fragment_segment",
+            "fragments_dataset": "/volumes/fragments",
+            "out_dataset": "volumes/segmentation"
         }
- 
-     // "FindSegmentsBlockwiseTask2a":
-     //     {
-     //         "lut_dir": "luts/fragment_segment",
-     //         "fragments_dataset": "/volumes/fragments",
-     //         "num_workers": 8
-     //     },
- 
-     // "FindSegmentsBlockwiseTask2b":
-     //     {
-     //         "lut_dir": "luts/fragment_segment",
-     //         "fragments_dataset": "/volumes/fragments",
-     //         "num_workers": 8
-     //     },
- 
-     
  }
  

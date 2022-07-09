@@ -7,6 +7,21 @@ import sys
 import matplotlib.pyplot as plt
 from matplotlib.colors import TABLEAU_COLORS
 import numpy as np
+import matplotlib
+# switch to pgf backend
+matplotlib.use('svg')
+# update latex preamble
+plt.rcParams.update({
+    "svg.fonttype" : 'path',
+    "font.family": "serif",
+    # "text.usetex": True,
+    # "pgf.rcfonts": False,
+    # "pgf.texsystem": 'pdflatex', # default is xetex
+    # "pgf.preamble": [
+    #      r"\usepackage[T1]{fontenc}",
+    #      r"\usepackage{mathpazo}"
+    #      ]
+})
 
 def get_metric_dict(path='.'):
     train_list = glob(os.path.join(path, f'train_*'))
@@ -108,7 +123,7 @@ def plot_metric_pairs_scatters(all_metrics, thresh_metrics=None, bests=[], mets=
     # colors = list(TABLEAU_COLORS.values())
     # color_dict = get_color_dict(all_metrics)
     
-    fig, axs = plt.subplots(len(mets), 1, figsize=(20, 20*len(mets)))
+    fig, axs = plt.subplots(len(mets), 1, figsize=(10, 10*len(mets)))
     try:
         len(axs)
     except:
@@ -148,7 +163,7 @@ def plot_metric_pairs_scatters(all_metrics, thresh_metrics=None, bests=[], mets=
                     this_thresh_metric = thresh_metrics[train, predict+'.']
                 split, merge = get_thresh_line(this_thresh_metric, met)
                 if (train,predict) in bests or len(bests) == 0:
-                    kwargs = {'linewidth': 2}
+                    kwargs = {'linewidth': 1}
                 else:
                     kwargs = {'linestyle': 'dashed', 'linewidth': .5, 'alpha': 0.5}
                 axs[a].plot(split, 
@@ -186,9 +201,9 @@ def plot_metric_pairs_scatters(all_metrics, thresh_metrics=None, bests=[], mets=
             merge = all_metrics[f'{met}_merge'][train, predict]
             lim = max([split, merge, lim])
             if (train,predict) in bests or len(bests) == 0:
-                kwargs = {'color': color, 's': 80}
+                kwargs = {'color': color, 's': 95}
             else:
-                kwargs = {'facecolors': 'none', 'edgecolors':color, 's': 50}
+                kwargs = {'facecolors': 'none', 'edgecolors':color, 's': 70}
             axs[a].scatter(split, 
                         merge, 
                         label = f'{train}_{predict}', 
@@ -201,8 +216,9 @@ def plot_metric_pairs_scatters(all_metrics, thresh_metrics=None, bests=[], mets=
         axs[a].set_xlim([0, lim])
         axs[a].set_ylim([0, lim])
         # axs[a].legend(legend)
-        axs[a].legend(bbox_to_anchor=(a, 1))
+        axs[a].legend()#bbox_to_anchor=(2, 1))
     plt.show()
+    return fig
 
 def plot_metric_pairs_bar(all_metrics):
     width = 0.35  # the width of the bars
@@ -292,6 +308,66 @@ def get_color_dict(all):
     for i, train in enumerate(trains):
         color_dict[train] = colors[i]
     return color_dict
+
+#%%
+def get_category(name):
+    category = ''
+    acronym = ''
+    if 'split' in name or 'link' in name:
+        category += 'fake '
+        acronym += 'f'
+    else:
+        category += 'real '
+        acronym += 'r'
+    
+    if '90nm' in name:
+        category += 'low quality'
+        acronym += 'LQ'
+    else:
+        category += 'high quality'
+        acronym += 'HQ'
+    return f'{category} ({acronym})', category, acronym
+
+
+def get_result_table(metric_dict, met='voi', best_suf='_sum', best_f=np.min):
+    keys = set()
+    scores = defaultdict(list)
+    for (train, predict), metrics in metric_dict.items():
+        # print(train, predict)
+        train_name, _, _ = get_category(train)
+        predict_name, _, _ = get_category(predict)
+        if 'split' in train or 'split' in predict:
+            type = 'Split'
+        elif 'link' in train or 'link' in predict:
+            type = 'Linked (original)'
+        else:
+            type = 'Paired'        
+
+        keys.add((type, train_name, predict_name))
+        scores[type, train_name, predict_name, met+'_split'].append(metrics[met+'_split'])
+        scores[type, train_name, predict_name, met+'_merge'].append(metrics[met+'_merge'])
+        scores[type, train_name, predict_name, met+'_sum'].append(metrics[met+'_split'] + metrics[met+'_merge'])
+
+    out_str = f'Type, Trained On, Predicted On, {met.upper()} - Split, {met.upper()} - Merge, {met.upper()} - Sum \n'
+    for type, train, predict in keys:
+        out_str += f'{type}, {train}, {predict}, '
+        best_score = best_f(scores[type, train, predict, met+best_suf])
+        best_ind = scores[type, train, predict, met+best_suf].index(best_score)
+        for suf in ['_split', '_merge', '_sum']:
+            these = scores[type, train, predict, met+suf]
+            mean = np.mean(these)
+            best = these[best_ind]
+            scores[type, train, predict, met+suf, 'mean'] = mean
+            scores[type, train, predict, met+suf, 'best'] = best
+            if len(these) > 1:
+                out_str += f'%.3f (mean = %.3f), ' % (best, mean)
+            else:
+                out_str += f'%.3f, ' % (best)
+        out_str = out_str[:-2] + '\n'
+    print(out_str)
+    return scores, out_str
+
+
 # %%
 if __name__=='__main__':
     #MUST CALL FROM SETUP DIRECTORY
@@ -315,4 +391,5 @@ if __name__=='__main__':
             ]
     plot_metric_pairs_scatters(all_metrics, thresh_metrics=thresh_metrics, bests=bests)
 # %%
-plot_metric_pairs_scatters(all_metrics, thresh_metrics=thresh_metrics, bests=bests, mets=['voi'])
+fig = plot_metric_pairs_scatters(all_metrics, thresh_metrics=thresh_metrics, bests=bests, mets=['voi'])
+# %%

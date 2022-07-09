@@ -13,7 +13,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.Logger('Compare', 'INFO')
 
-from noise2gun import *
+# from noise2gun import *
 
 class Compare():
     def __init__(self, 

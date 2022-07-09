@@ -159,14 +159,14 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None, start_watche
             segment_config['Network']['train_dir'] = os.getcwd() +'/'
             with open(f"segment.json", "w") as config_file:
                 json.dump(segment_config, config_file)
-            os.system('sbatch train.sbatch', shell=True, text=True))
+            os.system('sbatch train.sbatch')
             if start_watchers:
                 os.system(f'sbatch network_watcher.sbatch \
                     {kwargs["save_every"]} \
                     {kwargs["max_iteration"]} \
                     {kwargs["save_every"]} \
                     {os.getcwd()}/segment.json \
-                    {raw_ds.split("/")[-1]}', shell=True, text=True))
+                    {raw_ds.split("/")[-1]}')
             os.chdir('../')
 
         if len(glob(foldername)) == 0: 

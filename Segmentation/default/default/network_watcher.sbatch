@@ -10,6 +10,7 @@
 
 module load gcc/9.2.0
 module load cuda/11.2
+module load boost
 
 increment=$1
 final_iteration=$2
@@ -22,11 +23,11 @@ segway_dir=/n/groups/htem/Segmentation/shared-nondev/segway2
 
 #$?
 # export PYTHONPATH=$PYTHONPATH:/n/groups/htem/Segmentation/tmn7/gunpowder-1.2.2-220114
-export PYTHONPATH=$PYTHONPATH:/n/groups/htem/users/jlr54/gunpowder_jax_triMod
+# export PYTHONPATH=$PYTHONPATH:/n/groups/htem/users/jlr54/gunpowder_jax_triMod
 # . /n/groups/htem/users/tmn7/envs/ubuntu18_python36_daisy1/bin/activate
 # . /n/groups/htem/users/tmn7/envs/ubuntu20_python39_wk/bin/activate
 
-. /n/groups/htem/users/tmn7/envs/ubuntu18_python37/bin/activate
+# . /n/groups/htem/users/tmn7/envs/ubuntu18_python37/bin/activate
 # . /n/groups/htem//users/mkn5/venv/daisy-2/bin/activate
 if [ "$PYTHONPATH" != */n/groups/htem/Segmentation/shared-nondev* ]; then
     echo INFO: PYTHONPATH env does not have segway... adding it
@@ -38,7 +39,7 @@ export TF_FORCE_GPU_ALLOW_GROWTH=true
 export XLA_FLAGS=--xla_gpu_strict_conv_algorithm_picker=false
 
 # Wait until network is running
-while [ ! -f .running ] && [ -f .done ]
+while [ ! -f .running ] && [ ! -f .done ]
 do
     sleep 1m
 done
@@ -60,21 +61,14 @@ do
     if [ -f "$resave_file" ]; then
         echo "$checkpoint_file ready!"  
 
-        #TODO: Determine if this is necessary
-        # # Remove existing zarr 
-        # if [ -d "${config_json/json/"zarr"}" ]; then
-        #     echo "Removing zarr"
-        #     rm -r "${config_json/json/"zarr"}"
-        # fi
-        
-        # echo Activate environment
-        # . /n/groups/htem/Segmentation/shared-nondev/cbx_fn/segway2/gt_scripts/activate_gt_env.sh "$config_json"
+        # TODO: Determine if this is necessary
+        # Remove existing zarr 
+        if [ -d "${config_json/json/"zarr"}" ]; then
+            echo "Removing zarr"
+            rm -r "${config_json/json/"zarr"}"
+        fi
 
-        # Add check so that the  next command only runs if previous command ran succesfully? 
-        echo ==========Affinities==========
-        python ${segway_dir}/tasks/segmentation/task_01.py ${config_json}
-        
-        echo ==========Agglomerate==========
+        echo ==========Segment==========
         # TODO Check for waterz error
         python ${segway_dir}/tasks/segmentation/task_06a_extract_segments.py ${config_json}
         

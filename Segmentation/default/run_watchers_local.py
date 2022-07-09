@@ -58,12 +58,13 @@ def get_updated_skeleton():
     return skel_file
     
 
-def run_watchers(ext="local", current_iter=None):
+def run_watchers(ext="local", current_iter=None, folders=None):
     command = {"local": "bash", "sbatch": "sbatch"}[ext]
     if current_iter is None:
         current_iter = kwargs["save_every"]
     
-    folders = [watcher.split('/')[0] for watcher in glob(f'train*/network_watcher.{ext}')]
+    if folders is None:
+        folders = [watcher.split('/')[0] for watcher in glob(f'train*/network_watcher.{ext}')]
 
     jobs = {}
     for folder in folders:
@@ -71,26 +72,13 @@ def run_watchers(ext="local", current_iter=None):
         os.chdir(folder)        
         with open('train_kwargs.json', 'r') as kwargs_file:
             kwargs = json.load(kwargs_file)
-        command_str = f'{command} network_watcher.{ext} {kwargs["save_every"]} {kwargs["max_iteration"]} {current_iter} {os.getcwd()}/segment.json {kwargs["raw_ds"].split("/")[-1]} &'
-        if ext == 'local':
-            job = Popen(
-                    command_str, 
-                    # [
-                    #     command, 
-                    #     f'network_watcher.{ext}', 
-                    #     str(kwargs["save_every"]), 
-                    #     str(kwargs["max_iteration"]), 
-                    #     str(kwargs["save_every"]), 
-                    #     f'{os.getcwd()}/segment.json', 
-                    #     kwargs["raw_ds"].split("/")[-1]
-                    # ], 
-                    shell=True, 
-                    text=True, 
-                )
-        elif ext == 'sbatch':
-            # job = check_output(command_str, shell=True, text=True)
-            os.system(command_str)
-            job = 'Sbatch job submitted.'
+        command_str = f'{command} network_watcher.{ext} {kwargs["save_every"]} {kwargs["max_iteration"]} {current_iter} {os.getcwd()}/segment.json {kwargs["raw_ds"].split("/")[-1]}'
+        success = os.system(command_str) == 0
+        if success:
+            job = 'Job run/submitted successfully: {folder}'
+        else:
+            job = 'Job run/submission failed: {folder}'
+
         os.chdir('../')
         jobs[folder] = job
     
@@ -112,17 +100,18 @@ def watch_watchers(jobs, ext='local'):
 
 # %%
 if __name__ == '__main__':
+    ext = 'local'
+    current_iter = None
+    folders = None
     if len(sys.argv) > 1:
         ext = sys.argv[1]
         if len(sys.argv) > 2:
             current_iter = sys.argv[2]
-        else:
-            current_iter = None
-    else:
-        ext = 'local'
+            if len(sys.argv) > 3:
+                folders = sys.argv[3:]
     update_watchers(current_iter)
-    jobs = run_watchers(ext, current_iter)
-    all_done = False
-    while not all_done:
-        all_done = watch_watchers(jobs, ext)
-        sleep(10)
+    jobs = run_watchers(ext, current_iter, folders)
+    # all_done = False
+    # while not all_done:
+    #     all_done = watch_watchers(jobs, ext)
+    #     sleep(10)
