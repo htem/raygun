@@ -112,10 +112,13 @@ def plot_metrics(all_metrics):
 def get_thresh_line(thresh_metrics, met, base='volumes/segmentation_'):
     split = []
     merge = []
+    # ds_list = []
     threshes = sorted([ds.replace(base, '') for ds in thresh_metrics.keys()])
     for thresh in threshes:
         split.append(thresh_metrics[base+thresh][met+'_split'])
         merge.append(thresh_metrics[base+thresh][met+'_merge'])
+    #     ds_list.append(base+thresh)
+    # print(ds_list)
     return split, merge
 
 def plot_metric_pairs_scatters(all_metrics, thresh_metrics=None, bests=[], mets=None):
@@ -206,11 +209,16 @@ def plot_metric_pairs_scatters(all_metrics, thresh_metrics=None, bests=[], mets=
             lim = max([split, merge, lim])
             if (train,predict) in bests or len(bests) == 0:
                 kwargs = {'color': color, 's': 95}
+                _,_, train_ac = get_category(train)
+                _,_, predict_ac = get_category(predict)
+                label = f'train on {train_ac} > predict on {predict_ac} (best)'
             else:
+                # label = f'train on {train_ac} > predict on {predict_ac}'
+                label = None
                 kwargs = {'facecolors': 'none', 'edgecolors':color, 's': 70}
             axs[a].scatter(split, 
                         merge, 
-                        label = f'{train}_{predict}', 
+                        label = label, 
                         marker=marker,
                         **kwargs
                         )
@@ -334,41 +342,47 @@ def get_category(name):
 
 def get_result_table(metric_dict, met='voi', best_suf='_sum', best_f=np.min):
     keys = set()
+    names = defaultdict(list)
     scores = defaultdict(list)
-    for (train, predict), metrics in metric_dict.items():
+    for (train_name, predict_name), metrics in metric_dict.items():
         # print(train, predict)
-        train_name, _, _ = get_category(train)
-        predict_name, _, _ = get_category(predict)
-        if 'split' in train or 'split' in predict:
+        train_cat, _, _ = get_category(train_name)
+        predict_cat, _, _ = get_category(predict_name)
+        if 'split' in train_name or 'split' in predict_name:
             type = 'Split'
-        elif 'link' in train or 'link' in predict:
+        elif 'link' in train_name or 'link' in predict_name:
             type = 'Linked (original)'
-        else:
+        elif ('real_30nm' in train_name and 'real_30nm' in predict_name) or ('real_90nm' in train_name and 'real_90nm' in predict_name):
             type = 'Paired'        
+        else:
+            type = 'Naive'        
 
-        keys.add((type, train_name, predict_name))
-        scores[type, train_name, predict_name, met+'_split'].append(metrics[met+'_split'])
-        scores[type, train_name, predict_name, met+'_merge'].append(metrics[met+'_merge'])
-        scores[type, train_name, predict_name, met+'_sum'].append(metrics[met+'_split'] + metrics[met+'_merge'])
+        keys.add((type, train_cat, predict_cat))
+        names[type, train_cat, predict_cat].append((train_name, predict_name))
+        scores[type, train_cat, predict_cat, met+'_split'].append(metrics[met+'_split'])
+        scores[type, train_cat, predict_cat, met+'_merge'].append(metrics[met+'_merge'])
+        scores[type, train_cat, predict_cat, met+'_sum'].append(metrics[met+'_split'] + metrics[met+'_merge'])
 
+    bests = []
     out_str = f'Type, Trained On, Predicted On, {met.upper()} - Split, {met.upper()} - Merge, {met.upper()} - Sum \n'
-    for type, train, predict in keys:
-        out_str += f'{type}, {train}, {predict}, '
-        best_score = best_f(scores[type, train, predict, met+best_suf])
-        best_ind = scores[type, train, predict, met+best_suf].index(best_score)
+    for type, train_cat, predict_cat in keys:
+        out_str += f'{type}, {train_cat}, {predict_cat}, '
+        best_score = best_f(scores[type, train_cat, predict_cat, met+best_suf])
+        best_ind = scores[type, train_cat, predict_cat, met+best_suf].index(best_score)
+        bests.append(names[type, train_cat, predict_cat][best_ind])
         for suf in ['_split', '_merge', '_sum']:
-            these = scores[type, train, predict, met+suf]
+            these = scores[type, train_cat, predict_cat, met+suf]
             mean = np.mean(these)
             best = these[best_ind]
-            scores[type, train, predict, met+suf, 'mean'] = mean
-            scores[type, train, predict, met+suf, 'best'] = best
+            scores[type, train_cat, predict_cat, met+suf, 'mean'] = mean
+            scores[type, train_cat, predict_cat, met+suf, 'best'] = best
             if len(these) > 1:
                 out_str += f'%.3f (mean = %.3f), ' % (best, mean)
             else:
                 out_str += f'%.3f, ' % (best)
         out_str = out_str[:-2] + '\n'
     print(out_str)
-    return scores, out_str
+    return scores, bests
 
 
 # %%
@@ -382,14 +396,19 @@ sys.path.append(os.getcwd)
 from batch_evaluate import *
 thresh_metrics = batch_evaluate() #TODO: replace with loading from saved: 'metrics/test_thresh_metrics.json'
 #%%
-bests = [('train_real_30nm', 'predict_real_30nm'),
-        ('train_real_90nm', 'predict_real_90nm'),
-        ('train_link20220407s42c310000_90nm', 'predict_real_90nm'),
-        ('train_split20220407s42c340000_90nm', 'predict_real_90nm'),
-        ('train_real_30nm', 'predict_link20220407s42c310000_30nm'),
-        ('train_real_30nm', 'predict_split20220407s42c340000_30nm')
-        ]
+scores, bests = get_result_table(metric_dict, met='voi', best_suf='_sum', best_f=np.min)
+
+#%%
+# bests = [('train_real_30nm', 'predict_real_30nm'),
+#         ('train_real_90nm', 'predict_real_90nm'),
+#         ('train_link20220407s42c310000_90nm', 'predict_real_90nm'),
+#         ('train_split20220407s42c340000_90nm', 'predict_real_90nm'),
+#         ('train_real_30nm', 'predict_link20220407s42c310000_30nm'),
+#         ('train_real_30nm', 'predict_split20220407s42c340000_30nm')
+#         ]
 plot_metric_pairs_scatters(all_metrics, thresh_metrics=thresh_metrics, bests=bests)
 # %%
 fig = plot_metric_pairs_scatters(all_metrics, thresh_metrics=thresh_metrics, bests=bests, mets=['voi'])
 # %%
+predict_comp = {"CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed3_checkpoint340000_netG1_184tCrp": {"structural_similarity": 0.24770465076330822, "peak_signal_noise_ratio": 16.453361785580466, "mean_squared_error": 1471.44550390625}, "CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed13_checkpoint350000_netG1_184tCrp": {"structural_similarity": 0.2633604227862902, "peak_signal_noise_ratio": 16.791079440371202, "mean_squared_error": 1361.358216328125}, "CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed4_checkpoint310000_netG1_184tCrp": {"structural_similarity": 0.30191307398567785, "peak_signal_noise_ratio": 16.68705218780684, "mean_squared_error": 1394.360726921875}, "CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed42_checkpoint340000_netG1_184tCrp": {"structural_similarity": 0.26181434724996744, "peak_signal_noise_ratio": 16.34498202353288, "mean_squared_error": 1508.62798121875}, "CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed13_checkpoint330000_netG1_184tCrp": {"structural_similarity": 0.27780372862216124, "peak_signal_noise_ratio": 16.96722523719191, "mean_squared_error": 1307.247551765625}, "CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed42_checkpoint310000_netG1_184tCrp": {"structural_similarity": 0.2938248210649898, "peak_signal_noise_ratio": 17.496394410603482, "mean_squared_error": 1157.286587390625}, "file": "/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvTopGT/CBxs_lobV_topm100um_eval_1.n5", "roi": "[52110:64110, 18000:30000, 33540:45540] (12000, 12000, 12000)", "ds1": "volumes/raw_30nm"}
+train_comp = {"CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed3_checkpoint340000_netG2_184tCrp": {"structural_similarity": 0.6052299103586687, "peak_signal_noise_ratio": 18.31577374835684, "mean_squared_error": 958.3033051875}, "CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed13_checkpoint350000_netG2_184tCrp": {"structural_similarity": 0.6167000492953976, "peak_signal_noise_ratio": 19.43100785318174, "mean_squared_error": 741.275379015625}, "CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed4_checkpoint310000_netG2_184tCrp": {"structural_similarity": 0.5502777157504858, "peak_signal_noise_ratio": 19.41991437730643, "mean_squared_error": 743.1712889375}, "CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed42_checkpoint340000_netG2_184tCrp": {"structural_similarity": 0.6046846137565378, "peak_signal_noise_ratio": 18.006385504600782, "mean_squared_error": 1029.06263746875}, "CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed13_checkpoint330000_netG2_184tCrp": {"structural_similarity": 0.5792716592266437, "peak_signal_noise_ratio": 19.22594775343522, "mean_squared_error": 777.11552546875}, "CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed42_checkpoint310000_netG2_184tCrp": {"structural_similarity": 0.5473250499653292, "peak_signal_noise_ratio": 13.65396279963808, "mean_squared_error": 2803.39362175}, "file": "/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvBottomGT/CBxs_lobV_bottomp100um_training_0.n5", "roi": "[26880:38880, 57600:69600, 9360:21360] (12000, 12000, 12000)", "ds1": "volumes/interpolated_90nm_aligned"}
