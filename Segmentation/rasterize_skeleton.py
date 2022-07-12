@@ -100,7 +100,7 @@ if __name__=="__main__":
     evaluation = rasterize_and_evaluate(config, thresh_list=thresh_list)
     best_eval = {}
     for thresh, metrics in evaluation.items():
-        if len(best_eval)==0 or get_score(best_eval[current_iteration]) > get_score(metrics):
+        if len(best_eval)==0 or get_score(best_eval) > get_score(metrics):
             best_eval = metrics
             best_eval['segment_ds'] = thresh
             best_eval['iteration'] = current_iteration

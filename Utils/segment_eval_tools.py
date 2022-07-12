@@ -8,12 +8,14 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import TABLEAU_COLORS
 import numpy as np
 import matplotlib
-# switch to pgf backend
+# switch to svg backend
 matplotlib.use('svg')
 # update latex preamble
 plt.rcParams.update({
     "svg.fonttype" : 'path',
-    "font.family": "serif",
+    "font.family": "sans-serif",
+    "font.sans-serif": "AvenirNextLTPro",#["Avenir", "AvenirNextLTPro", "Avenir Next LT Pro", "AvenirNextLTPro-Regular", 'UniversLTStd-Light', 'Verdana', 'Helvetica']
+    "path.simplify" : True,
     # "text.usetex": True,
     # "pgf.rcfonts": False,
     # "pgf.texsystem": 'pdflatex', # default is xetex
@@ -36,6 +38,8 @@ def get_metric_dict(path='.'):
             if not key.isnumeric():
                 predict_name = key.replace('segment_', '').replace(train_name+'_', '')
                 # predict_list.append(predict_name)
+                if not 'voi_split' in stats.keys():
+                    stats = list(stats.values())[0]
                 metric_dict[train_name, predict_name] = stats
     return metric_dict
 
@@ -50,7 +54,7 @@ def compare_metrics(metric_dict=None,
     normed_metrics = defaultdict(dict)
     norm = metric_dict[tuple(norm_base)]
     for metric in metrics:
-        print(f'Baseline for {metric} is {norm[metric]} from {norm_base}')
+        # print(f'Baseline for {metric} is {norm[metric]} from {norm_base}')
         for (train, predict), stats in metric_dict.items():
             normed_metrics[metric][train, predict] = stats[metric] #/ norm[metric] # TODO: Decide how to adjust with baseline
 
@@ -309,7 +313,6 @@ def get_color_dict(all):
         color_dict[train] = colors[i]
     return color_dict
 
-#%%
 def get_category(name):
     category = ''
     acronym = ''
@@ -369,27 +372,24 @@ def get_result_table(metric_dict, met='voi', best_suf='_sum', best_f=np.min):
 
 
 # %%
-if __name__=='__main__':
-    #MUST CALL FROM SETUP DIRECTORY
-    metric_dict = get_metric_dict()
-    all_metrics = compare_metrics(metric_dict)
-    train_dirs = glob(f'{os.path.join(os.getcwd(), "train_*")}/')
-    seg_dict = {}
-    for train_dir in train_dirs:
-        seg_dict[train_dir] = glob(os.path.join(train_dir, 'segment_train*.json'))
-    
-    sys.path.append(os.getcwd)
-    from batch_evaluate import *
-    thresh_metrics = batch_evaluate(seg_dict) #TODO: replace with loading from saved: 'metrics/test_thresh_metrics.json'
+# if __name__=='__main__':
+os.chdir('/n/groups/htem/Segmentation/networks/xray_setups/eccv-bic/setup02')
+
+metric_dict = get_metric_dict()
+all_metrics = compare_metrics(metric_dict)
+
+sys.path.append(os.getcwd)
+from batch_evaluate import *
+thresh_metrics = batch_evaluate() #TODO: replace with loading from saved: 'metrics/test_thresh_metrics.json'
 #%%
-    bests = [('train_real_30nm', 'predict_real_30nm'),
-            ('train_real_90nm', 'predict_real_90nm'),
-            ('train_link20220407s42c310000_90nm', 'predict_real_90nm'),
-            ('train_split20220407s42c340000_90nm', 'predict_real_90nm'),
-            ('train_real_30nm', 'predict_link20220407s42c310000_30nm'),
-            ('train_real_30nm', 'predict_split20220407s42c340000_30nm')
-            ]
-    plot_metric_pairs_scatters(all_metrics, thresh_metrics=thresh_metrics, bests=bests)
+bests = [('train_real_30nm', 'predict_real_30nm'),
+        ('train_real_90nm', 'predict_real_90nm'),
+        ('train_link20220407s42c310000_90nm', 'predict_real_90nm'),
+        ('train_split20220407s42c340000_90nm', 'predict_real_90nm'),
+        ('train_real_30nm', 'predict_link20220407s42c310000_30nm'),
+        ('train_real_30nm', 'predict_split20220407s42c340000_30nm')
+        ]
+plot_metric_pairs_scatters(all_metrics, thresh_metrics=thresh_metrics, bests=bests)
 # %%
 fig = plot_metric_pairs_scatters(all_metrics, thresh_metrics=thresh_metrics, bests=bests, mets=['voi'])
 # %%
