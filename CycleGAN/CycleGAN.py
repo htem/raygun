@@ -34,6 +34,7 @@ except:
     from CycleGAN_Model import *
     from CycleGAN_LossFunctions import *
     from CycleGAN_Optimizers import *
+
 class CycleGAN(): #TODO: Just pass config file or dictionary
     def __init__(self,
             src_A, #EXPECTS ZARR VOLUME
@@ -55,11 +56,19 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             gnet_kwargs = {},
             g_init_learning_rate=1e-5,
 
-            dnet_depth=3, # number of layers in Discriminator networks
-            d_downsample_factor=2,
-            d_num_fmaps=16,
-            d_kernel_size=3, 
             d_init_learning_rate=1e-5,
+            dnet_type='classic',
+            dnet_kwargs={
+                    'input_nc': 1,
+                    # 'output_nc': 1,
+                    'downsampling_kw': 2, # downsampling factor
+                    'kw': 3, # kernel size
+                    'n_layers': 3, # number of layers in Discriminator networks
+                    # 'norm_layer': torch.nn.InstanceNorm3d,#partial(torch.nn.InstanceNorm3d, affine=True),#, track_running_stats=True),
+                    # 'activation': torch.nn.SELU,
+                    'ngf': 64,
+                    # 'n_blocks': 9, # resnet specific
+                },
             
             loss_style='cycle', # supports 'cycle' or 'split' or 'custom'
             loss_kwargs={'gan_mode': 'lsgan', # or 'wgangp' for Wasserstein
@@ -116,10 +125,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.gnet_type = gnet_type.lower()
             self.gnet_kwargs = gnet_kwargs
 
-            self.dnet_depth = dnet_depth
-            self.d_downsample_factor = d_downsample_factor
-            self.d_num_fmaps = d_num_fmaps
-            self.d_kernel_size = d_kernel_size 
+            self.dnet_type = dnet_type
+            self.dnet_kwargs = dnet_kwargs
             self.num_epochs = num_epochs
             self.batch_size = batch_size
             self.cache_size = cache_size
@@ -338,26 +345,76 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             init_weights(generator, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
         return generator
 
-    def get_discriminator(self, conf=None):
-        if conf is None: conf = self
-        if conf.ndims == 3: #3D case
-            norm_instance = torch.nn.InstanceNorm3d
-            discriminator_maker = NLayerDiscriminator3D
-        elif conf.ndims == 2:
-            norm_instance = torch.nn.InstanceNorm2d
-            discriminator_maker = NLayerDiscriminator
+    def get_discriminator(self, dnet_kwargs=None):
+        if dnet_kwargs is None:
+            dnet_kwargs = self.dnet_kwargs
 
-        norm_layer = functools.partial(norm_instance, affine=False, track_running_stats=False)
-        discriminator = discriminator_maker(input_nc=1, 
-                                        ndf=conf.d_num_fmaps, 
-                                        n_layers=conf.dnet_depth, 
-                                        norm_layer=norm_layer,
-                                        downsampling_kw=conf.d_downsample_factor, 
-                                        kw=conf.d_kernel_size,
-                                 )
-                                 
-        init_weights(discriminator, init_type='kaiming')
+        if self.dnet_type == 'unet':
+
+            # if self.ndims == 2:
+            #     discriminator = UnetGenerator(**self.dnet_kwargs)
+            
+            # elif self.ndims == 3:
+            #     discriminator = UnetGenerator3D(**self.dnet_kwargs)
+
+            # else:
+            #     raise f'Unet discriminators only specified for 2D or 3D, not {self.ndims}D'
+            self.set_downsample_factors()
+
+            discriminator = torch.nn.Sequential(
+                                UNet(**dnet_kwargs),
+                                # ConvPass(self.dnet_kwargs['ngf'], self.dnet_kwargs['output_nc'], [(1,)*self.ndims], activation=None, padding=self.dnet_kwargs['padding_type']), 
+                                torch.nn.Tanh()
+                                )
+        
+        elif self.dnet_type == 'residualunet':
+            self.set_downsample_factors()
+            
+            discriminator = torch.nn.Sequential(
+                                ResidualUNet(**dnet_kwargs), 
+                                torch.nn.Tanh()
+                                )
+            
+        elif self.dnet_type == 'resnet':
+            
+            if self.ndims == 2:
+                discriminator = ResnetGenerator(**dnet_kwargs)
+            
+            elif self.ndims == 3:
+                discriminator = ResnetGenerator3D(**dnet_kwargs)
+
+            else:
+                raise f'Resnet discriminators only specified for 2D or 3D, not {self.ndims}D'
+
+        elif self.dnet_type == 'classic':
+            if self.ndims == 3: #3D case
+                norm_instance = torch.nn.InstanceNorm3d
+                discriminator_maker = NLayerDiscriminator3D
+            elif self.ndims == 2:
+                norm_instance = torch.nn.InstanceNorm2d
+                discriminator_maker = NLayerDiscriminator
+
+            dnet_kwargs['norm_layer'] = functools.partial(norm_instance, affine=False, track_running_stats=False)
+            discriminator = discriminator_maker(**dnet_kwargs)
+                                    
+            init_weights(discriminator, init_type='kaiming')
+            return discriminator
+
+        else:
+
+            raise f'Unknown discriminator type requested: {self.dnet_type}'
+        
+        activation = dnet_kwargs['activation'] if 'activation' in dnet_kwargs else nn.ReLU
+        
+        if activation is not None:
+            # if activation == nn.SELU:
+            #     init_weights(discriminator, init_type='kaiming', nonlinearity='linear') # For Self-Normalizing Neural Networks
+            # else:
+            init_weights(discriminator, init_type='kaiming', nonlinearity=activation.__class__.__name__.lower())
+        else:
+            init_weights(discriminator, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
         return discriminator
+
 
     def setup_networks(self):
         self.netG1 = self.get_generator()
