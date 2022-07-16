@@ -214,14 +214,14 @@ class ResnetGenerator(nn.Module):
         model += padder.copy()
         model += [nn.Conv2d(input_nc, ngf, kernel_size=7, padding=p, bias=use_bias),
                  norm_layer(ngf),
-                 activation(True)]
+                 activation()]
 
         n_downsampling = 2
         for i in range(n_downsampling):  # add downsampling layers
             mult = 2 ** i
             model += [nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=updown_p, bias=use_bias),
                       norm_layer(ngf * mult * 2),
-                      activation(True)]
+                      activation()]
 
         mult = 2 ** n_downsampling
         for i in range(n_blocks):       # add ResNet blocks
@@ -241,7 +241,7 @@ class ResnetGenerator(nn.Module):
                                          padding=updown_p, output_padding=updown_p,
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
-                      activation(True)]
+                      activation()]
         model += padder.copy()
         model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=p)]
         model += [nn.Tanh()]
@@ -317,7 +317,7 @@ class ResnetBlock(nn.Module):
         conv_block = []
         conv_block += padder.copy()
 
-        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation(True)]
+        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation()]
         if use_dropout:
             conv_block += [nn.Dropout(0.5)]
         
@@ -653,14 +653,14 @@ class ResnetGenerator3D(nn.Module):
         model += padder.copy()
         model += [nn.Conv3d(input_nc, ngf, kernel_size=7, padding=p, bias=use_bias),
                  norm_layer(ngf),
-                 activation(True)]
+                 activation()]
 
         n_downsampling = 2
         for i in range(n_downsampling):  # add downsampling layers
             mult = 2 ** i
             model += [nn.Conv3d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=updown_p, bias=use_bias), #TODO: Make actually use padding_type for every convolution (currently does zeros if not valid)
                       norm_layer(ngf * mult * 2),
-                      activation(True)]
+                      activation()]
 
         mult = 2 ** n_downsampling
         for i in range(n_blocks):       # add ResNet blocks
@@ -680,7 +680,7 @@ class ResnetGenerator3D(nn.Module):
                                          padding=updown_p, output_padding=updown_p,
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
-                      activation(True)]
+                      activation()]
         model += padder.copy()
         model += [nn.Conv3d(ngf, output_nc, kernel_size=7, padding=p)]
         model += [nn.Tanh()]
@@ -733,7 +733,7 @@ class ResnetBlock3D(nn.Module):
         conv_block = []
         conv_block += padder.copy()
 
-        conv_block += [nn.Conv3d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation(True)]
+        conv_block += [nn.Conv3d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation()]
         if use_dropout:
             conv_block += [nn.Dropout(0.5)]
 

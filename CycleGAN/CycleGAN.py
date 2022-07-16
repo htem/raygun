@@ -1,3 +1,4 @@
+from copy import deepcopy
 import itertools
 from matplotlib import pyplot as plt
 import torch
@@ -91,7 +92,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             save_every=2000,
             tensorboard_path='./tensorboard/',
             verbose=True,
-            checkpoint=None, # Used for prediction/rendering, training always starts from latest            
+            checkpoint=None, # Used for prediction/rendering, training always starts from latest   
+            pretrain_gnet=False         
             ):
 
             self.src_A = src_A
@@ -124,6 +126,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
             self.gnet_type = gnet_type.lower()
             self.gnet_kwargs = gnet_kwargs
+            self.pretrain_gnet = pretrain_gnet
 
             self.dnet_type = dnet_type
             self.dnet_kwargs = dnet_kwargs
@@ -267,6 +270,20 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
 
+    def get_valid_context(self, side_length=None):
+        # returns number of pixels to crop from a side to trim network outputs to valid FOV
+        if side_length is None:
+            side_length = self.side_length
+        
+        gnet_kwargs = self.gnet_kwargs.copy()
+        gnet_kwargs['padding_type'] = 'valid'
+        gnet = self.get_generator(gnet_kwargs=gnet_kwargs)
+        
+        shape = (1,1) + (side_length,) * self.ndims
+        pars = [par for par in gnet.parameters()]
+        result = gnet(torch.zeros(*shape, device=pars[0].device))
+        return ((gp.Coordinate(shape) - gp.Coordinate(result.shape)) / 2)[-self.ndims:]
+
     def get_valid_crop(self, side_length=None):
         # returns number of pixels to crop from a side to trim network outputs to valid FOV
         if side_length is None:
@@ -283,11 +300,35 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         raise 'get_valid_crop() not fully implemented (in conflict with other usage of cropping'
         return gp.Coordinate(pad[-self.ndims:])
 
-    def set_downsample_factors(self):
-        if 'downsample_factors' not in self.gnet_kwargs:
-            down_factor = 2 if 'down_factor' not in self.gnet_kwargs else self.gnet_kwargs.pop('down_factor')
-            num_downs = 3 if 'num_downs' not in self.gnet_kwargs else self.gnet_kwargs.pop('num_downs')
-            self.gnet_kwargs.update({'downsample_factors': [(down_factor,)*self.ndims,] * (num_downs - 1)})
+    def get_downsample_factors(self, net_kwargs):
+        if 'downsample_factors' not in net_kwargs:
+            down_factor = 2 if 'down_factor' not in net_kwargs else net_kwargs.pop('down_factor')
+            num_downs = 3 if 'num_downs' not in net_kwargs else net_kwargs.pop('num_downs')
+            net_kwargs.update({'downsample_factors': [(down_factor,)*self.ndims,] * (num_downs - 1)})
+        return net_kwargs
+
+    def pretrain_generator(self, gnet=None, iter=1000, accel_factor=100, loss_fn=torch.nn.HuberLoss()):
+        if gnet is None:
+            gnet = self.get_generator()
+        optimizer = torch.optim.Adam(gnet.parameters(), lr=self.g_init_learning_rate*accel_factor, betas=self.adam_betas)
+        shape = (1,1) + (self.side_length,) * self.ndims
+        pars = [par for par in gnet.parameters()]
+        test = torch.rand(*shape, device=pars[0].device, requires_grad=True) * 2 - 1
+        pbar = tqdm(range(iter))
+        for i in pbar:
+            out = gnet(test)
+            loss = loss_fn(out, test)
+            pbar.set_postfix({'loss': loss.item()})
+            loss.backward()
+            optimizer.step()     
+            test = torch.rand(*shape, requires_grad=True, device=pars[0].device) * 2 - 1
+            
+        print(f'Final loss: {loss.item()}')
+        #TODO: Figure out how to get this to work for spawning workers later
+        # gnet = gnet.to('cpu')
+        # torch.cuda.empty_cache()
+        # cudart.cudaDeviceReset()
+        return gnet
 
     def get_generator(self, gnet_kwargs=None):
         if gnet_kwargs is None:
@@ -303,7 +344,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
             # else:
             #     raise f'Unet generators only specified for 2D or 3D, not {self.ndims}D'
-            self.set_downsample_factors()
+            gnet_kwargs = self.get_downsample_factors(gnet_kwargs)
 
             generator = torch.nn.Sequential(
                                 UNet(**gnet_kwargs),
@@ -312,7 +353,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 )
         
         elif self.gnet_type == 'residualunet':
-            self.set_downsample_factors()
+            gnet_kwargs = self.get_downsample_factors(gnet_kwargs)
             
             generator = torch.nn.Sequential(
                                 ResidualUNet(**gnet_kwargs), 
@@ -359,7 +400,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
             # else:
             #     raise f'Unet discriminators only specified for 2D or 3D, not {self.ndims}D'
-            self.set_downsample_factors()
+            dnet_kwargs = self.get_downsample_factors(dnet_kwargs)
 
             discriminator = torch.nn.Sequential(
                                 UNet(**dnet_kwargs),
@@ -368,7 +409,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 )
         
         elif self.dnet_type == 'residualunet':
-            self.set_downsample_factors()
+            dnet_kwargs = self.get_downsample_factors(dnet_kwargs)
             
             discriminator = torch.nn.Sequential(
                                 ResidualUNet(**dnet_kwargs), 
@@ -415,10 +456,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             init_weights(discriminator, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
         return discriminator
 
-
     def setup_networks(self):
-        self.netG1 = self.get_generator()
-        self.netG2 = self.get_generator()
+        if self.pretrain_gnet:
+            self.netG1 = self.pretrain_generator()
+            self.netG2 = deepcopy(self.netG1)
+        else:
+            self.netG1 = self.get_generator()
+            self.netG2 = self.get_generator()
         
         self.netD1 = self.get_discriminator()
         self.netD2 = self.get_discriminator()

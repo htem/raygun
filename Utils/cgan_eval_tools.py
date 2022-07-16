@@ -62,7 +62,7 @@ def pick_checkpoints(meta_log_dir='/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionE
     show_best_steps(model_logs)
     return model_logs
 
-def get_model_type(model_name: str, types: list) -> str:
+def get_model_type(model_name: str, types: list=['link', 'split']) -> str:
     for type in types:
         if type in model_name.lower():
             return type
@@ -96,9 +96,18 @@ def plot_scores(model_logs):
         plt.plot(model_logs[model_name]['score_steps'], model_logs[model_name]['scores'], label=model_name)
     plt.legend()
 
-def show_best_steps(model_logs):
+def show_best_steps(model_logs, types: list=['link', 'split']):
+    bests = defaultdict(dict)
     for model_name in model_logs.keys():
-        print(f'{model_name} best step: {model_logs[model_name]["best_step"]}')
+        this_best_score = model_logs[model_name]['scores'][model_logs[model_name]['score_steps'] == model_logs[model_name]['best_step']][0]
+        print(f'{model_name} \n\t best step: {model_logs[model_name]["best_step"]} \n\t with score {this_best_score}')
+        
+        type = get_model_type(model_name)
+        if type not in bests.keys() or bests[type]['score'] > this_best_score:
+            bests[type] = {'score': this_best_score, 'model_name': model_name, 'step': model_logs[model_name]["best_step"], 'layer_name': get_best_layer(type, '#INSERT SEED#', model_logs[model_name]["best_step"])}
+        
+    for type in types:
+        print(f'Best {type}: \n\t model_name: {bests[type]["model_name"]} \n\t layer_name: {bests[type]["layer_name"]} \n\t score: {bests[type]["score"]}')
 
 def get_best_layer(type, seed, step,
             net_raw_prefix='CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407',
