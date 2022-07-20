@@ -1,5 +1,3 @@
-scancel -u $USER
-
 rm */.done
 rm */.running
 

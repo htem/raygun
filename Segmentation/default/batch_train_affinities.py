@@ -19,51 +19,58 @@ logging.basicConfig(level=logging.INFO)
 # n_devices = 1
 
 #%%
-def add_raws_to_zarr(src, dest, datasets, num_workers=34):
+def add_raws_to_zarr(src, dest, datasets, num_workers=34, chunk_wise=False):
     for ds in datasets:
-        this = daisy.open_ds(src, ds)
-        that = daisy.prepare_ds(dest,
+        if os.path.isdir(os.path.join(dest, ds)):
+            remove_tree(os.path.join(dest, ds))
+        from_ds = daisy.open_ds(src, ds)
+        to_ds = daisy.prepare_ds(dest,
                                 ds,
-                                this.roi,
-                                this.voxel_size,
-                                this.dtype,
+                                from_ds.roi,
+                                from_ds.voxel_size,
+                                from_ds.dtype,
                                 )
-        rw_roi = daisy.Roi((0,0,0), this.voxel_size * 64)
-                
-        #Write data to new dataset
-        try: #New daisy            
-            def save_chunk(block:daisy.Roi):
-                that.__setitem__(block.write_roi, this.__getitem__(block.read_roi))
-            task = daisy.Task(
-                f'{ds}---add_missing',
-                this.roi,
-                rw_roi,
-                rw_roi,
-                process_function=save_chunk,
-                read_write_conflict=False,
-                # fit='shrink',
-                num_workers=num_workers,
-                max_retries=2)
-            success = daisy.run_blockwise([task])
-        except: #Try old daisy
-            def save_chunk(block:daisy.Roi):
-                try:
-                    that.__setitem__(block.write_roi, this.__getitem__(block.read_roi))
-                    return 0 # success
-                except:
-                    return 1 # error
-            success = daisy.run_blockwise(this.roi,
-                rw_roi,
-                rw_roi,
-                process_function=save_chunk,
-                read_write_conflict=False,
-                # fit='shrink',
-                num_workers=num_workers,
-                max_retries=2)
-        if success:
-            print(f'Added {ds}.')
+        
+        if chunk_wise:
+            rw_roi = daisy.Roi((0,0,0), from_ds.voxel_size * 64)                
+            #Write data to new dataset
+            try: #New daisy            
+                def save_chunk(block:daisy.Roi):
+                    to_ds.__setitem__(block.write_roi, from_ds.to_ndarray(block.read_roi))
+                task = daisy.Task(
+                    f'{ds}---add_missing',
+                    from_ds.roi,
+                    rw_roi,
+                    rw_roi,
+                    process_function=save_chunk,
+                    read_write_conflict=False,
+                    # fit='shrink',
+                    num_workers=num_workers,
+                    max_retries=2)
+                success = daisy.run_blockwise([task])
+            except: #Try old daisy
+                def save_chunk(block:daisy.Roi):
+                    try:
+                        to_ds.__setitem__(block.write_roi, from_ds.to_ndarray(block.read_roi))
+                        return 0 # success
+                    except:
+                        return 1 # error
+                success = daisy.run_blockwise(from_ds.roi,
+                    rw_roi,
+                    rw_roi,
+                    process_function=save_chunk,
+                    read_write_conflict=False,
+                    # fit='shrink',
+                    num_workers=num_workers,
+                    max_retries=2)
+            if success:
+                print(f'Added {ds}.')
+            else:
+                print(f'Failed to save {ds}.')
         else:
-            print(f'Failed to save {ds}.')
+            print(f'Copying {ds} non-chunkwise - this may take a bit as it is {from_ds.shape}...')
+            to_ds[from_ds.roi] = from_ds.to_ndarray()
+
 
 def get_train_foldername(name, net_res={'netg1': '30nm', 'netg2': '90nm'}):
     #CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed13_checkpoint330000_netG2
@@ -93,7 +100,7 @@ def get_train_foldername(name, net_res={'netg1': '30nm', 'netg2': '90nm'}):
         i -= 1
     return f'train_{source}{id[0]}{id[1]}{id[2]}_{res}'
 
-def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None, start_watchers=False):
+def batch_train_affinities(raw_ds_list, raw_srcs=None, start_watchers=False):
     with open('default/train_kwargs.json', 'r') as default_file:
         default_kwargs = json.load(default_file)
 
@@ -103,7 +110,7 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None, start_watche
     else:
         check_raws = True
         
-    with open('default/segment.json', 'r') as default_file:
+    with open('default/segment_validate.json', 'r') as default_file:
         segment_config = json.load(StringIO(jsmin(default_file.read())))
 
     temp = []
@@ -117,7 +124,7 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None, start_watche
             temp.append(raw_ds)
     raw_ds_list = temp
     
-    if check_raws:
+    if check_raws:#Make sure every dataset is available for training
         raw_names = set([raw.replace('volumes/', '') for raw in raw_ds_list])    
         for raw_src, dense_sample in zip(raw_srcs, default_kwargs["dense_samples"]):
             current_raws = set([ds.split('/')[-1] for ds in glob(dense_sample+'/volumes/*')])        
@@ -125,6 +132,15 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None, start_watche
             if len(missing) > 0:
                 print(f'Adding missing raws: {missing}')
                 add_raws_to_zarr(raw_src, dense_sample, missing)
+
+    # if seg_raw_srcs is not None:#Make sure every dataset is available for validating
+    #     raw_names = set([raw.replace('volumes/', '') for raw in raw_ds_list])    
+    #     for raw_src, seg_file in zip(seg_raw_srcs, segment_config["Input"]["raw_file"]):
+    #         current_raws = set([ds.split('/')[-1] for ds in glob(seg_file+'/volumes/*')])        
+    #         missing = ['volumes/'+ missed for missed in set(raw_names).difference(current_raws)]
+    #         if len(missing) > 0:
+    #             print(f'Adding missing raws to segmentation volume: {missing}')
+    #             add_raws_to_zarr(raw_src, seg_file, missing)
 
     #check if any files need making
     if default_kwargs['unlabeled_mask_ds'] == '':
@@ -136,6 +152,7 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None, start_watche
     
     #get skeleton for validation
     if not os.path.exists(segment_config['SkeletonConfig']['file']):
+        os.makedirs('./skeletons', exist_ok=True)
         files = glob('./skeletons/*')
         if len(files) == 0 or segment_config['SkeletonConfig']['file'] == 'update':
             segment_config['SkeletonConfig']['file'] = download_wk_skeleton(
@@ -153,19 +170,19 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None, start_watche
         def setup():
             os.chdir(f'{foldername}/')
             with open(f"train_kwargs.json", "w") as kwargs_file:
-                json.dump(kwargs, kwargs_file)
-            segment_config['Input']['raw_dataset'] = seg_ds_dict[foldername.split('_')[-1]]
+                json.dump(kwargs, kwargs_file, indent=4)
+            segment_config['Input']['raw_dataset'] = raw_ds
             segment_config['Network']['name'] = foldername
             segment_config['Network']['train_dir'] = os.getcwd() +'/'
-            with open(f"segment.json", "w") as config_file:
-                json.dump(segment_config, config_file)
+            with open(f"segment_validate.json", "w") as config_file:
+                json.dump(segment_config, config_file, indent=4)
             os.system('sbatch train.sbatch')
             if start_watchers:
                 os.system(f'sbatch network_watcher.sbatch \
                     {kwargs["save_every"]} \
                     {kwargs["max_iteration"]} \
-                    {kwargs["save_every"]} \
-                    {os.getcwd()}/segment.json \
+                    {segment_config["Network"]["iteration"]} \
+                    {os.getcwd()}/segment_validate.json \
                     {raw_ds.split("/")[-1]}')
             os.chdir('../')
 
@@ -177,7 +194,6 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None, start_watche
         elif len(glob(f'{foldername}/.running')) == 0 and len(glob(f'{foldername}/.done')) == 0:
             print(f'Training affinity prediction on {raw_ds}.')            
             setup()
-
 
         elif len(glob(f'{foldername}/.done')) > 0 and len(glob(f'{foldername}/checkpoints/{raw_ds.split("/")[-1]}_checkpoint_{kwargs["max_iteration"]}')) == 0:
             print(f'Retraining affinity prediction on {raw_ds}, because it did not finish last time.')
@@ -193,26 +209,19 @@ def batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs=None, start_watche
 
         if not os.path.islink(f'{os.getcwd()}/logs/{foldername}'):
             os.symlink(f'{os.getcwd()}/{foldername}/log/{raw_ds.split("/")[-1]}', f'{os.getcwd()}/logs/{foldername}', target_is_directory=True)
-
 #%%
+
 #Should be run from folder where batch_train_affinities.py is
 if __name__ == "__main__":
+#%%
 
     raw_ds_list = ['volumes/raw_30nm', 
                     'volumes/interpolated_90nm_aligned',
-                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed3_checkpoint340000_netG2_184tCrp',
-                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed13_checkpoint350000_netG2_184tCrp',
                     'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed4_checkpoint310000_netG2_184tCrp',
-                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed42_checkpoint340000_netG2_184tCrp',
-                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed13_checkpoint330000_netG2_184tCrp',
-                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed42_checkpoint310000_netG2_184tCrp',
+                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed42_checkpoint340000_netG2_184tCrp'
                     ]    
 
-    seg_ds_dict = {
-        '30nm': 'volumes/raw_30nm',
-        '90nm': 'volumes/interpolated_90nm_aligned'
-    }
-
     raw_srcs = ["/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/GT/CBvBottomGT/CBxs_lobV_bottomp100um_training_0.n5"]
+# %%
 
-    batch_train_affinities(raw_ds_list, seg_ds_dict, raw_srcs)
+    batch_train_affinities(raw_ds_list, raw_srcs)

@@ -101,7 +101,7 @@ if __name__=="__main__":
     best_eval = {}
     for thresh, metrics in evaluation.items():
         if len(best_eval)==0 or get_score(best_eval) > get_score(metrics):
-            best_eval = metrics
+            best_eval = metrics.copy()
             best_eval['segment_ds'] = thresh
             best_eval['iteration'] = current_iteration
 

@@ -29,18 +29,18 @@ def update_watchers(current_iter=None, exts=['local', 'sbatch']):
     skel_file = get_updated_skeleton()
 
     for folder in folders:                
-        with open(f'{folder}/segment.json', 'r') as file:
+        with open(f'{folder}/segment_validate.json', 'r') as file:
             segment_config = json.load(StringIO(jsmin(file.read())))
         segment_config['SkeletonConfig']['file'] = skel_file
         if current_iter is not None:
             segment_config['Network']['iteration'] = int(current_iter)
-        with open(f"{folder}/segment.json", "w") as config_file:
-            json.dump(segment_config, config_file)
+        with open(f"{folder}/segment_validate.json", "w") as config_file:
+            json.dump(segment_config, config_file, indent=4)
         for watcher in watchers:
             logger.info(f'Updating {copy(watcher, folder)}...')
         
 def get_updated_skeleton():
-    with open('default/segment.json', 'r') as default_file:
+    with open('default/segment_validate.json', 'r') as default_file:
         segment_config = json.load(StringIO(jsmin(default_file.read())))
         
     if not os.path.exists(segment_config['SkeletonConfig']['file']):
@@ -72,7 +72,7 @@ def run_watchers(ext="local", current_iter=None, folders=None):
         os.chdir(folder)        
         with open('train_kwargs.json', 'r') as kwargs_file:
             kwargs = json.load(kwargs_file)
-        command_str = f'{command} network_watcher.{ext} {kwargs["save_every"]} {kwargs["max_iteration"]} {current_iter} {os.getcwd()}/segment.json {kwargs["raw_ds"].split("/")[-1]}'
+        command_str = f'{command} network_watcher.{ext} {kwargs["save_every"]} {kwargs["max_iteration"]} {current_iter} {os.getcwd()}/segment_validate.json {kwargs["raw_ds"].split("/")[-1]}' # add & to parallelize but beware of overloading GPUs
         success = os.system(command_str) == 0
         if success:
             job = 'Job run/submitted successfully: {folder}'

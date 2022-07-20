@@ -21,50 +21,23 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 #%%
-def fix_best_metric(folders, keys=['nvi_split', 'nvi_merge']):
-    TODO: Deprecated
-    def get_score(metrics, keys):
-        score = 0
-        for key in keys:
-            if not np.isnan(metrics[key]):
-                score += metrics[key]
-                # if metrics[key] != 0: #Discard any 0 metrics as flawed(?)
-                #     score *= metrics[key]
-            else:
-                return 999
-        return score
-
-    for folder in folders:
-        with open(f"{folder}/metrics/metrics.json", "r") as f:
-            metrics = json.load(f)
-        best_metric = None
-        best_iteration = 0
-        for iteration, metric in metrics.items():
-            if iteration.isnumeric():
-                if best_metric is None or get_score(metric) < get_score(best_metric[best_iteration]):
-                    best_metric = {iteration: metric}
-                    best_iteration = iteration
-        with open(f"{folder}/metrics/best.iteration", "w") as f:
-            json.dump(best_metric)
-
 
 def update_segmentors(seg_dict, 
                     exts=['local', 'sbatch'], 
-                    default_config_fn='default/segment_test.json', 
+                    default_config_fp='default/segment_test.json', 
                     best_iter_fp='metrics/best.iteration',
-                    use_best_thresh=True,
                     ):
     segmentors = []
     for ext in exts:
         segmentors += glob(f'default/segmentor.{ext}')
     
     #Find most recent skeleton
-    skel_file = get_updated_skeleton(default_config_fn)
+    skel_file = get_updated_skeleton(default_config_fp)
     
     configs = defaultdict(list)
     for train_dir, raw_ds_list in seg_dict.items():
         train_name = train_dir.strip('/').split('/')[-1]
-        with open(f"{default_config_fn}", 'r') as file:
+        with open(f"{default_config_fp}", 'r') as file:
             default_config = json.load(StringIO(jsmin(file.read())))
 
         src = default_config['Input']['raw_file']
@@ -74,14 +47,13 @@ def update_segmentors(seg_dict,
 
         with open(f"{train_dir}/{best_iter_fp}", 'r') as f: # Set to best iteration
             best = json.load(f)
-        best_iter, best_metrics = list(best.items())[0]
         # if len(default_config['Input']['db_name']) >= 64: #TODO:FIX THIS IN SEGWAY
         #     default_config['Input']['db_name'] = default_config['Input']['db_name'][:63]
-        default_config['Network']['iteration'] = int(best_iter)
+        default_config['Network']['iteration'] = int(best['iteration'])
         #Update other params
         default_config['Network']['name'] = train_name
         default_config['Network']['train_dir'] = train_dir
-        default_config['segment_ds'] = best_metrics['segment_ds']
+        default_config['segment_ds'] = best['segment_ds']
 
         #Make json for each dataset to segment with network
         for raw_ds in seg_dict[train_dir]:
@@ -91,7 +63,7 @@ def update_segmentors(seg_dict,
             config['Input']['raw_dataset'] = raw_ds
             config_name = f"{train_dir}/segment_{predict_name}.json"
             with open(config_name, "w") as config_file: #Save config
-                json.dump(config, config_file)
+                json.dump(config, config_file, indent=4)
             configs[train_dir].append(config_name)
 
         for segmentor in segmentors: #Copy worker scripts
@@ -202,13 +174,6 @@ def get_raws(raw_ds_list, src):
             out.append(raw_ds)
     return out
 
-def mk_seg_dict(src, base='.'):
-    seg_dict = defaultdict(list)
-    train_dirs = glob(f'{base}/train_*/')
-    raw_ds_list = glob(f'{src}/')
-    for train_dir in train_dirs:
-        seg_dict[train_dir] = ...#TODO
-
 def batch_segment(seg_dict, ext='local'):
     command = {"local": "bash", "sbatch": "sbatch"}[ext]
 
@@ -235,21 +200,13 @@ if __name__ == "__main__":
         ext = sys.argv[1].lower()
     else:
         ext = 'local'
-    # if len(sys.argv) > 1:
-    #     fix_best = sys.argv[1].lower() == 'fix_best'
-    # else:
-    #     fix_best = False
 
     res_dict = {
         '30nm': ['volumes/raw_30nm', 
                     'volumes/interpolated_90nm_aligned',
-                    #TODO: Fill these in from segment_test.json (switch netG2-->netG1)
-                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed3_checkpoint340000_netG1_184tCrp',
-                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed13_checkpoint350000_netG1_184tCrp',
                     'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed4_checkpoint310000_netG1_184tCrp',
-                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed42_checkpoint340000_netG1_184tCrp',
-                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed13_checkpoint330000_netG1_184tCrp',
-                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407LinkNoBottle_seed42_checkpoint310000_netG1_184tCrp',
+                    'volumes/CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_seed42_checkpoint340000_netG1_184tCrp'
+                    #TODO: Fill these in from segment_test.json (switch netG2-->netG1)                    
                     ],
         '90nm': ['volumes/interpolated_90nm_aligned']
     }
@@ -258,9 +215,6 @@ if __name__ == "__main__":
     seg_dict = {}
     for train_dir in train_dirs:
         seg_dict[train_dir] = res_dict[train_dir.strip('/').split('/')[-1].split('_')[-1]]
-
-    # if fix_best:
-    #     fix_best_metric(train_dirs)
 
     batch_segment(seg_dict, ext)
     print("All done.")
