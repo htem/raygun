@@ -79,6 +79,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
             sampling_bottleneck=False,
             adam_betas = [0.9, 0.999],
+            adam_decay = 0,
             
             min_coefvar=None,
             interp_order=None,
@@ -145,7 +146,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.verbose = verbose
             self.interp_order = interp_order
             self.sampling_bottleneck = sampling_bottleneck
-            self.adam_betas = adam_betas
+            self.adam_betas = adam_betas #TODO: condense all ADAM kwargs into kwarg dict
+            self.adam_decay = adam_decay
             self.min_coefvar = min_coefvar
             self._set_verbose()
             if checkpoint is None:
@@ -310,7 +312,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def pretrain_generator(self, gnet=None, iter=1000, accel_factor=100, loss_fn=torch.nn.HuberLoss()):
         if gnet is None:
             gnet = self.get_generator()
-        optimizer = torch.optim.Adam(gnet.parameters(), lr=self.g_init_learning_rate*accel_factor, betas=self.adam_betas)
+        optimizer = torch.optim.Adam(gnet.parameters(), lr=self.g_init_learning_rate*accel_factor, betas=self.adam_betas, weight_decay=self.adam_decay)
         shape = (1,1) + (self.side_length,) * self.ndims
         pars = [par for par in gnet.parameters()]
         test = torch.rand(*shape, device=pars[0].device, requires_grad=True) * 2 - 1
@@ -482,8 +484,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if self.loss_style.lower()=='cycle':
             
             self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2, scale_factor_A, scale_factor_B)
-            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG1.parameters(), self.netG2.parameters()), lr=self.g_init_learning_rate, betas=self.adam_betas)
-            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas)
+            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG1.parameters(), self.netG2.parameters()), lr=self.g_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
+            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
             self.optimizer = CycleGAN_Optimizer(self.optimizer_G, self.optimizer_D)
             
             self.loss = CycleGAN_Loss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D, self.optimizer_G, self.ndims, **self.loss_kwargs)
@@ -491,9 +493,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         elif self.loss_style.lower()=='split':
         
             self.model = CycleGAN_Split_Model(self.netG1, self.netD1, self.netG2, self.netD2, scale_factor_A, scale_factor_B)
-            self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
-            self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
-            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas)
+            self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
+            self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
+            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
             self.optimizer = Split_CycleGAN_Optimizer(self.optimizer_G1, self.optimizer_G2, self.optimizer_D)
 
             self.loss = SplitGAN_Loss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G1, self.optimizer_G2, self.optimizer_D, self.ndims, **self.loss_kwargs)
@@ -501,9 +503,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         elif self.loss_style.lower()=='custom':
         
             self.model = CycleGAN_Split_Model(self.netG1, self.netD1, self.netG2, self.netD2, scale_factor_A, scale_factor_B)
-            self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
-            self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
-            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas)
+            self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
+            self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
+            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
             self.optimizer = Split_CycleGAN_Optimizer(self.optimizer_G1, self.optimizer_G2, self.optimizer_D)
 
             self.loss = Custom_Loss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G1, self.optimizer_G2, self.optimizer_D, self.ndims, **self.loss_kwargs)
