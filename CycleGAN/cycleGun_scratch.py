@@ -1,6 +1,39 @@
 # %%
 import sys
 #%%
+sys.path.append('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220715/link/seed13/')
+from train import *
+
+# %%
+side_length=64
+batch = cycleGun.test_prediction('A', side_length=side_length, cycle=False)
+cycleGun.model.eval()
+# cycleGun.model.train()
+
+if cycleGun.real_A in batch:
+    net = cycleGun.model.netG1
+    other_net = cycleGun.model.netG2
+    real = batch[cycleGun.real_A].data * 2 - 1
+else:
+    net = cycleGun.model.netG2
+    other_net = cycleGun.model.netG1
+    real = batch[cycleGun.real_B].data * 2 - 1
+
+test = net(torch.cuda.FloatTensor(real).unsqueeze(0).unsqueeze(0))
+mid = real.shape[-1] // 2
+
+plt.figure(figsize=(10,10))
+plt.imshow(test.detach().cpu().squeeze()[mid], cmap='gray')#, vmin=fake.min(), vmax=fake.max())
+
+#%%
+kwargs = cycleGun.gnet_kwargs.copy()
+kwargs['padding_type'] = 'valid'
+valid_net = cycleGun.get_generator(kwargs)
+
+size = 64
+context = (size - valid_net(torch.rand(1,1,size,size,size)).shape[-1]) / 2
+
+#%%
 sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/CycleGAN/')
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220215_ import *
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220304_ import *
@@ -35,7 +68,7 @@ with gp.build(pipe):
 batch = cycleGun.test_train()
 
 # %%
-side_length=624
+side_length=64
 batch = cycleGun.test_prediction('A', side_length=side_length, cycle=False)
 # batch = cycleGun.test_prediction('B', side_length=side_length, cycle=False)
 

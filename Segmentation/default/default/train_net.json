@@ -1,0 +1,5 @@
+{
+    "input_shape": [132, 132, 132], 
+    "output_shape": [40, 40, 40], 
+    "inputs": ["raw"], 
+    "outputs": {"affs": {"out_dims": 3, "out_dtype": "uint8"}}}

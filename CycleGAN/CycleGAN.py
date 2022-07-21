@@ -1,3 +1,4 @@
+from copy import deepcopy
 import itertools
 from matplotlib import pyplot as plt
 import torch
@@ -7,7 +8,10 @@ import zarr
 import daisy
 import os
 
-import gunpowder as gp
+import sys
+sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
+from gunpowder import gunpowder as gp
+# import gunpowder as gp
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +35,7 @@ except:
     from CycleGAN_Model import *
     from CycleGAN_LossFunctions import *
     from CycleGAN_Optimizers import *
+
 class CycleGAN(): #TODO: Just pass config file or dictionary
     def __init__(self,
             src_A, #EXPECTS ZARR VOLUME
@@ -52,11 +57,19 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             gnet_kwargs = {},
             g_init_learning_rate=1e-5,
 
-            dnet_depth=3, # number of layers in Discriminator networks
-            d_downsample_factor=2,
-            d_num_fmaps=16,
-            d_kernel_size=3, 
             d_init_learning_rate=1e-5,
+            dnet_type='classic',
+            dnet_kwargs={
+                    'input_nc': 1,
+                    # 'output_nc': 1,
+                    'downsampling_kw': 2, # downsampling factor
+                    'kw': 3, # kernel size
+                    'n_layers': 3, # number of layers in Discriminator networks
+                    # 'norm_layer': torch.nn.InstanceNorm3d,#partial(torch.nn.InstanceNorm3d, affine=True),#, track_running_stats=True),
+                    # 'activation': torch.nn.SELU,
+                    'ngf': 64,
+                    # 'n_blocks': 9, # resnet specific
+                },
             
             loss_style='cycle', # supports 'cycle' or 'split' or 'custom'
             loss_kwargs={'gan_mode': 'lsgan', # or 'wgangp' for Wasserstein
@@ -66,6 +79,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
             sampling_bottleneck=False,
             adam_betas = [0.9, 0.999],
+            adam_decay = 0,
             
             min_coefvar=None,
             interp_order=None,
@@ -79,7 +93,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             save_every=2000,
             tensorboard_path='./tensorboard/',
             verbose=True,
-            checkpoint=None, # Used for prediction/rendering, training always starts from latest            
+            checkpoint=None, # Used for prediction/rendering, training always starts from latest   
+            pretrain_gnet=False         
             ):
 
             self.src_A = src_A
@@ -112,11 +127,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
             self.gnet_type = gnet_type.lower()
             self.gnet_kwargs = gnet_kwargs
+            self.pretrain_gnet = pretrain_gnet
 
-            self.dnet_depth = dnet_depth
-            self.d_downsample_factor = d_downsample_factor
-            self.d_num_fmaps = d_num_fmaps
-            self.d_kernel_size = d_kernel_size 
+            self.dnet_type = dnet_type
+            self.dnet_kwargs = dnet_kwargs
             self.num_epochs = num_epochs
             self.batch_size = batch_size
             self.cache_size = cache_size
@@ -132,7 +146,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.verbose = verbose
             self.interp_order = interp_order
             self.sampling_bottleneck = sampling_bottleneck
-            self.adam_betas = adam_betas
+            self.adam_betas = adam_betas #TODO: condense all ADAM kwargs into kwarg dict
+            self.adam_decay = adam_decay
             self.min_coefvar = min_coefvar
             self._set_verbose()
             if checkpoint is None:
@@ -257,6 +272,20 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
 
+    def get_valid_context(self, side_length=None):
+        # returns number of pixels to crop from a side to trim network outputs to valid FOV
+        if side_length is None:
+            side_length = self.side_length
+        
+        gnet_kwargs = self.gnet_kwargs.copy()
+        gnet_kwargs['padding_type'] = 'valid'
+        gnet = self.get_generator(gnet_kwargs=gnet_kwargs)
+        
+        shape = (1,1) + (side_length,) * self.ndims
+        pars = [par for par in gnet.parameters()]
+        result = gnet(torch.zeros(*shape, device=pars[0].device))
+        return ((gp.Coordinate(shape) - gp.Coordinate(result.shape)) / 2)[-self.ndims:]
+
     def get_valid_crop(self, side_length=None):
         # returns number of pixels to crop from a side to trim network outputs to valid FOV
         if side_length is None:
@@ -270,14 +299,38 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         pars = [par for par in gnet.parameters()]
         result = gnet(torch.zeros(*shape, device=pars[0].device))
         pad = np.floor((gp.Coordinate(shape) - gp.Coordinate(result.shape)) / 2)
-
+        raise 'get_valid_crop() not fully implemented (in conflict with other usage of cropping'
         return gp.Coordinate(pad[-self.ndims:])
 
-    def set_downsample_factors(self):
-        if 'downsample_factors' not in self.gnet_kwargs:
-            down_factor = 2 if 'down_factor' not in self.gnet_kwargs else self.gnet_kwargs.pop('down_factor')
-            num_downs = 3 if 'num_downs' not in self.gnet_kwargs else self.gnet_kwargs.pop('num_downs')
-            self.gnet_kwargs.update({'downsample_factors': [(down_factor,)*self.ndims,] * (num_downs - 1)})
+    def get_downsample_factors(self, net_kwargs):
+        if 'downsample_factors' not in net_kwargs:
+            down_factor = 2 if 'down_factor' not in net_kwargs else net_kwargs.pop('down_factor')
+            num_downs = 3 if 'num_downs' not in net_kwargs else net_kwargs.pop('num_downs')
+            net_kwargs.update({'downsample_factors': [(down_factor,)*self.ndims,] * (num_downs - 1)})
+        return net_kwargs
+
+    def pretrain_generator(self, gnet=None, iter=1000, accel_factor=100, loss_fn=torch.nn.HuberLoss()):
+        if gnet is None:
+            gnet = self.get_generator()
+        optimizer = torch.optim.Adam(gnet.parameters(), lr=self.g_init_learning_rate*accel_factor, betas=self.adam_betas, weight_decay=self.adam_decay)
+        shape = (1,1) + (self.side_length,) * self.ndims
+        pars = [par for par in gnet.parameters()]
+        test = torch.rand(*shape, device=pars[0].device, requires_grad=True) * 2 - 1
+        pbar = tqdm(range(iter))
+        for i in pbar:
+            out = gnet(test)
+            loss = loss_fn(out, test)
+            pbar.set_postfix({'loss': loss.item()})
+            loss.backward()
+            optimizer.step()     
+            test = torch.rand(*shape, requires_grad=True, device=pars[0].device) * 2 - 1
+            
+        print(f'Final loss: {loss.item()}')
+        #TODO: Figure out how to get this to work for spawning workers later
+        # gnet = gnet.to('cpu')
+        # torch.cuda.empty_cache()
+        # cudart.cudaDeviceReset()
+        return gnet
 
     def get_generator(self, gnet_kwargs=None):
         if gnet_kwargs is None:
@@ -293,7 +346,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
             # else:
             #     raise f'Unet generators only specified for 2D or 3D, not {self.ndims}D'
-            self.set_downsample_factors()
+            gnet_kwargs = self.get_downsample_factors(gnet_kwargs)
 
             generator = torch.nn.Sequential(
                                 UNet(**gnet_kwargs),
@@ -302,7 +355,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 )
         
         elif self.gnet_type == 'residualunet':
-            self.set_downsample_factors()
+            gnet_kwargs = self.get_downsample_factors(gnet_kwargs)
             
             generator = torch.nn.Sequential(
                                 ResidualUNet(**gnet_kwargs), 
@@ -335,30 +388,83 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             init_weights(generator, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
         return generator
 
-    def get_discriminator(self, conf=None):
-        if conf is None: conf = self
-        if conf.ndims == 3: #3D case
-            norm_instance = torch.nn.InstanceNorm3d
-            discriminator_maker = NLayerDiscriminator3D
-        elif conf.ndims == 2:
-            norm_instance = torch.nn.InstanceNorm2d
-            discriminator_maker = NLayerDiscriminator
+    def get_discriminator(self, dnet_kwargs=None):
+        if dnet_kwargs is None:
+            dnet_kwargs = self.dnet_kwargs
 
-        norm_layer = functools.partial(norm_instance, affine=False, track_running_stats=False)
-        discriminator = discriminator_maker(input_nc=1, 
-                                        ndf=conf.d_num_fmaps, 
-                                        n_layers=conf.dnet_depth, 
-                                        norm_layer=norm_layer,
-                                        downsampling_kw=conf.d_downsample_factor, 
-                                        kw=conf.d_kernel_size,
-                                 )
-                                 
-        init_weights(discriminator, init_type='kaiming')
+        if self.dnet_type == 'unet':
+
+            # if self.ndims == 2:
+            #     discriminator = UnetGenerator(**self.dnet_kwargs)
+            
+            # elif self.ndims == 3:
+            #     discriminator = UnetGenerator3D(**self.dnet_kwargs)
+
+            # else:
+            #     raise f'Unet discriminators only specified for 2D or 3D, not {self.ndims}D'
+            dnet_kwargs = self.get_downsample_factors(dnet_kwargs)
+
+            discriminator = torch.nn.Sequential(
+                                UNet(**dnet_kwargs),
+                                # ConvPass(self.dnet_kwargs['ngf'], self.dnet_kwargs['output_nc'], [(1,)*self.ndims], activation=None, padding=self.dnet_kwargs['padding_type']), 
+                                torch.nn.Tanh()
+                                )
+        
+        elif self.dnet_type == 'residualunet':
+            dnet_kwargs = self.get_downsample_factors(dnet_kwargs)
+            
+            discriminator = torch.nn.Sequential(
+                                ResidualUNet(**dnet_kwargs), 
+                                torch.nn.Tanh()
+                                )
+            
+        elif self.dnet_type == 'resnet':
+            
+            if self.ndims == 2:
+                discriminator = ResnetGenerator(**dnet_kwargs)
+            
+            elif self.ndims == 3:
+                discriminator = ResnetGenerator3D(**dnet_kwargs)
+
+            else:
+                raise f'Resnet discriminators only specified for 2D or 3D, not {self.ndims}D'
+
+        elif self.dnet_type == 'classic':
+            if self.ndims == 3: #3D case
+                norm_instance = torch.nn.InstanceNorm3d
+                discriminator_maker = NLayerDiscriminator3D
+            elif self.ndims == 2:
+                norm_instance = torch.nn.InstanceNorm2d
+                discriminator_maker = NLayerDiscriminator
+
+            dnet_kwargs['norm_layer'] = functools.partial(norm_instance, affine=False, track_running_stats=False)
+            discriminator = discriminator_maker(**dnet_kwargs)
+                                    
+            init_weights(discriminator, init_type='kaiming')
+            return discriminator
+
+        else:
+
+            raise f'Unknown discriminator type requested: {self.dnet_type}'
+        
+        activation = dnet_kwargs['activation'] if 'activation' in dnet_kwargs else nn.ReLU
+        
+        if activation is not None:
+            # if activation == nn.SELU:
+            #     init_weights(discriminator, init_type='kaiming', nonlinearity='linear') # For Self-Normalizing Neural Networks
+            # else:
+            init_weights(discriminator, init_type='kaiming', nonlinearity=activation.__class__.__name__.lower())
+        else:
+            init_weights(discriminator, init_type='normal', init_gain=0.05) #TODO: MAY WANT TO ADD TO CONFIG FILE
         return discriminator
 
     def setup_networks(self):
-        self.netG1 = self.get_generator()
-        self.netG2 = self.get_generator()
+        if self.pretrain_gnet:
+            self.netG1 = self.pretrain_generator()
+            self.netG2 = deepcopy(self.netG1)
+        else:
+            self.netG1 = self.get_generator()
+            self.netG2 = self.get_generator()
         
         self.netD1 = self.get_discriminator()
         self.netD2 = self.get_discriminator()
@@ -378,8 +484,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if self.loss_style.lower()=='cycle':
             
             self.model = CycleGAN_Model(self.netG1, self.netD1, self.netG2, self.netD2, scale_factor_A, scale_factor_B)
-            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG1.parameters(), self.netG2.parameters()), lr=self.g_init_learning_rate, betas=self.adam_betas)
-            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas)
+            self.optimizer_G = torch.optim.Adam(itertools.chain(self.netG1.parameters(), self.netG2.parameters()), lr=self.g_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
+            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
             self.optimizer = CycleGAN_Optimizer(self.optimizer_G, self.optimizer_D)
             
             self.loss = CycleGAN_Loss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_D, self.optimizer_G, self.ndims, **self.loss_kwargs)
@@ -387,9 +493,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         elif self.loss_style.lower()=='split':
         
             self.model = CycleGAN_Split_Model(self.netG1, self.netD1, self.netG2, self.netD2, scale_factor_A, scale_factor_B)
-            self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
-            self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
-            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas)
+            self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
+            self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
+            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
             self.optimizer = Split_CycleGAN_Optimizer(self.optimizer_G1, self.optimizer_G2, self.optimizer_D)
 
             self.loss = SplitGAN_Loss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G1, self.optimizer_G2, self.optimizer_D, self.ndims, **self.loss_kwargs)
@@ -397,9 +503,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         elif self.loss_style.lower()=='custom':
         
             self.model = CycleGAN_Split_Model(self.netG1, self.netD1, self.netG2, self.netD2, scale_factor_A, scale_factor_B)
-            self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
-            self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas)
-            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas)
+            self.optimizer_G1 = torch.optim.Adam(self.netG1.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
+            self.optimizer_G2 = torch.optim.Adam(self.netG2.parameters(), lr=self.g_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
+            self.optimizer_D = torch.optim.Adam(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), lr=self.d_init_learning_rate, betas=self.adam_betas, weight_decay=self.adam_decay)
             self.optimizer = Split_CycleGAN_Optimizer(self.optimizer_G1, self.optimizer_G2, self.optimizer_D)
 
             self.loss = Custom_Loss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G1, self.optimizer_G2, self.optimizer_D, self.ndims, **self.loss_kwargs)
@@ -749,17 +855,20 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 px_pad = self.get_valid_crop(side_length=side_length)
             else:
                 px_pad = crop_to_valid
-            self.model.crop_pad = px_pad
-            px_pad = gp.Coordinate((0,)*(len(self.common_voxel_size) - len(px_pad)) + px_pad)
+            self.model.set_crop_pad(px_pad, self.ndims)
+            coor_pad = np.zeros((len(self.common_voxel_size)))
+            coor_pad[-self.ndims:] = px_pad # assumes first dimension is z (i.e. the dimension breaking isotropy)
+            coor_pad = gp.Coordinate(coor_pad)
 
         scan_request = gp.BatchRequest()
         for array in arrays:            
-            extents = self.get_extents(side_length, array_name=array.identifier)
-            if crop_to_valid and array is not datapipe.real:
-                extents -= px_pad * 2
-                if array is datapipe.cycled:
-                    extents -= px_pad * 2                    
-            scan_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
+            if array is not datapipe.real:
+                extents = self.get_extents(side_length, array_name=array.identifier)
+                if crop_to_valid:
+                    extents -= coor_pad * 2
+                    if array is datapipe.cycled:
+                        extents -= coor_pad * 2 
+                scan_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
 
         render_pipe = datapipe.source 
         if datapipe.resample: render_pipe += datapipe.resample
@@ -799,7 +908,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             self.compressor = {'id': 'blosc', 
                 'clevel': 3,
                 'cname': 'blosclz',
-                'blocksize': 64
+                # 'blocksize': 64
                 }        
         source_ds = daisy.open_ds(datapipe.src_path, datapipe.real_name)
         datapipe.total_roi = source_ds.data_roi.snap_to_grid(self.common_voxel_size, 'shrink')
@@ -813,7 +922,8 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 np.uint8,
                 write_size=write_size,
                 num_channels=1,
-                compressor=self.compressor)
+                compressor=self.compressor,
+                delete=True)
                 
         render_pipe += gp.ZarrWrite(
                         dataset_names = dataset_names,
@@ -831,14 +941,20 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             render_pipe.request_batch(request)
             print('Finished.')
 
-    def load_saved_model(self, checkpoint=None):
+    def load_saved_model(self, checkpoint=None, cuda_available=None):
+        if cuda_available is None:
+            cuda_available = torch.cuda.is_available()
         if checkpoint is None:
             checkpoint = self.checkpoint
         else:
             self.checkpoint = checkpoint
 
         if checkpoint is not None:
-            checkpoint = torch.load(checkpoint)
+            if not cuda_available:
+                checkpoint = torch.load(checkpoint, map_location=torch.device('cpu'))
+            else:
+                checkpoint = torch.load(checkpoint)
+
             if "model_state_dict" in checkpoint:
                 self.model.load_state_dict(checkpoint["model_state_dict"])
             else:
