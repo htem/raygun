@@ -1,0 +1,80 @@
+#!/bin/bash
+
+increment=$1
+final_iteration=$2
+curr_iteration=$3
+config_json=`realpath $4`
+model=$5
+
+echo Watching $model
+
+# venv
+segway_dir=/n/groups/htem/Segmentation/shared-nondev/segway2
+
+if [ "$PYTHONPATH" != */n/groups/htem/Segmentation/shared-nondev* ]; then
+    echo INFO: PYTHONPATH env does not have segway... adding it
+    export PYTHONPATH=$PYTHONPATH:/n/groups/htem/Segmentation/shared-nondev
+fi
+
+export TF_FORCE_GPU_ALLOW_GROWTH=true
+export XLA_FLAGS=--xla_gpu_strict_conv_algorithm_picker=false
+
+# Wait until network is running
+while [ ! -f .running ] && [ ! -f .done ]
+do
+    sleep 1m
+done
+
+while [ $((curr_iteration-increment)) -ne $final_iteration ]
+do
+
+    # Check if checkpoint exists
+    checkpoint_file="${model}_checkpoint_${curr_iteration}"
+    resave_file="model_checkpoint_${curr_iteration}"          
+    if [ -f "$checkpoint_file" ]; then
+        mv $checkpoint_file $resave_file
+    fi 
+    if [ ! -f "$resave_file" ]; then
+        echo "$checkpoint_file does not exist. Waiting..."
+        sleep 5m
+        continue
+    fi
+    if [ -f "$resave_file" ]; then
+        echo "$checkpoint_file ready!"  
+
+        # TODO: Determine if this is necessary
+        # Remove existing zarr 
+        if [ -d "${config_json/json/"zarr"}" ]; then
+            echo "Removing zarr"
+            rm -r "${config_json/json/"zarr"}"
+        fi
+
+        #Get most available GPU:
+        n=0
+        m=0
+        m_i=0
+        for i in $(nvidia-smi --format=csv,noheader,nounits --query-gpu=memory.free)
+        do
+                if ((m_i < i)) ; then
+                        m_i=$i
+                        m=$n
+                fi
+                n=$((n+1))
+        done
+        export CUDA_VISIBLE_DEVICES=$m
+        
+        echo ==========Agglomerate==========
+        # TODO Check for waterz error
+        python ${segway_dir}/tasks/segmentation/task_06a_extract_segments.py ${config_json}
+        
+        echo ==========Evaluate==========
+        python /n/groups/htem/users/jlr54/raygun/Segmentation/rasterize_skeleton.py ${config_json} ${increment}
+        
+        # Increment
+        curr_iteration=$((curr_iteration+increment))
+        echo  Next iteration-- $curr_iteration
+        sleep 1m
+    fi
+done
+
+echo "all done"

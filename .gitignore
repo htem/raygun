@@ -9,3 +9,4 @@ __pycache__*
 *.out
 .nfs*
 */igneous_tasks
+TransformParameters*

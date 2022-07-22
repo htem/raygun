@@ -11,12 +11,12 @@ from torch.nn import init
 class NLayerDiscriminator(nn.Module):
     """Defines a PatchGAN discriminator"""
 
-    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d,
+    def __init__(self, input_nc, ngf=64, n_layers=3, norm_layer=nn.BatchNorm2d,
                  kw=4, downsampling_kw=None):
         """Construct a PatchGAN discriminator
         Parameters:
             input_nc (int)  -- the number of channels in input images
-            ndf (int)       -- the number of filters in the last conv layer
+            ngf (int)       -- the number of filters in the last conv layer
             n_layers (int)  -- the number of conv layers in the discriminator
             norm_layer      -- normalization layer
         """
@@ -31,27 +31,27 @@ class NLayerDiscriminator(nn.Module):
 
         padw = 1
         ds_kw = downsampling_kw
-        sequence = [nn.Conv2d(input_nc, ndf, kernel_size=ds_kw, stride=2, padding=padw), nn.LeakyReLU(0.2, True)]
+        sequence = [nn.Conv2d(input_nc, ngf, kernel_size=ds_kw, stride=2, padding=padw), nn.LeakyReLU(0.2, True)]
         nf_mult = 1
         nf_mult_prev = 1
         for n in range(1, n_layers):  # gradually increase the number of filters
             nf_mult_prev = nf_mult
             nf_mult = min(2 ** n, 8)
             sequence += [
-                nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=ds_kw, stride=2, padding=padw, bias=use_bias),
-                norm_layer(ndf * nf_mult),
+                nn.Conv2d(ngf * nf_mult_prev, ngf * nf_mult, kernel_size=ds_kw, stride=2, padding=padw, bias=use_bias),
+                norm_layer(ngf * nf_mult),
                 nn.LeakyReLU(0.2, True)
             ]
 
         nf_mult_prev = nf_mult
         nf_mult = min(2 ** n_layers, 8)
         sequence += [
-            nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
-            norm_layer(ndf * nf_mult),
+            nn.Conv2d(ngf * nf_mult_prev, ngf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
+            norm_layer(ngf * nf_mult),
             nn.LeakyReLU(0.2, True)
         ]
 
-        sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
+        sequence += [nn.Conv2d(ngf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
         self.model = nn.Sequential(*sequence)
 
     @property
@@ -214,14 +214,14 @@ class ResnetGenerator(nn.Module):
         model += padder.copy()
         model += [nn.Conv2d(input_nc, ngf, kernel_size=7, padding=p, bias=use_bias),
                  norm_layer(ngf),
-                 activation(True)]
+                 activation()]
 
         n_downsampling = 2
         for i in range(n_downsampling):  # add downsampling layers
             mult = 2 ** i
             model += [nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=updown_p, bias=use_bias),
                       norm_layer(ngf * mult * 2),
-                      activation(True)]
+                      activation()]
 
         mult = 2 ** n_downsampling
         for i in range(n_blocks):       # add ResNet blocks
@@ -241,7 +241,7 @@ class ResnetGenerator(nn.Module):
                                          padding=updown_p, output_padding=updown_p,
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
-                      activation(True)]
+                      activation()]
         model += padder.copy()
         model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=p)]
         model += [nn.Tanh()]
@@ -317,7 +317,7 @@ class ResnetBlock(nn.Module):
         conv_block = []
         conv_block += padder.copy()
 
-        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation(True)]
+        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation()]
         if use_dropout:
             conv_block += [nn.Dropout(0.5)]
         
@@ -562,13 +562,13 @@ class UnetSkipConnectionBlock3D(nn.Module):
 class NLayerDiscriminator3D(nn.Module):
     """Defines a PatchGAN discriminator"""
 
-    def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm3d,
+    def __init__(self, input_nc, ngf=64, n_layers=3, norm_layer=nn.BatchNorm3d,
                  kw=4, downsampling_kw=None,
                  ):
         """Construct a PatchGAN discriminator
         Parameters:
             input_nc (int)  -- the number of channels in input images
-            ndf (int)       -- the number of filters in the last conv layer
+            ngf (int)       -- the number of filters in the last conv layer
             n_layers (int)  -- the number of conv layers in the discriminator
             norm_layer      -- normalization layer
         """
@@ -583,27 +583,27 @@ class NLayerDiscriminator3D(nn.Module):
 
         padw = 1
         ds_kw = downsampling_kw
-        sequence = [nn.Conv3d(input_nc, ndf, kernel_size=ds_kw, stride=2, padding=padw), nn.LeakyReLU(0.2, True)]
+        sequence = [nn.Conv3d(input_nc, ngf, kernel_size=ds_kw, stride=2, padding=padw), nn.LeakyReLU(0.2, True)]
         nf_mult = 1
         nf_mult_prev = 1
         for n in range(1, n_layers):  # gradually increase the number of filters
             nf_mult_prev = nf_mult
             nf_mult = min(2 ** n, 8)
             sequence += [
-                nn.Conv3d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=ds_kw, stride=2, padding=padw, bias=use_bias),
-                norm_layer(ndf * nf_mult),
+                nn.Conv3d(ngf * nf_mult_prev, ngf * nf_mult, kernel_size=ds_kw, stride=2, padding=padw, bias=use_bias),
+                norm_layer(ngf * nf_mult),
                 nn.LeakyReLU(0.2, True)
             ]
 
         nf_mult_prev = nf_mult
         nf_mult = min(2 ** n_layers, 8)
         sequence += [
-            nn.Conv3d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
-            norm_layer(ndf * nf_mult),
+            nn.Conv3d(ngf * nf_mult_prev, ngf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
+            norm_layer(ngf * nf_mult),
             nn.LeakyReLU(0.2, True)
         ]
 
-        sequence += [nn.Conv3d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
+        sequence += [nn.Conv3d(ngf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
         self.model = nn.Sequential(*sequence)
 
     def forward(self, input):
@@ -653,14 +653,14 @@ class ResnetGenerator3D(nn.Module):
         model += padder.copy()
         model += [nn.Conv3d(input_nc, ngf, kernel_size=7, padding=p, bias=use_bias),
                  norm_layer(ngf),
-                 activation(True)]
+                 activation()]
 
         n_downsampling = 2
         for i in range(n_downsampling):  # add downsampling layers
             mult = 2 ** i
             model += [nn.Conv3d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=updown_p, bias=use_bias), #TODO: Make actually use padding_type for every convolution (currently does zeros if not valid)
                       norm_layer(ngf * mult * 2),
-                      activation(True)]
+                      activation()]
 
         mult = 2 ** n_downsampling
         for i in range(n_blocks):       # add ResNet blocks
@@ -680,7 +680,7 @@ class ResnetGenerator3D(nn.Module):
                                          padding=updown_p, output_padding=updown_p,
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
-                      activation(True)]
+                      activation()]
         model += padder.copy()
         model += [nn.Conv3d(ngf, output_nc, kernel_size=7, padding=p)]
         model += [nn.Tanh()]
@@ -733,7 +733,7 @@ class ResnetBlock3D(nn.Module):
         conv_block = []
         conv_block += padder.copy()
 
-        conv_block += [nn.Conv3d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation(True)]
+        conv_block += [nn.Conv3d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation()]
         if use_dropout:
             conv_block += [nn.Dropout(0.5)]
 
