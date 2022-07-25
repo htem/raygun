@@ -21,7 +21,21 @@ class ConvPass(torch.nn.Module):
             padding_mode='reflect',
             norm_layer=None
             ):
+        """Convolution pass block
 
+        Args:
+            input_nc (int): Number of input channels
+            output_nc (int): Number of output channels
+            kernel_sizes (list(int) or array_like): Kernel sizes for convolution layers.
+            activation (str or callable): Name of activation function in 'torch.nn' or the function itself.
+            padding (str, optional): What type of padding to use in convolutions. Defaults to 'valid'.
+            residual (bool, optional): Whether to make the blocks calculate the residual. Defaults to False.
+            padding_mode (str, optional): What values to use in padding (i.e. 'zeros', 'reflect', 'wrap', etc.). Defaults to 'reflect'.
+            norm_layer (callable or None, optional): Whether to use a normalization layer and if so (i.e. if not None), the layer to use. Defaults to None.
+
+        Returns:
+            ConvPass: Convolution block
+        """
         super(ConvPass, self).__init__()
 
         if activation is not None:
@@ -122,6 +136,21 @@ class ConvDownsample(torch.nn.Module):
             padding_mode='reflect',
             norm_layer=None
             ):
+        """Convolution-based downsampling
+
+        Args:
+            input_nc (int): Number of input channels.
+            output_nc (int): Number of output channels.
+            kernel_sizes (list(int) or array_like): Kernel sizes for convolution layers.
+            downsample_factor (int): Factor by which to downsample in all spatial dimensions.
+            activation (str or callable): Name of activation function in 'torch.nn' or the function itself.
+            padding (str, optional): What type of padding to use in convolutions. Defaults to 'valid'.
+            padding_mode (str, optional): What values to use in padding (i.e. 'zeros', 'reflect', 'wrap', etc.). Defaults to 'reflect'.
+            norm_layer (callable or None, optional): Whether to use a normalization layer and if so (i.e. if not None), the layer to use. Defaults to None.
+
+        Returns:
+            Downsampling layer.
+        """            
 
         super(ConvDownsample, self).__init__()
 
@@ -174,8 +203,15 @@ class MaxDownsample(torch.nn.Module):
             self,
             downsample_factor,
             flexible=True): 
-            # flexible=True allows torch.nn.MaxPoolNd to crop the right/bottom of tensors in order to allow pooling of tensors not evenly divisible by the downsample_factor. Alternative implementations could pass 'ceil_mode=True' or 'padding= {# > 0}' to avoid cropping of inputs.
-            # flexible=False forces inputs to be evenly divisible by the downsample_factor, which generally restricts the flexibility of model architectures.
+        """MaxPooling-based downsampling
+
+        Args:
+            downsample_factor (list(int) or array_like): Factors to downsample by in each dimension.
+            flexible (bool, optional): True allows torch.nn.MaxPoolNd to crop the right/bottom of tensors in order to allow pooling of tensors not evenly divisible by the downsample_factor. Alternative implementations could pass 'ceil_mode=True' or 'padding= {# > 0}' to avoid cropping of inputs. False forces inputs to be evenly divisible by the downsample_factor, which generally restricts the flexibility of model architectures. Defaults to True.
+        
+        Returns:
+            Downsampling layer.
+        """                       
 
         super(MaxDownsample, self).__init__()
 
@@ -214,7 +250,6 @@ class MaxDownsample(torch.nn.Module):
                         self.downsample_factor,
                         self.dims - d))
         return
-
 
 class Upsample(torch.nn.Module):
 
@@ -343,7 +378,6 @@ class Upsample(torch.nn.Module):
         f_cropped = self.crop(f_left, g_cropped.size()[-self.dims:])
 
         return torch.cat([f_cropped, g_cropped], dim=1)
-
 
 class UNet(torch.nn.Module):
 
