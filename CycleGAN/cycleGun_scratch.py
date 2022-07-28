@@ -1,9 +1,9 @@
 # %%
 import sys
 #%%
-sys.path.append('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220715/link/seed13/')
+sys.path.append('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725//resnet_track001/')
 from train import *
-
+cycleGun.load_saved_model('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725/resnet_track001/models/cycleGAN_setups_set20220725_resnet_track001_checkpoint_100000')
 # %%
 side_length=64
 batch = cycleGun.test_prediction('A', side_length=side_length, cycle=False)
@@ -54,6 +54,7 @@ sys.path.append('/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/raygun/
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220313SplitResSeluParNoise_train import *
 # from CycleGun_CBxFN90nmtile3_CBx30nmBottom100um_20220324SplitValidResSelu_train import *
 from CycleGun_CBxFN90nmTile2_CBv30nmBottom100um_20220407SplitNoBottle_train import *
+#%%
 # from CycleGun_CBv30nmBottom100um_cb2gcl1_20220320SplitResSelu_train import *
 import matplotlib.pyplot as plt
 import zarr
@@ -68,48 +69,62 @@ with gp.build(pipe):
 batch = cycleGun.test_train()
 
 # %%
-side_length=64
+side_length=256
 batch = cycleGun.test_prediction('A', side_length=side_length, cycle=False)
 # batch = cycleGun.test_prediction('B', side_length=side_length, cycle=False)
 
 # %%
-cycleGun.model.eval()
-# cycleGun.model.train()
+def try_patch(cycleGun, side='A', pad=0, mode='eval', side_length=256):
+    batch = cycleGun.test_prediction(side.upper(), side_length=side_length, cycle=False)
+    if mode.lower() == 'eval':
+        cycleGun.model.eval()
+    else:
+        cycleGun.model.train()
 
-if cycleGun.real_A in batch:
-    net = cycleGun.model.netG1
-    other_net = cycleGun.model.netG2
-    real = batch[cycleGun.real_A].data * 2 - 1
-else:
-    net = cycleGun.model.netG2
-    other_net = cycleGun.model.netG1
-    real = batch[cycleGun.real_B].data * 2 - 1
+    if cycleGun.real_A in batch:
+        net = cycleGun.model.netG1
+        other_net = cycleGun.model.netG2
+        real = batch[cycleGun.real_A].data * 2 - 1
+    else:
+        net = cycleGun.model.netG2
+        other_net = cycleGun.model.netG1
+        real = batch[cycleGun.real_B].data * 2 - 1
 
-mid = real.shape[-1] // 2
-test = net(torch.cuda.FloatTensor(real).unsqueeze(0))
-# pad = (real.shape[-1] - test.shape[-1]) // 2
-# pad = 40
-pad = cycleGun.get_valid_crop(side_length)[-1]
+    mid = real.shape[-1] // 2
+    test = net(torch.cuda.FloatTensor(real).unsqueeze(0))
+    # pad = (real.shape[-1] - test.shape[-1]) // 2
+    # pad = 0
+    # pad = cycleGun.get_valid_crop(side_length)[-1]
 
-patch1 = torch.cuda.FloatTensor(real[:, :mid+pad, :mid+pad]).unsqueeze(0)
-patch2 = torch.cuda.FloatTensor(real[:, mid-pad:, :mid+pad]).unsqueeze(0)
-patch3 = torch.cuda.FloatTensor(real[:, :mid+pad, mid-pad:]).unsqueeze(0)
-patch4 = torch.cuda.FloatTensor(real[:, mid-pad:, mid-pad:]).unsqueeze(0)
+    patch1 = torch.cuda.FloatTensor(real[:, :mid+pad, :mid+pad]).unsqueeze(0)
+    patch2 = torch.cuda.FloatTensor(real[:, mid-pad:, :mid+pad]).unsqueeze(0)
+    patch3 = torch.cuda.FloatTensor(real[:, :mid+pad, mid-pad:]).unsqueeze(0)
+    patch4 = torch.cuda.FloatTensor(real[:, mid-pad:, mid-pad:]).unsqueeze(0)
 
-patches = [patch1, patch2, patch3, patch4]
-fakes = []
-for patch in patches:
-    test = net(patch)
-    fakes.append(test.detach().cpu().squeeze())
+    patches = [patch1, patch2, patch3, patch4]
+    fakes = []
+    for patch in patches:
+        test = net(patch)
+        fakes.append(test.detach().cpu().squeeze())
 
-if pad != 0:
-    fake_comb = torch.cat((torch.cat((fakes[0][:-pad, :-pad], fakes[1][pad:, :-pad])), torch.cat((fakes[2][:-pad, pad:], fakes[3][pad:, pad:]))), axis=1)
-else:
-    fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fakes[3]))), axis=1)
+    if pad != 0:
+        fake_comb = torch.cat((torch.cat((fakes[0][:-pad, :-pad], fakes[1][pad:, :-pad])), torch.cat((fakes[2][:-pad, pad:], fakes[3][pad:, pad:]))), axis=1)
+    else:
+        fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fakes[3]))), axis=1)
+    
+    return fake_comb.squeeze(), real.squeeze()
 
 # %%
-plt.figure(figsize=(10,10))
-plt.imshow(fake_comb, cmap='gray')#, vmin=fake.min(), vmax=fake.max())
+fig, axs = plt.subplots(1, 3, figsize=(30,10))
+for i, mode in enumerate(['eval', 'train']):
+    eval_fake, real = try_patch(cycleGun, batch, mode='eval', pad=40)
+train_fake, _ = try_patch(cycleGun, batch, mode='train', pad=40)
+axs[0].imshow(real, cmap='gray', vmin=-1, vmax=1)
+axs[0].set_title('Real')
+axs[1].imshow(train_fake, cmap='gray', vmin=-1, vmax=1)
+axs[1].set_title('Train Fake')
+axs[2].imshow(eval_fake, cmap='gray', vmin=-1, vmax=1)
+axs[2].set_title('Eval Fake')
 
 # %% what happens if we put it through multiple times?
 n = 10

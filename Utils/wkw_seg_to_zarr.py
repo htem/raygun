@@ -46,11 +46,12 @@ def download_wk_skeleton(
 # Extracts and saves volume annotations as a uint32 layer alongside the zarr used for making GT (>> assumes same ROI)
 def wkw_seg_to_zarr(
         annotation_ID,
-        save_path,
+        save_path, #TODO: Add mkdtemp() as default
         zarr_path,
         raw_name,
         wk_url = 'http://catmaid2.hms.harvard.edu:9000',
         wk_token = "Q9OpWh1PPwHYfH9BsnoM2Q",
+        gt_name = None,
         gt_name_prefix = 'volumes/',
     ):
     print(f"Downloading {wk_url}/annotations/Explorational/{annotation_ID}...")
@@ -95,7 +96,8 @@ def wkw_seg_to_zarr(
             data = dataset.read(ds.roi.get_offset() / ds.voxel_size, ds.roi.get_shape() / ds.voxel_size).squeeze()
             
             # Save annotations to zarr
-            gt_name = f'{gt_name_prefix}gt_{annotation.dataset_name}_{annotation.username.replace(" ","")}_{time_str}'
+            if gt_name is None:
+                gt_name = f'{gt_name_prefix}gt_{annotation.dataset_name}_{annotation.username.replace(" ","")}_{time_str}'
             
             target_roi = ds.roi
             gt_array = daisy.Array(data, ds.roi, ds.voxel_size)
@@ -144,6 +146,7 @@ def wkw_seg_to_zarr(
 
             if success:
                 print(f'{target_roi} from {annotation_name} written to {zarr_path}/{gt_name}')
+                return gt_name
             else:
                 print('Failed to save annotation layer.')
 #%%
