@@ -1,5 +1,6 @@
+from distutils.dir_util import remove_tree
 import os
-from tempfile import mkdtemp
+import tempfile
 from daisy import *
 import sys
 sys.path.append('/n/groups/htem/users/jlr54/raygun/Utils/')
@@ -24,16 +25,21 @@ annotation_ID = '62ded548010000b200fe6375'
 
 
 # --- Connect to image volume and get metadata --- #
-print('Loading volume metadata...')
-vol = open_ds(file_path + file_name, in_name)
+file = os.path.join(file_path, file_name)
+mask = os.path.join(file, mask_name)
+if os.path.exists(mask):
+    print('Deleting old mask...')
+    remove_tree(mask)
+# print('Loading volume metadata...')
+# vol = open_ds(file, in_name)
 
-print('Opening a zarr volume for the mask...')
-#modified daisy to not have to specify chunk_shape (line 319 in daisy/datasets.py)
-mask_vol = prepare_ds(file_path+file_name, 
-                        mask_name,
-                        vol.roi,
-                        vol.voxel_size,
-                        bool)
+# print('Opening a zarr volume for the mask...')
+# #modified daisy to not have to specify chunk_shape (line 319 in daisy/datasets.py)
+# mask_vol = prepare_ds(file, 
+#                         mask_name,
+#                         vol.roi,
+#                         vol.voxel_size,
+#                         bool)
 
 # --- Make mask --- #
 print('Making mask volume...')
@@ -50,13 +56,9 @@ print('Making mask volume...')
 # assert vol.shape == mask.shape, f"Zarr volume shape:{vol.shape} != Mask volume shape: {mask.shape}"
 
 # --- Get Webknossos mask --- #
-save_path = mkdtemp()
-wkw_seg_to_zarr(annotation_ID, save_path, os.path.join(file_path, file_name), in_name, gt_name=mask_name)
+with tempfile.TemporaryDirectory() as save_path:
+    mask_vol = get_wk_mask(annotation_ID, save_path, file, in_name, save_name=mask_name)
 
-# --- Save mask --- #
-print('Saving to zarr...')
-# mask_vol[vol.roi] = mask
-mask_vol[vol.roi] = True
 for mask_roi in mask_rois:
     mask_vol[mask_roi] = False
 

@@ -5,6 +5,12 @@ import numpy as np
 import tensorflow as tf
 from glob import glob
 import os
+import sys
+
+import daisy
+import torch
+sys.path.insert(0, '/n/groups/htem/users/jlr54/gunpowder/')
+from gunpowder import gunpowder as gp
 
 def parse_events_file(path: str, tags: list):
     metrics = defaultdict(list)
@@ -117,4 +123,115 @@ def get_best_layer(type, seed, step,
                 'link': 'LinkNoBottle'
             }):
     return f'volumes/{net_raw_prefix}{type_dict[type]}_seed{seed}_checkpoint{step}{net_raw_suffix}'
+# %%
+def try_patch(cycleGun, side='A', pad=0, mode='eval', side_length=512, real=None, batch=None):
+    if real is None:
+        if batch is None:
+            batch = cycleGun.test_prediction(side.upper(), side_length=side_length, cycle=False)
+
+        real = batch[getattr(cycleGun, f'real_{side}')].data * 2 - 1
+        real = real.squeeze()
+
+    else:
+        real = np.expand_dims(real, axis=0)
+
+    if side.upper() == 'A':
+        net = cycleGun.model.netG1.to('cuda')
+    else:
+        net = cycleGun.model.netG2.to('cuda')
+            
+    if mode.lower() == 'eval':
+        cycleGun.model.eval()
+    elif mode.lower() == 'real':
+        return real, []
+    else:
+        cycleGun.model.train()
+    
+    mid = real.shape[-1] // 2
+    test = net(torch.cuda.FloatTensor(real).unsqueeze(0))
+    # pad = (real.shape[-1] - test.shape[-1]) // 2
+    # pad = 0
+    # pad = cycleGun.get_valid_crop(side_length)[-1]
+
+    patch1 = torch.cuda.FloatTensor(real[:, :mid+pad, :mid+pad]).unsqueeze(0)
+    patch2 = torch.cuda.FloatTensor(real[:, mid-pad:, :mid+pad]).unsqueeze(0)
+    patch3 = torch.cuda.FloatTensor(real[:, :mid+pad, mid-pad:]).unsqueeze(0)
+    patch4 = torch.cuda.FloatTensor(real[:, mid-pad:, mid-pad:]).unsqueeze(0)
+
+    patches = [patch1, patch2, patch3, patch4]
+    fakes = []
+    for patch in patches:
+        test = net(patch)
+        fakes.append(test.detach().cpu().squeeze())
+
+    if pad != 0:
+        fake_comb = torch.cat((torch.cat((fakes[0][:-pad, :-pad], fakes[1][pad:, :-pad])), torch.cat((fakes[2][:-pad, pad:], fakes[3][pad:, pad:]))), axis=1)
+    else:
+        fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fakes[3]))), axis=1)
+    
+    return fake_comb.squeeze(), real.squeeze()
+
+def get_center_roi(ds, side_length, ndims, voxel_size=None):
+    if voxel_size is None:
+        voxel_size = ds.voxel_size
+    shape = list((1,)*3)
+    shape[:ndims] = (side_length * 2,)*ndims
+    real_shape = voxel_size * daisy.Coordinate(shape)
+    roi = daisy.Roi(ds.roi.center, real_shape)
+    roi = roi.shift(-real_shape / 2).snap_to_grid(ds.voxel_size)
+    return roi
+
+def get_real(cycleGun, side, roi=None):
+    ds = daisy.open_ds(getattr(cycleGun, f'src_{side}'), getattr(cycleGun, f'{side}_name'))
+    if roi is None:
+        roi = get_center_roi(ds, cycleGun.side_length, cycleGun.ndims, daisy.Coordinate(cycleGun.common_voxel_size))
+    
+    # pipe = getattr(cycleGun, f'datapipe_{side}')
+    # request = gp.BatchRequest()
+    # request.add(pipe.real, roi, cycleGun.common_voxel_size)
+    # with gp.build(pipe.predict_pipe):
+    #     batch = pipe.predict_pipe.request_batch(request)
+
+    # return batch[pipe.real].data * 2 - 1
+
+    data = ds.to_ndarray(roi)
+    if len(data.shape) > cycleGun.ndims:
+        data = data[...,0]
+    return (data / 255) * 2 - 1
+
+def show_patches(cycleGun, checkpoint_path=None, pad=0):
+    if isinstance(cycleGun, str):
+        sys.path.append('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725/resnet_track001/')
+        import train
+        cycleGun = train.cycleGun
+        cycleGun.load_saved_model()
+
+    side_length = cycleGun.side_length
+    fig, axs = plt.subplots(2, 3, figsize=(30,20))
+    reals = []
+    for i, side in enumerate(['A', 'B']):
+        axs[i,0].set_ylabel(side)
+        # batch = cycleGun.test_prediction(side.upper(), side_length=side_length*2, cycle=False)
+        real = get_real(cycleGun, side)
+        reals.append(real)
+        for j, mode in enumerate(['real', 'eval', 'train']):
+            if mode == 'real':
+                img = real
+            else:
+                img, _ = try_patch(cycleGun, side=side, mode=mode, pad=pad, side_length=side_length, real=real)
+            axs[i,j].imshow(img, cmap='gray', vmin=-1, vmax=1)
+            axs[i,j].set_title(mode)
+    return cycleGun, fig, real
+
+
+#%%
+cycleGun, fig, real = show_patches('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725/resnet_track001/')
+
+#%%
+sys.path.append('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725/resnet_track001/')
+from train import *
+cycleGun.load_saved_model('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725/resnet_track001/models/cycleGAN_setups_set20220725_resnet_track001_checkpoint_100000')
+#%%
+cycleGun, fig, real = show_patches(cycleGun)
+
 # %%

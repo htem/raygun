@@ -1,7 +1,7 @@
 # %%
 import sys
 #%%
-sys.path.append('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725//resnet_track001/')
+sys.path.append('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725/resnet_track001/')
 from train import *
 cycleGun.load_saved_model('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725/resnet_track001/models/cycleGAN_setups_set20220725_resnet_track001_checkpoint_100000')
 # %%
@@ -69,12 +69,12 @@ with gp.build(pipe):
 batch = cycleGun.test_train()
 
 # %%
-side_length=256
+side_length=512
 batch = cycleGun.test_prediction('A', side_length=side_length, cycle=False)
 # batch = cycleGun.test_prediction('B', side_length=side_length, cycle=False)
 
 # %%
-def try_patch(cycleGun, side='A', pad=0, mode='eval', side_length=256):
+def try_patch(cycleGun, side='A', pad=0, mode='eval', side_length=512):
     batch = cycleGun.test_prediction(side.upper(), side_length=side_length, cycle=False)
     if mode.lower() == 'eval':
         cycleGun.model.eval()
@@ -115,16 +115,17 @@ def try_patch(cycleGun, side='A', pad=0, mode='eval', side_length=256):
     return fake_comb.squeeze(), real.squeeze()
 
 # %%
-fig, axs = plt.subplots(1, 3, figsize=(30,10))
-for i, mode in enumerate(['eval', 'train']):
-    eval_fake, real = try_patch(cycleGun, batch, mode='eval', pad=40)
-train_fake, _ = try_patch(cycleGun, batch, mode='train', pad=40)
-axs[0].imshow(real, cmap='gray', vmin=-1, vmax=1)
-axs[0].set_title('Real')
-axs[1].imshow(train_fake, cmap='gray', vmin=-1, vmax=1)
-axs[1].set_title('Train Fake')
-axs[2].imshow(eval_fake, cmap='gray', vmin=-1, vmax=1)
-axs[2].set_title('Eval Fake')
+fig, axs = plt.subplots(2, 3, figsize=(30,20))
+for i, side in enumerate(['A', 'B']):
+    for i, mode in enumerate(['eval', 'train']):
+        eval_fake, real = try_patch(cycleGun, side=side, mode='eval', pad=40)
+        train_fake, _ = try_patch(cycleGun, batch, mode='train', pad=40)
+        axs[0].imshow(real, cmap='gray', vmin=-1, vmax=1)
+        axs[0].set_title('Real')
+        axs[1].imshow(train_fake, cmap='gray', vmin=-1, vmax=1)
+        axs[1].set_title('Train Fake')
+        axs[2].imshow(eval_fake, cmap='gray', vmin=-1, vmax=1)
+        axs[2].set_title('Eval Fake')
 
 # %% what happens if we put it through multiple times?
 n = 10

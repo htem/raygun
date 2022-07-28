@@ -154,7 +154,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 try:
                     self.checkpoint, self.iteration = self._get_latest_checkpoint()
                 except:
-                    logger.info('Checkpoint not found. Starting from scratch.')
+                    print('Checkpoint not found. Starting from scratch.')
                     self.checkpoint = None
             else:
                 self.checkpoint = checkpoint
@@ -657,6 +657,18 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         if datapipe.unsqueeze:
             datapipe.train_pipe += datapipe.unsqueeze # add "channel" dimensions if neccessary, else use z dimension as channel
         datapipe.train_pipe += gp.Stack(self.batch_size)# add "batch" dimensions    
+
+
+        # Make predicting datapipe
+        datapipe.predict_pipe = datapipe.source
+        if datapipe.reject:
+            datapipe.predict_pipe += datapipe.reject
+        if datapipe.resample:
+            datapipe.predict_pipe += datapipe.resample
+        datapipe.train_pipe += datapipe.normalize_real + datapipe.scaleimg2tanh_real
+        if datapipe.unsqueeze:
+            datapipe.predict_pipe += datapipe.unsqueeze # add "channel" dimensions if neccessary, else use z dimension as channel
+        datapipe.predict_pipe += gp.Stack(1)# add "batch" dimensions    
         setattr(self, 'pipe_'+side, datapipe.train_pipe)
 
         return datapipe
