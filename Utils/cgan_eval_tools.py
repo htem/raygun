@@ -1,5 +1,6 @@
 #%%
 from collections import defaultdict
+from importlib.machinery import SourceFileLoader
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
@@ -184,31 +185,28 @@ def get_center_roi(ds, side_length, ndims, voxel_size=None):
 def get_real(cycleGun, side, roi=None):
     ds = daisy.open_ds(getattr(cycleGun, f'src_{side}'), getattr(cycleGun, f'{side}_name'))
     if roi is None:
-        roi = get_center_roi(ds, cycleGun.side_length, cycleGun.ndims, daisy.Coordinate(cycleGun.common_voxel_size))
-    
-    # pipe = getattr(cycleGun, f'datapipe_{side}')
-    # request = gp.BatchRequest()
-    # request.add(pipe.real, roi, cycleGun.common_voxel_size)
-    # with gp.build(pipe.predict_pipe):
-    #     batch = pipe.predict_pipe.request_batch(request)
-
-    # return batch[pipe.real].data * 2 - 1
+        roi = get_center_roi(ds, cycleGun.side_length, cycleGun.ndims, daisy.Coordinate(cycleGun.common_voxel_size))    
 
     data = ds.to_ndarray(roi)
     if len(data.shape) > cycleGun.ndims:
         data = data[...,0]
     return (data / 255) * 2 - 1
 
-def show_patches(cycleGun, checkpoint_path=None, pad=0):
+def show_patches(cycleGun, pad=0):
     if isinstance(cycleGun, str):
-        sys.path.append('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725/resnet_track001/')
-        import train
+        path = cycleGun
+        sys.path.insert(0, path)
+        train = SourceFileLoader('train', f'{path}train.py').load_module()
+        sys.path.pop(0)
         cycleGun = train.cycleGun
+        del train
+        del sys.modules['train']
         cycleGun.load_saved_model()
 
     side_length = cycleGun.side_length
     fig, axs = plt.subplots(2, 3, figsize=(30,20))
     reals = []
+    print(cycleGun.model_name)
     for i, side in enumerate(['A', 'B']):
         axs[i,0].set_ylabel(side)
         # batch = cycleGun.test_prediction(side.upper(), side_length=side_length*2, cycle=False)
@@ -225,12 +223,17 @@ def show_patches(cycleGun, checkpoint_path=None, pad=0):
 
 
 #%%
-cycleGun, fig, real = show_patches('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725/resnet_track001/')
+pad = 10
+base = '/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220729/'
+cycleGun, fig, real = show_patches(base+'resnet_track0001/', pad=pad)
+# cycleGun, fig, real = show_patches(base+'resnet_track001/', pad=pad)
+# cycleGun, fig, real = show_patches(base+'resnet_track01/', pad=pad)
+# cycleGun, fig, real = show_patches(base+'unet/', pad=pad)
 
 #%%
-sys.path.append('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725/resnet_track001/')
+sys.path.append(base+'/resnet_track001/')
 from train import *
-cycleGun.load_saved_model('/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220725/resnet_track001/models/cycleGAN_setups_set20220725_resnet_track001_checkpoint_100000')
+cycleGun.load_saved_model(base+'/resnet_track001/models/cycleGAN_setups_set20220728_resnet_track001_checkpoint_100000')
 #%%
 cycleGun, fig, real = show_patches(cycleGun)
 

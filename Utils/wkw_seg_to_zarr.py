@@ -51,7 +51,8 @@ def get_wk_mask(
         raw_name,
         wk_url = 'http://catmaid2.hms.harvard.edu:9000',
         wk_token = "Q9OpWh1PPwHYfH9BsnoM2Q",
-        save_name=None
+        save_name=None,
+        mask_out=True
     ):
     print(f"Downloading {wk_url}/annotations/Explorational/{annotation_ID}...")
     with wk.webknossos_context(token=wk_token, url=wk_url):
@@ -97,7 +98,10 @@ def get_wk_mask(
     if save_name is not None:
         print('Saving...')
         target_roi = ds.roi
-        mask_array = daisy.Array(data > 0, ds.roi, ds.voxel_size)
+        if mask_out:
+            mask_array = daisy.Array(data == 0, ds.roi, ds.voxel_size)
+        else:
+            mask_array = daisy.Array(data > 0, ds.roi, ds.voxel_size)
         
         chunk_size = ds.chunk_shape[0]
         num_channels = 1
@@ -149,7 +153,10 @@ def get_wk_mask(
             print('Failed to save annotation layer.')
     
     else:
-        return daisy.Array(data > 0, ds.roi, ds.voxel_size)
+        if mask_out:
+            return daisy.Array(data == 0, ds.roi, ds.voxel_size)
+        else:
+            return daisy.Array(data > 0, ds.roi, ds.voxel_size)
 
 
 # Extracts and saves volume annotations as a uint32 layer alongside the zarr used for making GT (>> assumes same ROI)

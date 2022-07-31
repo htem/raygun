@@ -354,7 +354,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                                 torch.nn.Tanh()
                                 )
         
-        elif self.gnet_type == 'residualunet':
+        elif self.gnet_type == 'residual_unet':
             gnet_kwargs = self.get_downsample_factors(gnet_kwargs)
             
             generator = torch.nn.Sequential(
@@ -665,7 +665,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             datapipe.predict_pipe += datapipe.reject
         if datapipe.resample:
             datapipe.predict_pipe += datapipe.resample
-        datapipe.train_pipe += datapipe.normalize_real + datapipe.scaleimg2tanh_real
+        datapipe.predict_pipe += datapipe.normalize_real + datapipe.scaleimg2tanh_real
         if datapipe.unsqueeze:
             datapipe.predict_pipe += datapipe.unsqueeze # add "channel" dimensions if neccessary, else use z dimension as channel
         datapipe.predict_pipe += gp.Stack(1)# add "batch" dimensions    

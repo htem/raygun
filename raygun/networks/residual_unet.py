@@ -19,7 +19,8 @@ class ConvPass(torch.nn.Module):
             padding='valid',
             residual=False,
             padding_mode='reflect',
-            norm_layer=None
+            norm_layer=None,
+            final=False
             ):
         """Convolution pass block
 
@@ -31,7 +32,8 @@ class ConvPass(torch.nn.Module):
             padding (str, optional): What type of padding to use in convolutions. Defaults to 'valid'.
             residual (bool, optional): Whether to make the blocks calculate the residual. Defaults to False.
             padding_mode (str, optional): What values to use in padding (i.e. 'zeros', 'reflect', 'wrap', etc.). Defaults to 'reflect'.
-            norm_layer (callable or None, optional): Whether to use a normalization layer and if so (i.e. if not None), the layer to use. Defaults to None.
+            norm_layer (callable or None, optional): Whether to use a normalization layer and if so (i.e. if not None), the layer to use. Defaults to None.            
+            final (bool, optional): Whether this block is the final output of the network (and thus should have the final activation omitted). Defaults to False.
 
         Returns:
             ConvPass: Convolution block
@@ -48,6 +50,7 @@ class ConvPass(torch.nn.Module):
 
         self.residual = residual
         self.padding = padding
+        self.final = final
 
         layers = []
 
@@ -90,7 +93,7 @@ class ConvPass(torch.nn.Module):
             if norm_layer is not None:
                 layers.append(norm_layer(output_nc))
 
-            if not (residual and i == (len(kernel_sizes) - 1)):
+            if not ((residual and i == (len(kernel_sizes) - 1)) or (final and i == (len(kernel_sizes) - 1))):
                 layers.append(self.activation)            
 
             input_nc = output_nc
@@ -121,7 +124,10 @@ class ConvPass(torch.nn.Module):
                 init_x = self.crop(self.x_init_map(x), res.size()[-self.dims:])
             else:
                 init_x = self.x_init_map(x)
-            return self.activation(init_x + res)            
+            if not self.final:
+                return self.activation(init_x + res)
+            else:
+                return (init_x + res)            
 
 class ConvDownsample(torch.nn.Module):
 
@@ -380,7 +386,7 @@ class Upsample(torch.nn.Module):
 
         return torch.cat([f_cropped, g_cropped], dim=1)
 
-class UNet(torch.nn.Module):
+class ResidualUNet(torch.nn.Module):
 
     def __init__(
             self,
@@ -508,7 +514,7 @@ class UNet(torch.nn.Module):
 
         '''
 
-        super(UNet, self).__init__()
+        super(ResidualUNet, self).__init__()
 
         self.ndims = len(downsample_factors[0])
         self.num_levels = len(downsample_factors) + 1
@@ -516,6 +522,15 @@ class UNet(torch.nn.Module):
         self.input_nc = input_nc
         self.output_nc = output_nc if output_nc else ngf
         self.residual = residual
+        
+        if activation is not None:
+            if isinstance(activation, str):
+                self.activation = getattr(torch.nn, activation)()
+            else:
+                self.activation = activation() # assume is function
+        else:
+            self.activation = nn.Identity()
+
         if add_noise == 'param':                   # add noise feature if necessary
             self.noise_layer = ParameterizedNoiseBlock()
         elif add_noise:
@@ -619,7 +634,8 @@ class UNet(torch.nn.Module):
                     activation=activation,
                     padding=padding_type,
                     residual=self.residual,
-                    norm_layer=norm_layer)
+                    norm_layer=norm_layer,
+                    final=(level==0))
                 for level in range(self.num_levels - 1)
             ])
             for _ in range(num_heads)
@@ -665,6 +681,9 @@ class UNet(torch.nn.Module):
     def forward(self, x):
 
         y = self.rec_forward(self.num_levels - 1, x)
+
+        for i in range(self.num_heads):
+            y[i] = self.activation(x + y[i])
 
         if self.num_heads == 1:
             return y[0]
