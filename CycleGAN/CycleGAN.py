@@ -1,5 +1,7 @@
 from copy import deepcopy
+import copy
 import itertools
+import random
 from matplotlib import pyplot as plt
 import torch
 import glob
@@ -94,9 +96,11 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             tensorboard_path='./tensorboard/',
             verbose=True,
             checkpoint=None, # Used for prediction/rendering, training always starts from latest   
-            pretrain_gnet=False         
+            pretrain_gnet=False,
+            random_seed=None
             ):
-
+            # for key in config:
+            #     setattr(self, '%s' % key, config[key])
             self.src_A = src_A
             self.src_B = src_B
             self.A_voxel_size = gp.Coordinate(A_voxel_size)
@@ -158,6 +162,13 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                     self.checkpoint = None
             else:
                 self.checkpoint = checkpoint
+
+            if random_seed is not None:
+                torch.manual_seed(random_seed)
+                random.seed(random_seed)
+                np.random.seed(random_seed)
+            self.random_seed = random_seed
+
             self.build_machine()
             self.training_pipeline = None
             self.test_training_pipeline = None
@@ -740,6 +751,9 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.model.train()
         with gp.build(self.training_pipeline):
             for i in tqdm(range(self.num_epochs)):
+                # this_request = copy.deepcopy(self.train_request)
+                # this_request._random_seed = random.randint(0, 2**32)
+                # self.batch = self.training_pipeline.request_batch(this_request)
                 self.batch = self.training_pipeline.request_batch(self.train_request)
                 if i == 1:
                     self.write_tBoard_graph()
@@ -802,7 +816,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
 
         predict_pipe += gp.Squeeze(squeeze_arrays, axis=0) # remove batch dimension
 
-        request = gp.BatchRequest()
+        request = gp.BatchRequest(random_seed=random.randint(0, 4294967295))
         for array in arrays:            
             extents = self.get_extents(side_length, array_name=array.identifier)
             request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
@@ -814,6 +828,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         return self.batch
 
     def render_full(self, side='A', side_length=None, cycle=False, crop_to_valid=False, test=False, label_dict=None):
+        raise DeprecationWarning()
         #CYCLED CURRENTLY SAVED IN UPSAMPLED FORM (i.e. not original voxel size)
         #set model into evaluation mode
         self.model.eval()

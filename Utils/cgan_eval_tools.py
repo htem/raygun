@@ -142,17 +142,17 @@ def try_patch(cycleGun, side='A', pad=0, mode='eval', side_length=512, real=None
         net = cycleGun.model.netG2.to('cuda')
             
     if mode.lower() == 'eval':
-        cycleGun.model.eval()
+        # cycleGun.model.eval()
+        net.eval()
     elif mode.lower() == 'real':
         return real, []
     else:
-        cycleGun.model.train()
+        # cycleGun.model.train()
+        net.train()
     
     mid = real.shape[-1] // 2
-    test = net(torch.cuda.FloatTensor(real).unsqueeze(0))
+    # test = net(torch.cuda.FloatTensor(real).unsqueeze(0))
     # pad = (real.shape[-1] - test.shape[-1]) // 2
-    # pad = 0
-    # pad = cycleGun.get_valid_crop(side_length)[-1]
 
     patch1 = torch.cuda.FloatTensor(real[:, :mid+pad, :mid+pad]).unsqueeze(0)
     patch2 = torch.cuda.FloatTensor(real[:, mid-pad:, :mid+pad]).unsqueeze(0)
@@ -206,7 +206,7 @@ def show_patches(cycleGun, pad=0):
     side_length = cycleGun.side_length
     fig, axs = plt.subplots(2, 3, figsize=(30,20))
     reals = []
-    print(cycleGun.model_name)
+    print(f'{cycleGun.model_name} at iteration {cycleGun.iteration}')
     for i, side in enumerate(['A', 'B']):
         axs[i,0].set_ylabel(side)
         # batch = cycleGun.test_prediction(side.upper(), side_length=side_length*2, cycle=False)
@@ -225,10 +225,10 @@ def show_patches(cycleGun, pad=0):
 #%%
 pad = 10
 base = '/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220729/'
-cycleGun, fig, real = show_patches(base+'resnet_track0001/', pad=pad)
+# cycleGun, fig, real = show_patches(base+'resnet_track0001/', pad=pad)
 # cycleGun, fig, real = show_patches(base+'resnet_track001/', pad=pad)
 # cycleGun, fig, real = show_patches(base+'resnet_track01/', pad=pad)
-# cycleGun, fig, real = show_patches(base+'unet/', pad=pad)
+cycleGun, fig, real = show_patches(base+'unet/', pad=pad)
 
 #%%
 sys.path.append(base+'/resnet_track001/')

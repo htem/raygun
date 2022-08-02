@@ -522,6 +522,7 @@ class ResidualUNet(torch.nn.Module):
         self.input_nc = input_nc
         self.output_nc = output_nc if output_nc else ngf
         self.residual = residual
+        self.padding_type = padding_type
         
         if activation is not None:
             if isinstance(activation, str):
@@ -678,9 +679,26 @@ class ResidualUNet(torch.nn.Module):
 
         return fs_out
 
+    def crop(self, x, shape):
+        '''Center-crop x to match spatial dimensions given by shape.'''
+
+        x_target_size = x.size()[:-self.ndims] + shape
+
+        offset = tuple(
+            (a - b)//2
+            for a, b in zip(x.size(), x_target_size))
+
+        slices = tuple(
+            slice(o, o + s)
+            for o, s in zip(offset, x_target_size))
+
+        return x[slices]
+
     def forward(self, x):
 
         y = self.rec_forward(self.num_levels - 1, x)
+        if self.padding_type.lower() == 'valid':
+            x = self.crop(x, y[0].size()[-self.ndims:])
 
         for i in range(self.num_heads):
             y[i] = self.activation(x + y[i])
