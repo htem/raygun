@@ -319,7 +319,7 @@ class ResnetBlock(nn.Module):
 
         conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation()]
         if use_dropout:
-            conv_block += [nn.Dropout(0.5)]
+            conv_block += [nn.Dropout(0.2)]
         
         conv_block += padder.copy()
         conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim)]
@@ -438,7 +438,7 @@ class UnetSkipConnectionBlock(nn.Module):
             up = [uprelu, upconv, upnorm]
 
             if use_dropout:
-                model = down + [submodule] + up + [nn.Dropout(0.5)]
+                model = down + [submodule] + up + [nn.Dropout(0.2)]
             else:
                 model = down + [submodule] + up
 
@@ -542,7 +542,7 @@ class UnetSkipConnectionBlock3D(nn.Module):
             up = [uprelu, upconv, upnorm]
 
             if use_dropout:
-                model = down + [submodule] + up + [nn.Dropout(0.5)]
+                model = down + [submodule] + up + [nn.Dropout(0.2)]
             else:
                 model = down + [submodule] + up
 
@@ -735,7 +735,7 @@ class ResnetBlock3D(nn.Module):
 
         conv_block += [nn.Conv3d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), activation()]
         if use_dropout:
-            conv_block += [nn.Dropout(0.5)]
+            conv_block += [nn.Dropout(0.2)]
 
         conv_block += padder.copy()
         conv_block += [nn.Conv3d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim)]

@@ -42,8 +42,6 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def __init__(self,
             src_A, #EXPECTS ZARR VOLUME
             src_B,
-            A_voxel_size=(1, 1, 1), # voxel size of src_A (for each dimension)
-            B_voxel_size=(1, 1, 1), # voxel size of src_B (for each dimension)
             common_voxel_size=None, # voxel size to resample A and B into for training
             ndims=None,
             A_name='raw',
@@ -97,16 +95,15 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
             verbose=True,
             checkpoint=None, # Used for prediction/rendering, training always starts from latest   
             pretrain_gnet=False,
-            random_seed=None
+            random_seed=None,
+            **config
             ):
-            # for key in config:
-            #     setattr(self, '%s' % key, config[key])
+            for key in config:
+                setattr(self, '%s' % key, config[key])
             self.src_A = src_A
             self.src_B = src_B
-            self.A_voxel_size = gp.Coordinate(A_voxel_size)
-            self.B_voxel_size = gp.Coordinate(B_voxel_size)
             if common_voxel_size is None:
-                self.common_voxel_size = self.B_voxel_size
+                self.common_voxel_size = daisy.open_ds(src_B, B_name).voxel_size
             else:
                 self.common_voxel_size = gp.Coordinate(common_voxel_size)
             if ndims is None:
@@ -550,7 +547,10 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
     def get_datapipe(self, side):
         datapipe = type('DataPipe', (object,), {}) # make simple object to smoothly store variables
         side = side.upper() # ensure uppercase
-        datapipe.src_voxel_size = getattr(self, side+'_voxel_size')
+        
+        datapipe.src_path = getattr(self, 'src_'+side)# the zarr container
+        datapipe.real_name = getattr(self, side+'_name')
+        datapipe.src_voxel_size = daisy.open_ds(datapipe.src_path, datapipe.real_name).voxel_size
         
         # declare arrays to use in the pipelines
         array_names = ['real', 
@@ -600,9 +600,7 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
                 datapipe.mask_src = datapipe.mask
 
         # setup data sources
-        datapipe.src_path = getattr(self, 'src_'+side)# the zarr container
         datapipe.out_path = getattr(self, side+'_out_path')
-        datapipe.real_name = getattr(self, side+'_name')
         datapipe.src_names = {datapipe.real_src: datapipe.real_name}
         datapipe.src_specs = {datapipe.real_src: gp.ArraySpec(interpolatable=True, voxel_size=datapipe.src_voxel_size)}
         if datapipe.masked: 

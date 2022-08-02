@@ -344,15 +344,15 @@ class RRG(nn.Module):
 ##########################################################################
 ##---------- MIRNet  -----------------------
 class MIRNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=3, n_feat=64, kernel_size=3, stride=2, n_RRG=3, n_MSRB=2, height=3, width=2, bias=False):
+    def __init__(self, input_nc=1, output_nc=1, ngf=64, kernel_size=3, stride=2, n_RRG=3, n_MSRB=2, height=3, width=2, bias=False):
         super(MIRNet, self).__init__()
 
-        self.conv_in = nn.Conv2d(in_channels, n_feat, kernel_size=kernel_size, padding=(kernel_size - 1) // 2, bias=bias)
+        self.conv_in = nn.Conv2d(input_nc, ngf, kernel_size=kernel_size, padding=(kernel_size - 1) // 2, bias=bias)
 
-        modules_body = [RRG(n_feat, n_MSRB, height, width, stride, bias) for _ in range(n_RRG)]
+        modules_body = [RRG(ngf, n_MSRB, height, width, stride, bias) for _ in range(n_RRG)]
         self.body = nn.Sequential(*modules_body)
 
-        self.conv_out = nn.Conv2d(n_feat, out_channels, kernel_size=kernel_size, padding=(kernel_size - 1) // 2, bias=bias)
+        self.conv_out = nn.Conv2d(ngf, output_nc, kernel_size=kernel_size, padding=(kernel_size - 1) // 2, bias=bias)
 
     def forward(self, x):
         h = self.conv_in(x)

@@ -151,8 +151,12 @@ def try_patch(cycleGun, side='A', pad=0, mode='eval', side_length=512, real=None
         net.train()
     
     mid = real.shape[-1] // 2
-    # test = net(torch.cuda.FloatTensor(real).unsqueeze(0))
-    # pad = (real.shape[-1] - test.shape[-1]) // 2
+    if pad is True:
+        test = net(torch.cuda.FloatTensor(real).unsqueeze(0))
+        pad = (real.shape[-1] - test.shape[-1]) // 2
+        valid = True #TODO: This is super hacky :/
+    else:
+        valid = False
 
     patch1 = torch.cuda.FloatTensor(real[:, :mid+pad, :mid+pad]).unsqueeze(0)
     patch2 = torch.cuda.FloatTensor(real[:, mid-pad:, :mid+pad]).unsqueeze(0)
@@ -165,7 +169,7 @@ def try_patch(cycleGun, side='A', pad=0, mode='eval', side_length=512, real=None
         test = net(patch)
         fakes.append(test.detach().cpu().squeeze())
 
-    if pad != 0:
+    if pad != 0 and not valid:
         fake_comb = torch.cat((torch.cat((fakes[0][:-pad, :-pad], fakes[1][pad:, :-pad])), torch.cat((fakes[2][:-pad, pad:], fakes[3][pad:, pad:]))), axis=1)
     else:
         fake_comb = torch.cat((torch.cat((fakes[0], fakes[1])), torch.cat((fakes[2], fakes[3]))), axis=1)
@@ -224,11 +228,13 @@ def show_patches(cycleGun, pad=0):
 
 #%%
 pad = 10
-base = '/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220729/'
+base = '/n/groups/htem/ResolutionEnhancement/cycleGAN_setups/set20220801/'
 # cycleGun, fig, real = show_patches(base+'resnet_track0001/', pad=pad)
 # cycleGun, fig, real = show_patches(base+'resnet_track001/', pad=pad)
 # cycleGun, fig, real = show_patches(base+'resnet_track01/', pad=pad)
-cycleGun, fig, real = show_patches(base+'unet/', pad=pad)
+# cycleGun, fig, real = show_patches(base+'residual_parNoise__32x3_unet/', pad=pad)
+# cycleGun, fig, real = show_patches(base+'residual_parNoise__12x5_unet/', pad=pad)
+# cycleGun, fig, real = show_patches(base+'residual_valid_convDown_parNoise__12x5_unet/', pad=True)
 
 #%%
 sys.path.append(base+'/resnet_track001/')
