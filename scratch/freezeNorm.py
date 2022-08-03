@@ -8,7 +8,6 @@ from utils import *
 from skimage import data
 import matplotlib.pyplot as plt
 from tqdm import trange
-
 torch.cuda.set_device(1)
 # %%
 class Test():
@@ -153,43 +152,42 @@ plt.plot(losses)
 model_allTrain = Test()
 model_allFix = Test()
 model_switch = Test()
+model_noNorm = Test(norm=torch.nn.Identity)
 
 steps = 1000
 show_every = 500
 allTrain_losses = np.zeros((2*steps,))
+noNorm_losses = np.zeros((2*steps,))
 allFix_losses = np.zeros((2*steps,))
 switch_losses = np.zeros((2*steps,))
 ticker = trange(steps)
-model_allTrain.set_mode('train')
 model_allFix.set_mode('fix_stats')
-model_switch.set_mode('train')
 for step in ticker:
     allTrain_losses[step] = model_allTrain.step((step % show_every)==0)
+    noNorm_losses[step] = model_noNorm.step((step % show_every)==0)
     allFix_losses[step] = model_allFix.step((step % show_every)==0)
     switch_losses[step] = model_switch.step((step % show_every)==0)
     ticker.set_postfix({'allTrain':allTrain_losses[step],
+                        'noNorm': noNorm_losses[step],
                         'allFix': allFix_losses[step],
                         'switch': switch_losses[step]})
-plt.figure()
-plt.plot(allTrain_losses, label='allTrain')
-plt.plot(allFix_losses, label='allFix')
-plt.plot(switch_losses, label='switch')
-plt.legend()
 
 ticker = trange(steps, steps*2)
 model_switch.set_mode('fix_stats')
 for step in ticker:
     allTrain_losses[step] = model_allTrain.step((step % show_every)==0)
+    noNorm_losses[step] = model_noNorm.step((step % show_every)==0)
     allFix_losses[step] = model_allFix.step((step % show_every)==0)
     switch_losses[step] = model_switch.step((step % show_every)==0)
     ticker.set_postfix({'allTrain':allTrain_losses[step],
+                        'noNorm': noNorm_losses[step],
                         'allFix': allFix_losses[step],
                         'switch': switch_losses[step]})
 
 plt.figure()
 plt.plot(allTrain_losses, label='allTrain')
+plt.plot(noNorm_losses, label='noNorm')
 plt.plot(allFix_losses, label='allFix')
 plt.plot(switch_losses, label='switch')
 plt.legend()
 # %%
-model_noNorm = Test(norm=torch.nn.Identity)
