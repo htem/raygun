@@ -11,28 +11,40 @@ from tqdm import trange
 torch.cuda.set_device(1)
 # %%
 class Test():
-    def __init__(self, net=None, norm=None, size=24, seed=42, noise_factor=3, img='astronaut', ind=31):
+    def __init__(self, 
+                net=None, 
+                activation=None,
+                norm=None, 
+                size=24, 
+                seed=42, 
+                noise_factor=3, 
+                img='astronaut', 
+                ind=31, 
+                name=''):
+        torch.manual_seed(seed)
         if net is None:
             if norm is None:
                 norm = partial(torch.nn.InstanceNorm2d, track_running_stats=True, momentum=0.01)
+            if activation is None:
+                activation = torch.nn.ReLU
             self.net = torch.nn.Sequential(
-                            ResnetGenerator(1, 1, 32, norm, n_blocks=4), 
-                            torch.nn.Sigmoid()
+                            ResnetGenerator(1, 1, 32, norm, n_blocks=4, activation=activation), 
+                            torch.nn.Tanh()
                         ).to('cuda')
         else:
             self.net = net
         self.size = size
         self.mode = 'train'
         self.ind = ind
+        self.name = name
         self.noise_factor = noise_factor
         self.loss_fn = torch.nn.MSELoss()
-        self.optim = torch.optim.Adam(self.net.parameters())#, lr=1e-6)
-        torch.manual_seed(seed)
+        self.optim = torch.optim.Adam(self.net.parameters(), lr=1e-5)
         if img is not None:
             self.data = getattr(data, img)()
             if len(self.data.shape) > 2:
                 self.data = self.data[...,0]
-            self.data = torch.cuda.FloatTensor(self.data).unsqueeze(0) / 255
+            self.data = (torch.cuda.FloatTensor(self.data).unsqueeze(0) / 255) * 2 - 1
             self.size = self.data.shape[-1]
     
     def get_norm_layers(self):
@@ -44,10 +56,15 @@ class Test():
         for norm in self.get_norm_layers():
             means.append(norm.running_mean)
             vars.append(norm.running_var)
+        means = torch.cat(means)
+        vars = torch.cat(vars)
         return means, vars
 
-    def set_mode(self, mode):
-        self.mode = mode
+    def set_mode(self, mode=None):
+        if mode is None:
+            mode = self.mode
+        else:
+            self.mode = mode
         if mode == 'fix_stats':
             self.net.train()
             for m in self.net.modules():
@@ -77,30 +94,40 @@ class Test():
         if self.data is None:
             ind = torch.randint(low=0, high=200, size=(1,))[0]
             is_face = ind >= 100
-            gt = torch.cuda.FloatTensor(data.lfw_subset()[ind][:self.size, :self.size]).unsqueeze(0)
+            gt = torch.cuda.FloatTensor(data.lfw_subset()[ind][:self.size, :self.size]).unsqueeze(0) * 2 - 1
             
         else:
             is_face = None
             gt = self.data
                 
-        noise = torch.randperm(self.size**2, device='cuda').reshape((self.size, self.size)).unsqueeze(0) / self.size**2 # mean should always be 0.5
+        noise = ((torch.randperm(self.size**2, device='cuda').reshape((self.size, self.size)).unsqueeze(0) / self.size**2) * 2 - 1).requires_grad_() # should always be mean=0 var=1
         # noise = torch.rand_like(gt, device='cuda', requires_grad=True)
 
         img = (gt*noise) / self.noise_factor + (gt / self.noise_factor)
 
-        return self.im2batch(img), self.im2batch(gt), is_face
+        return self.im2batch(img.detach()), self.im2batch(gt), is_face
+
+    def eval(self, show=True, patches=None, gt=None):
+        self.net.eval()
+        patches, gt, out, is_face = self.forward(patches=patches, gt=gt)
+        if show:
+            self.show()
+        self.set_mode()
+        return self.out
 
     def show(self):
         fig, axs = plt.subplots(1, 3, figsize=(15,5))
-        axs[0].imshow(self.img, cmap='gray')
+        axs[0].imshow(self.img, cmap='gray', vmin=-1, vmax=1)
+        axs[0].set_ylabel(self.name)
         axs[0].set_title('Input')
-        axs[1].imshow(self.out, cmap='gray')
+        axs[1].imshow(self.out, cmap='gray', vmin=-1, vmax=1)
         axs[1].set_title('Output')
-        axs[2].imshow(self.gt, cmap='gray')
+        axs[2].imshow(self.gt, cmap='gray', vmin=-1, vmax=1)
         axs[2].set_title('Actual')
 
-    def forward(self):
-        patches, gt, is_face = self.get_data()
+    def forward(self, patches=None, gt=None, is_face=None):
+        if patches is None or gt is None:
+            patches, gt, is_face = self.get_data()
         self.img = self.batch2im(patches)
         self.gt = self.batch2im(gt)
         out = self.net(patches)
@@ -109,8 +136,9 @@ class Test():
 
         return patches, gt, out, is_face
 
-    def step(self, show=False):
-        patches, gt, out, is_face = self.forward()
+    def step(self, show=False, patches=None, gt=None):
+        self.optim.zero_grad(True)
+        patches, gt, out, is_face = self.forward(patches=patches, gt=gt)
         loss = self.loss_fn(out, gt)
         loss.backward()
         self.optim.step()
@@ -118,76 +146,99 @@ class Test():
             self.show()
         return loss.item()
 
-#%%
-model = Test()
-#%%
-patches, gt, out, is_face = model.forward()
-model.show()
+def eval_models(data_src, models):
+    outs = {}
+    patches, gt, is_face = data_src.get_data()
+    for name, model in models.items():
+        outs[name] = model.eval(show=False, patches=patches, gt=gt)
+    num = len(models.keys()) + 2
+    fig, axs = plt.subplots(1, num, figsize=(5*num, 5))
+    axs[0].imshow(data_src.batch2im(patches), cmap='gray', vmin=-1, vmax=1)
+    axs[0].set_title('Input')
+    axs[-1].imshow(data_src.batch2im(gt), cmap='gray', vmin=-1, vmax=1)
+    axs[-1].set_title('Real')
+    for ax, name in zip(axs[1:-1], models.keys()):
+        ax.imshow(outs[name], cmap='gray', vmin=-1, vmax=1)
+        ax.set_title(name)
 
 #%%
+model = Test()
+patches, gt, out, is_face = model.forward()
+model.show()
 model.step(True)
 
 #%%
-steps = 1000
-show_every = 100
-losses = np.zeros((2*steps,))
-ticker = trange(steps)
-model.set_mode('train')
-for step in ticker:
-    losses[step] = model.step((step % show_every)==0)
-    ticker.set_postfix({'loss':losses[step]})
-plt.figure()
-plt.plot(losses)
+model_kwargs = {
+                'activation': torch.nn.SELU
+                }
 
-#%%))
-ticker = trange(steps)
-model.set_mode('fix_stats')
-for step in ticker:
-    losses[step] = model.step((step % show_every)==0)
-    ticker.set_postfix({'loss':losses[step]})
-plt.figure()
-plt.plot(losses)
+model_names = ['allTrain',
+            'allFix',
+            'switch',
+            'noNorm',
+            'noTrack']
 
-#%%
-model_allTrain = Test()
-model_allFix = Test()
-model_switch = Test()
-model_noNorm = Test(norm=torch.nn.Identity)
+models = {}
+for name in model_names:
+    these_kwargs = model_kwargs.copy()
+    these_kwargs['name'] = name
+    if name == 'noNorm':
+        these_kwargs['norm'] = torch.nn.Identity
+    elif name == 'noTrack':
+        model_kwargs['norm'] = torch.nn.InstanceNorm2d
+    models[name] = Test(**these_kwargs)
 
-steps = 1000
-show_every = 500
-allTrain_losses = np.zeros((2*steps,))
-noNorm_losses = np.zeros((2*steps,))
-allFix_losses = np.zeros((2*steps,))
-switch_losses = np.zeros((2*steps,))
+steps = 500
+show_every = steps*3
+losses = {}
+means = np.zeros((2*steps,))
+vars = np.zeros((2*steps,))
+for name in model_names:
+    losses[name] = np.zeros((2*steps,))
+    
 ticker = trange(steps)
-model_allFix.set_mode('fix_stats')
+models['allFix'].set_mode('fix_stats')
+data_src = Test()
 for step in ticker:
-    allTrain_losses[step] = model_allTrain.step((step % show_every)==0)
-    noNorm_losses[step] = model_noNorm.step((step % show_every)==0)
-    allFix_losses[step] = model_allFix.step((step % show_every)==0)
-    switch_losses[step] = model_switch.step((step % show_every)==0)
-    ticker.set_postfix({'allTrain':allTrain_losses[step],
-                        'noNorm': noNorm_losses[step],
-                        'allFix': allFix_losses[step],
-                        'switch': switch_losses[step]})
+    ticker_postfix = {}
+    patches, gt, is_face = data_src.get_data()
+    for name, model in models.items():
+        losses[name][step] = model.step((step % show_every)==0, patches=patches, gt=gt)
+        ticker_postfix[name] = losses[name][step]
+    tempM, tempV = models['allTrain'].get_running_norm_stats()
+    means[step], vars[step] = tempM.mean(), tempV.mean()
+    ticker.set_postfix(ticker_postfix)
+
+eval_models(data_src, models)
+tempM, tempV = models['switch'].get_running_norm_stats()
+print(f'For Switch training: Mean mean: {tempM.mean()}, Mean var: {tempV.mean()}')
 
 ticker = trange(steps, steps*2)
-model_switch.set_mode('fix_stats')
+models['switch'].set_mode('fix_stats')
 for step in ticker:
-    allTrain_losses[step] = model_allTrain.step((step % show_every)==0)
-    noNorm_losses[step] = model_noNorm.step((step % show_every)==0)
-    allFix_losses[step] = model_allFix.step((step % show_every)==0)
-    switch_losses[step] = model_switch.step((step % show_every)==0)
-    ticker.set_postfix({'allTrain':allTrain_losses[step],
-                        'noNorm': noNorm_losses[step],
-                        'allFix': allFix_losses[step],
-                        'switch': switch_losses[step]})
+    ticker_postfix = {}
+    for name, model in models.items():
+        losses[name][step] = model.step((step % show_every)==0, patches=patches, gt=gt)
+        ticker_postfix[name] = losses[name][step]
+    tempM, tempV = models['allTrain'].get_running_norm_stats()
+    means[step], vars[step] = tempM.mean(), tempV.mean()
+    ticker.set_postfix(ticker_postfix)
 
-plt.figure()
-plt.plot(allTrain_losses, label='allTrain')
-plt.plot(noNorm_losses, label='noNorm')
-plt.plot(allFix_losses, label='allFix')
-plt.plot(switch_losses, label='switch')
+#%%
+eval_models(data_src, models)
+tempM, tempV = models['switch'].get_running_norm_stats()
+print(f'For Switch training: Mean mean: {tempM.mean()}, Mean var: {tempV.mean()}')
+
+#%%
+plt.figure(figsize=(15,10))
+for name, loss in losses.items():
+    plt.plot(loss, label=name)
+plt.title('Losses')
+plt.ylim([0,.1])
+plt.legend()
+ # %%
+plt.figure(figsize=(15,10))
+plt.plot(means, label='Means')
+plt.plot(vars, label='Variances')
 plt.legend()
 # %%
