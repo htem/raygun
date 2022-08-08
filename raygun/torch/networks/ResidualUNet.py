@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from utils import NoiseBlock, ParameterizedNoiseBlock
+from networks.utils import NoiseBlock, ParameterizedNoiseBlock
 
 class ConvPass(torch.nn.Module):
 
