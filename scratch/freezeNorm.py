@@ -177,7 +177,7 @@ model.step(True)
 
 #%%
 model_kwargs = {
-                'activation': torch.nn.SELU
+                # 'activation': torch.nn.SELU
                 }
 
 model_names = ['allTrain',

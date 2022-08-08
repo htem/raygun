@@ -34,10 +34,12 @@ def eval_args(config, file):
         elif isinstance(v, str):
             if '$working_dir' in v:
                 v = v.replace('$working_dir', os.path.dirname(file))
+            
             if v[0] == '#' and v[-1] == '#':
                 v = eval(v[1:-1])
             elif v.count('#') > 0 and v.count('#') % 2 == 0:
-                v = _eval_args(v)            
+                v = _eval_args(v)           
+
             config[k] = v
     return config
 

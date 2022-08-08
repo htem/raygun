@@ -1,4 +1,0 @@
-{
-    "include_config": "../train_kwargs.conf",
-    "random_seed": 42
-}
