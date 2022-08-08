@@ -77,6 +77,12 @@ class Test():
         if mode == 'eval':
             self.net.eval()
     
+    def toggle_stat_fix(self):
+        if self.mode == 'fix_stats':
+            self.set_mode('train')
+        else:
+            self.set_mode('fix_stats')
+    
     def im2batch(self, img):
         mid = self.size // 2        
         patches = []
@@ -155,11 +161,13 @@ def eval_models(data_src, models):
     fig, axs = plt.subplots(1, num, figsize=(5*num, 5))
     axs[0].imshow(data_src.batch2im(patches), cmap='gray', vmin=-1, vmax=1)
     axs[0].set_title('Input')
-    axs[-1].imshow(data_src.batch2im(gt), cmap='gray', vmin=-1, vmax=1)
+    gt = data_src.batch2im(gt)
+    axs[-1].imshow(gt, cmap='gray', vmin=-1, vmax=1)
     axs[-1].set_title('Real')
     for ax, name in zip(axs[1:-1], models.keys()):
         ax.imshow(outs[name], cmap='gray', vmin=-1, vmax=1)
-        ax.set_title(name)
+        mse = torch.mean((gt - outs[name])**2)
+        ax.set_title(f'{name}: MSE={mse}')
 
 #%%
 model = Test()
@@ -174,7 +182,9 @@ model_kwargs = {
 
 model_names = ['allTrain',
             'allFix',
-            'switch',
+            'switch_10',
+            'switch_200',
+            'switch_500',
             'noNorm',
             'noTrack']
 
@@ -188,13 +198,13 @@ for name in model_names:
         model_kwargs['norm'] = torch.nn.InstanceNorm2d
     models[name] = Test(**these_kwargs)
 
-steps = 500
-show_every = steps*3
+steps = 1000
+show_every = steps*2
 losses = {}
-means = np.zeros((2*steps,))
-vars = np.zeros((2*steps,))
+means = np.zeros((steps,))
+vars = np.zeros((steps,))
 for name in model_names:
-    losses[name] = np.zeros((2*steps,))
+    losses[name] = np.zeros((steps,))
     
 ticker = trange(steps)
 models['allFix'].set_mode('fix_stats')
@@ -203,21 +213,9 @@ for step in ticker:
     ticker_postfix = {}
     patches, gt, is_face = data_src.get_data()
     for name, model in models.items():
-        losses[name][step] = model.step((step % show_every)==0, patches=patches, gt=gt)
-        ticker_postfix[name] = losses[name][step]
-    tempM, tempV = models['allTrain'].get_running_norm_stats()
-    means[step], vars[step] = tempM.mean(), tempV.mean()
-    ticker.set_postfix(ticker_postfix)
-
-eval_models(data_src, models)
-tempM, tempV = models['switch'].get_running_norm_stats()
-print(f'For Switch training: Mean mean: {tempM.mean()}, Mean var: {tempV.mean()}')
-
-ticker = trange(steps, steps*2)
-models['switch'].set_mode('fix_stats')
-for step in ticker:
-    ticker_postfix = {}
-    for name, model in models.items():
+        if 'switch' in name:
+            if (step % int(name.split('_')[-1])) == 0 and step > 0:
+                model.toggle_stat_fix()
         losses[name][step] = model.step((step % show_every)==0, patches=patches, gt=gt)
         ticker_postfix[name] = losses[name][step]
     tempM, tempV = models['allTrain'].get_running_norm_stats()
@@ -226,8 +224,8 @@ for step in ticker:
 
 #%%
 eval_models(data_src, models)
-tempM, tempV = models['switch'].get_running_norm_stats()
-print(f'For Switch training: Mean mean: {tempM.mean()}, Mean var: {tempV.mean()}')
+# tempM, tempV = models['switch'].get_running_norm_stats()
+# print(f'For Switch training: Mean mean: {tempM.mean()}, Mean var: {tempV.mean()}')
 
 #%%
 plt.figure(figsize=(15,10))
