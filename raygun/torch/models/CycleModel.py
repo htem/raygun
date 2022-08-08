@@ -1,15 +1,16 @@
 import torch
 import torch.nn.functional as F
 
-class Link_Cycle_Model(torch.nn.Module):
-    def __init__(self, netG1, netG2, scale_factor_A=None, scale_factor_B=None):
+class CycleModel(torch.nn.Module):
+    def __init__(self, netG1, netG2, scale_factor_A=None, scale_factor_B=None, split=False):
         super().__init__()
         self.netG1 = netG1
         self.netG2 = netG2
         self.scale_factor_A = scale_factor_A
         self.scale_factor_B = scale_factor_B
+        self.split = split
         self.cycle = True
-        self.crop_pad = False
+        self.crop_pad = None #TODO: Determine if this is depracated
     
     def sampling_bottleneck(self, array, scale_factor):
         size = array.shape[-len(scale_factor):]
@@ -26,12 +27,15 @@ class Link_Cycle_Model(torch.nn.Module):
         
         if real_A is not None: #allow calling for single direction pass (i.e. prediction)
             self.fake_B = self.netG1(real_A)
-            if self.crop_pad is not False: 
+            if self.crop_pad is not None: 
                 self.fake_B = self.fake_B[self.crop_pad]
             if self.scale_factor_B: self.fake_B = self.sampling_bottleneck(self.fake_B, self.scale_factor_B) #apply sampling bottleneck
             if self.cycle:                
-                self.cycled_A = self.netG2(self.fake_B)
-                if self.crop_pad is not False: 
+                if self.split:
+                    self.cycled_A = self.netG2(self.fake_B.detach()) # detach to prevent backprop to first generator
+                else:
+                    self.cycled_A = self.netG2(self.fake_B)
+                if self.crop_pad is not None: 
                     self.cycled_A = self.cycled_A[self.crop_pad]
             else:
                 self.cycled_A = None
@@ -41,12 +45,15 @@ class Link_Cycle_Model(torch.nn.Module):
             
         if real_B is not None:
             self.fake_A = self.netG2(real_B)
-            if self.crop_pad is not False: 
+            if self.crop_pad is not None: 
                 self.fake_A = self.fake_A[self.crop_pad]
             if self.scale_factor_A: self.fake_A = self.sampling_bottleneck(self.fake_A, self.scale_factor_A) #apply sampling bottleneck
             if self.cycle:
-                self.cycled_B = self.netG1(self.fake_A)
-                if self.crop_pad is not False: 
+                if self.split:
+                    self.cycled_B = self.netG1(self.fake_A.detach()) # detach to prevent backprop to first generator
+                else:
+                    self.cycled_B = self.netG1(self.fake_A)
+                if self.crop_pad is not None: 
                     self.cycled_B = self.cycled_B[self.crop_pad]
             else:
                 self.cycled_B = None

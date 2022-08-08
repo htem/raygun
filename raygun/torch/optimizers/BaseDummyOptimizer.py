@@ -1,6 +1,6 @@
 import torch
 
-class Base_Dummy_Optimizer(torch.nn.Module):
+class BaseDummyOptimizer(torch.nn.Module):
     def __init__(self, **optimizers):
         super().__init__()
         for name, optimizer in optimizers.items():
