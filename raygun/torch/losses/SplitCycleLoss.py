@@ -1,9 +1,9 @@
 
 import torch
-from losses import GANLoss
+from raygun.torch.losses import GANLoss
 
 import logging
-logger = logging.Logger('CycleGANLoss', 'INFO')
+logger = logging.Logger(__name__, 'INFO')
 
 class SplitCycleLoss(torch.nn.Module):
     """CycleGAN loss function"""

@@ -9,13 +9,9 @@
 # --- Imports --- #
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
-# from pdb import set_trace as stx
 
-from raygun.utils.antialias import Downsample as downsamp
-
-
+from raygun.torch.utils.antialias import Downsample as downsamp
 
 ##########################################################################
 

@@ -1,3 +1,4 @@
+#%%
 from copy import deepcopy
 import itertools
 import random
@@ -10,10 +11,6 @@ import daisy
 import os
 
 import gunpowder as gp
-
-import logging
-logger = logging.Logger('CycleGAN', 'INFO')
-
 import math
 import functools
 from tqdm import tqdm
@@ -21,64 +18,41 @@ import numpy as np
 
 torch.backends.cudnn.benchmark = True
 
-from networks import *
-from models import CycleModel
-from losses import LinkCycleLoss, SplitCycleLoss
-from optimizers import BaseDummyOptimizer
-from utils import read_config
+from raygun.torch.networks import *
+from raygun.torch.models import CycleModel
+from raygun.torch.losses import LinkCycleLoss, SplitCycleLoss
+from raygun.torch.optimizers import BaseDummyOptimizer
+from raygun.torch.systems import BaseSystem
 
-class CycleGAN(): #TODO: Just pass config file or dictionary
-    def __init__(self, config_file):
-            #Add default params
-            for key, value in read_config('../default_configs/default_cycleGAN_conf.json').items():
-                setattr(self, key, value)
-            
-            #Get this configuration
-            for key, value in read_config(config_file).items():
-                setattr(self, key, value)
-            
-            if self.common_voxel_size is None:
-                self.common_voxel_size = gp.Coordinate(daisy.open_ds(self.src_B, self.B_name).voxel_size)
-            else:
-                self.common_voxel_size = gp.Coordinate(self.common_voxel_size)
-            if self.ndims is None:
-                self.ndims = sum(np.array(self.common_voxel_size) == np.min(self.common_voxel_size))                
-            if self.A_out_path is None:
-                self.A_out_path = self.src_A
-            if self.B_out_path is None:
-                self.B_out_path = self.src_B
-            self.gnet_type = self.gnet_type.lower()
-            
-            self._set_verbose()
-            if self.checkpoint is None:
-                try:
-                    self.checkpoint, self.iteration = self._get_latest_checkpoint()
-                except:
-                    print('Checkpoint not found. Starting from scratch.')
-                    self.checkpoint = None
+class CycleGAN(BaseSystem):
+    def __init__(self, config=None):
+        super().__init__(default_config='../default_configs/default_cycleGAN_conf.json', config=config)
 
-            if self.random_seed is not None:
-                torch.manual_seed(self.random_seed)
-                random.seed(self.random_seed)
-                np.random.seed(self.random_seed)
-
-            self.build_machine()
-            self.training_pipeline = None
-            self.test_training_pipeline = None
-
-    def set_device(self, id=0):
-        self.device_id = id
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(id)
-    
-    def set_verbose(self, verbose=True):
-        self.verbose = verbose
-        self._set_verbose()
-
-    def _set_verbose(self):
-        if self.verbose:
-            logging.basicConfig(level=logging.INFO)
+        if self.common_voxel_size is None:
+            self.common_voxel_size = gp.Coordinate(daisy.open_ds(self.src_B, self.B_name).voxel_size)
         else:
-            logging.basicConfig(level=logging.WARNING)
+            self.common_voxel_size = gp.Coordinate(self.common_voxel_size)
+        if self.ndims is None:
+            self.ndims = sum(np.array(self.common_voxel_size) == np.min(self.common_voxel_size))                
+        if self.A_out_path is None:
+            self.A_out_path = self.src_A
+        if self.B_out_path is None:
+            self.B_out_path = self.src_B
+        self.gnet_type = self.gnet_type.lower()
+        
+        if self.checkpoint is None:
+            try:
+                self.checkpoint, self.iteration = self._get_latest_checkpoint()
+            except:
+                print('Checkpoint not found. Starting from scratch.')
+                self.checkpoint = None
+
+        if self.random_seed is not None:
+            self.set_random_seed()
+
+        self.build_machine()
+        self.training_pipeline = None
+        self.test_training_pipeline = None    
 
     def batch_show(self, batch=None, i=0, show_mask=False):
         if batch is None:
@@ -721,164 +695,4 @@ class CycleGAN(): #TODO: Just pass config file or dictionary
         self.batch_show()
         return self.batch
 
-    def render_full(self, side='A', side_length=None, cycle=False, crop_to_valid=False, test=False, label_dict=None):
-        raise DeprecationWarning()
-        #CYCLED CURRENTLY SAVED IN UPSAMPLED FORM (i.e. not original voxel size)
-        #set model into evaluation mode
-        self.model.eval()
-        self.model.cycle = cycle
-        # model_outputs = {
-        #     0: self.fake_B,
-        #     1: self.cycled_B,
-        #     2: self.fake_A,
-        #     3: self.cycled_A}
-
-        side_length = self.side_length if side_length is None else side_length
-        
-        #datapipe has: train_pipe, source, reject, resample, augment, unsqueeze, etc.}
-        datapipe = getattr(self, 'datapipe_'+side)        
-        arrays = [datapipe.real, datapipe.fake]
-        if cycle:
-            arrays += [datapipe.cycled]
-
-        input_dict = {'real_'+side: datapipe.real}                
-
-        if side=='A':
-            output_dict = {0: datapipe.fake}
-            if cycle:
-                output_dict[3] = datapipe.cycled
-        else:        
-            output_dict = {2: datapipe.fake}
-            if cycle:
-                output_dict[1] = datapipe.cycled                   
-
-        # set prediction spec 
-        if datapipe.source.spec is None:
-            data_file = zarr.open(datapipe.src_path)
-            pred_spec = datapipe.source._Hdf5LikeSource__read_spec(datapipe.real, data_file, datapipe.real_name).copy()
-        else:
-            pred_spec = datapipe.source.spec[datapipe.real].copy()        
-        pred_spec.voxel_size = self.common_voxel_size
-
-        if label_dict is None:
-            dataset_names = {datapipe.fake: 'volumes/'+self.model_name+'_enFAKE'}
-            if cycle:
-                dataset_names[datapipe.cycled] = 'volumes/'+self.model_name+'_enCYCLED'
-        else:
-            dataset_names = {datapipe.fake: 'volumes/'+label_dict['fake']}
-            if cycle:
-                dataset_names[datapipe.cycled] = 'volumes/'+label_dict['cycled']
-
-
-        # Calculate padding if necessary:
-        if crop_to_valid:
-            if crop_to_valid is True:
-                px_pad = self.get_valid_crop(side_length=side_length)
-            else:
-                px_pad = crop_to_valid
-            self.model.set_crop_pad(px_pad, self.ndims)
-            coor_pad = np.zeros((len(self.common_voxel_size)))
-            coor_pad[-self.ndims:] = px_pad # assumes first dimension is z (i.e. the dimension breaking isotropy)
-            coor_pad = gp.Coordinate(coor_pad)
-
-        scan_request = gp.BatchRequest()
-        for array in arrays:            
-            if array is not datapipe.real:
-                extents = self.get_extents(side_length, array_name=array.identifier)
-                if crop_to_valid:
-                    extents -= coor_pad * 2
-                    if array is datapipe.cycled:
-                        extents -= coor_pad * 2 
-                scan_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
-
-        render_pipe = datapipe.source 
-        if datapipe.resample: render_pipe += datapipe.resample
-        
-        render_pipe += datapipe.normalize_real
-        render_pipe += datapipe.scaleimg2tanh_real
-
-        if datapipe.unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
-            render_pipe += datapipe.unsqueeze
-        render_pipe += gp.Unsqueeze([datapipe.real]) # add batch dimension
-
-        render_pipe += gp.torch.Predict(self.model,
-                                inputs = input_dict,
-                                outputs = output_dict,
-                                checkpoint = self.checkpoint,
-                                spawn_subprocess=self.spawn_subprocess
-                                )                
-        
-        if cycle:
-            render_pipe += datapipe.postnet_pipe.cycle
-        else:
-            render_pipe += datapipe.postnet_pipe.nocycle
-        render_pipe += gp.Squeeze(arrays[1:], axis=0) # remove batch dimension
-
-        # Convert float32 on [0,1] to uint8 on [0,255]
-        render_pipe += gp.IntensityScaleShift(datapipe.fake, 255, 0)        
-        render_pipe += gp.AsType(datapipe.fake, np.uint8)        
-        if cycle:
-            render_pipe += gp.IntensityScaleShift(datapipe.cycled, 255, 0)        
-            render_pipe += gp.AsType(datapipe.cycled, np.uint8)      
-
-        if test:
-            return scan_request, render_pipe
-
-        # Declare new array to write to
-        if not hasattr(self, 'compressor'):
-            self.compressor = {'id': 'blosc', 
-                'clevel': 3,
-                'cname': 'blosclz',
-                # 'blocksize': 64
-                }        
-        source_ds = daisy.open_ds(datapipe.src_path, datapipe.real_name)
-        datapipe.total_roi = source_ds.data_roi.snap_to_grid(self.common_voxel_size, 'shrink')
-        for key, name in dataset_names.items():
-            write_size = scan_request[key].roi.get_shape()
-            daisy.prepare_ds(
-                datapipe.out_path,
-                name,
-                datapipe.total_roi,
-                daisy.Coordinate(self.common_voxel_size),
-                np.uint8,
-                write_size=write_size,
-                num_channels=1,
-                compressor=self.compressor,
-                delete=True)
-                
-        render_pipe += gp.ZarrWrite(
-                        dataset_names = dataset_names,
-                        output_filename = datapipe.out_path,
-                        compression_type = self.compressor
-                        )        
-        
-        render_pipe += gp.Scan(scan_request, num_workers=self.num_workers, cache_size=self.cache_size)
-
-        request = gp.BatchRequest()
-
-        print(f'Full rendering pipeline declared for input type {side}. Building...')
-        with gp.build(render_pipe):
-            print('Starting full volume render...')
-            render_pipe.request_batch(request)
-            print('Finished.')
-
-    def load_saved_model(self, checkpoint=None, cuda_available=None):
-        if cuda_available is None:
-            cuda_available = torch.cuda.is_available()
-        if checkpoint is None:
-            checkpoint = self.checkpoint
-        else:
-            self.checkpoint = checkpoint
-
-        if checkpoint is not None:
-            if not cuda_available:
-                checkpoint = torch.load(checkpoint, map_location=torch.device('cpu'))
-            else:
-                checkpoint = torch.load(checkpoint)
-
-            if "model_state_dict" in checkpoint:
-                self.model.load_state_dict(checkpoint["model_state_dict"])
-            else:
-                self.model.load_state_dict(checkpoint)
-        else:
-            logger.warning('No saved checkpoint found.')
+# %%

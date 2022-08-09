@@ -44,6 +44,10 @@ def eval_args(config, file):
     return config
 
 def read_config(file):
+    #Check to make sure dictionary hasn't been passed directly
+    if isinstance(file, dict):
+        return file
+
     configs = []
     configs.append(loadJsonFile(file))
     last_file = file
