@@ -1,12 +1,6 @@
 {
     "common_voxel_size": null, // voxel size to resample A and B into for training
     "ndims": null,
-    "A_name": "raw",
-    "B_name": "raw",
-    "mask_A_name": null, // expects mask to be in same place as real zarr
-    "mask_B_name": null,
-    "A_out_path": null,
-    "B_out_path": null,
     "model_name": "CycleGAN",
     "gnet_type": "unet",
     "dnet_type": "classic",
@@ -17,7 +11,7 @@
             "n_layers": 3, // number of layers in Discriminator networks
             "ngf": 64
         },
-    "loss_type": "cycle", // supports "link" or "split"
+    "loss_type": "link", // supports "link" or "split"
     "loss_kwargs": {"g_lambda_dict": {"A": {
                                         "l1_loss": {"cycled": 10, "identity": 0.5}, // Default from CycleGAN paper
                                         "gan_loss": {"fake": 1, "cycled": 0}
@@ -32,12 +26,18 @@
                             }
                 },
     "sampling_bottleneck": false,
-    "optim_type": "Adam",
-    "optim_kwargs": {"betas": [0.9, 0.999],
-                    "weight_decay": 0
-            },
-    "g_init_learning_rate": 1e-5,
-    "d_init_learning_rate": 1e-5,
+    "g_optim_type": "Adam",
+    "g_optim_kwargs": {
+            "betas": [0.9, 0.999],
+            "lr": 1e-5,
+            "weight_decay": 0
+        },
+    "d_optim_type": "Adam",
+    "d_optim_kwargs": {
+            "betas": [0.9, 0.999],
+            "lr": 1e-5,
+            "weight_decay": 0
+        },
     "min_coefvar": null,
     "interp_order": null,
     "side_length": 64, // in common sized voxels

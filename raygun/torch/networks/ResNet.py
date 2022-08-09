@@ -8,7 +8,7 @@ class ResnetGenerator2D(torch.nn.Module):
     We adapt Torch code and idea from Justin Johnson's neural style transfer project(https://github.com/jcjohnson/fast-neural-style)
     """
 
-    def __init__(self, input_nc=1, output_nc=1, ngf=64, norm_layer=torch.nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='reflect', activation=torch.nn.ReLU, add_noise=False):
+    def __init__(self, input_nc=1, output_nc=1, ngf=64, norm_layer=torch.nn.BatchNorm2d, use_dropout=False, n_blocks=6, padding_type='reflect', activation=torch.nn.ReLU, add_noise=False, n_downsampling=2):
         """Construct a Resnet-based generator
         Parameters:
             input_nc (int)      -- the number of channels in input images
@@ -20,6 +20,7 @@ class ResnetGenerator2D(torch.nn.Module):
             padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zeros | valid
             activation          -- non-linearity layer to apply (default is ReLU)
             add_noise           -- whether to append a noise feature to the data prior to upsampling layers: True | False | 'param'
+            n_downsampling      -- number of times to downsample data before ResBlocks
         """
         assert(n_blocks >= 0)
         super().__init__()
@@ -47,7 +48,6 @@ class ResnetGenerator2D(torch.nn.Module):
                  norm_layer(ngf),
                  activation()]
 
-        n_downsampling = 2
         for i in range(n_downsampling):  # add downsampling layers
             mult = 2 ** i
             model += [torch.nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=updown_p, bias=use_bias),
@@ -163,7 +163,7 @@ class ResnetGenerator3D(torch.nn.Module):
     We adapt Torch code and idea from Justin Johnson's neural style transfer project(https://github.com/jcjohnson/fast-neural-style)
     """
 
-    def __init__(self, input_nc=1, output_nc=1, ngf=64, norm_layer=torch.nn.BatchNorm3d, use_dropout=False, n_blocks=6, padding_type='reflect', activation=torch.nn.ReLU, add_noise=False):
+    def __init__(self, input_nc=1, output_nc=1, ngf=64, norm_layer=torch.nn.BatchNorm3d, use_dropout=False, n_blocks=6, padding_type='reflect', activation=torch.nn.ReLU, add_noise=False, n_downsampling=2):
         """Construct a Resnet-based generator
         Parameters:
             input_nc (int)      -- the number of channels in input images
@@ -175,6 +175,7 @@ class ResnetGenerator3D(torch.nn.Module):
             padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zeros | valid
             activation          -- non-linearity layer to apply (default is ReLU)
             add_noise           -- whether to append a noise feature to the data prior to upsampling layers: True | False | 'param'
+            n_downsampling      -- number of times to downsample data before ResBlocks
         """
         assert(n_blocks >= 0)
         super().__init__()
@@ -202,7 +203,6 @@ class ResnetGenerator3D(torch.nn.Module):
                  norm_layer(ngf),
                  activation()]
 
-        n_downsampling = 2
         for i in range(n_downsampling):  # add downsampling layers
             mult = 2 ** i
             model += [torch.nn.Conv3d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=updown_p, bias=use_bias), #TODO: Make actually use padding_type for every convolution (currently does zeros if not valid)
@@ -330,6 +330,7 @@ class ResNet(ResnetGenerator2D, ResnetGenerator3D):
             padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zeros | valid
             activation          -- non-linearity layer to apply (default is ReLU)
             add_noise           -- whether to append a noise feature to the data prior to upsampling layers: True | False | 'param'
+            n_downsampling      -- number of times to downsample data before ResBlocks
         """
         if ndims == 2:
             ResnetGenerator2D.__init__(self, **kwargs)

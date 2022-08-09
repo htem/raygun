@@ -1,2 +1,6 @@
 {
+    "model_name": "Default",
+    "model_path": "./models/",
+    "ndims": 2,
+    "side_length": 256
 }
