@@ -1,26 +1,27 @@
 import torch.nn.functional as F
 
-from raygun.torch.models import CycleModel
+from raygun.torch.models import BaseModel
 from raygun.torch.networks.utils import *
 
-class FreezableCycleModel(CycleModel):
-    def __init__(self, netG1, netG2, scale_factor_A=None, scale_factor_B=None, split=False, freeze_at=100000, **kwargs):
+class FreezableModel(BaseModel):
+    def __init__(self, freeze_norms_at=None, **kwargs):
         super().__init__(**locals())
     
-    def set_norm_modes(self, mode:str='train', nets= ['netG1', 'netG2']):
-        for net in nets:
-            set_norm_mode(getattr(self, net), mode)
+    def set_norm_modes(self, mode:str='train'):
+        for net in self.nets:
+            set_norm_mode(net, mode)
 
-    def add_log(self, writer, iter, nets= ['netG1', 'netG2']):
+    def add_log(self, writer, iter):
         means = []
         vars = []
-        for net in nets:
+        for net in self.nets:
             mean, var = get_running_norm_stats(getattr(self, net))
             means.append(mean)
             vars.append(var)        
+            
         hists = {"means": torch.cat(means), "vars": torch.cat(vars)}
         for tag, values in hists:
             writer.add_histogram(tag, values, global_step=iter)
         
-        if iter == self.freeze_at:
+        if self.freeze_norms_at is not None and iter >= self.freeze_norms_at:
             self.set_norm_modes(mode='fix_norms')

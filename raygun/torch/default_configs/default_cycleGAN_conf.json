@@ -54,5 +54,6 @@
     "checkpoint": null, // Used for prediction/rendering, training always starts from latest   
     "pretrain_gnet": false,
     "random_seed": 42,
-    "trainer_base": "CycleTrain"
+    "trainer_base": "CycleTrain",
+    "freeze_norms_at": null
 }

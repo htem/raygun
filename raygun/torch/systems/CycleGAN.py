@@ -119,7 +119,12 @@ class CycleGAN(BaseSystem):
         else:
             scale_factor_A, scale_factor_B = None, None
         
-        self.model = CycleModel(self.netG1, self.netG2, scale_factor_A, scale_factor_B, split=self.loss_type.lower()=='split')
+        self.model = CycleModel(self.netG1, 
+                                self.netG2, 
+                                scale_factor_A, 
+                                scale_factor_B, 
+                                split=self.loss_type.lower()=='split', 
+                                freeze_norms_at=self.freeze_norms_at)
     
     def setup_optimization(self):
         if isinstance(self.optim, str):
