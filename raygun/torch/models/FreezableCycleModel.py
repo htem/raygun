@@ -4,7 +4,7 @@ from raygun.torch.models import CycleModel
 from raygun.torch.networks.utils import *
 
 class FreezableCycleModel(CycleModel):
-    def __init__(self, netG1, netG2, scale_factor_A=None, scale_factor_B=None, split=False):
+    def __init__(self, netG1, netG2, scale_factor_A=None, scale_factor_B=None, split=False, freeze_at=100000, **kwargs):
         super().__init__(**locals())
     
     def set_norm_modes(self, mode:str='train', nets= ['netG1', 'netG2']):
@@ -21,3 +21,6 @@ class FreezableCycleModel(CycleModel):
         hists = {"means": torch.cat(means), "vars": torch.cat(vars)}
         for tag, values in hists:
             writer.add_histogram(tag, values, global_step=iter)
+        
+        if iter == self.freeze_at:
+            self.set_norm_modes(mode='fix_norms')

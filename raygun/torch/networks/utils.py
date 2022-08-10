@@ -18,7 +18,7 @@ def get_running_norm_stats(net):
     return means, vars
 
 def set_norm_mode(net, mode='train'):
-    if mode == 'fix_stats':
+    if mode == 'fix_norms':
         net.train()
         for m in net.modules():
             if 'norm' in type(m).__name__.lower():

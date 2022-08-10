@@ -159,4 +159,4 @@ class CycleGAN(BaseSystem):
                 extents = self.get_extents(array_name=array.identifier)
                 request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
         return request
-            
+           

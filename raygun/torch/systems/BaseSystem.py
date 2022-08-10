@@ -221,3 +221,4 @@ class BaseSystem:
         except:
             pass # if not implemented
         return self.batch
+        

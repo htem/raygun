@@ -15,7 +15,8 @@ class BaseTrain(object):
                 save_every:int=2000,
                 spawn_subprocess:bool=False,
                 num_workers:int=11,
-                cache_size:int=50
+                cache_size:int=50,
+                **kwargs
                 ):
         for key, value in locals():
             setattr(self, key, value)

@@ -2,13 +2,8 @@ from raygun.torch.models import BaseModel
 import torch.nn.functional as F
 
 class CycleModel(BaseModel):
-    def __init__(self, netG1, netG2, scale_factor_A=None, scale_factor_B=None, split=False):
-        super().__init__()
-        self.netG1 = netG1
-        self.netG2 = netG2
-        self.scale_factor_A = scale_factor_A
-        self.scale_factor_B = scale_factor_B
-        self.split = split
+    def __init__(self, netG1, netG2, scale_factor_A=None, scale_factor_B=None, split=False, **kwargs):
+        super().__init__(**locals())
         self.cycle = True
         self.crop_pad = None #TODO: Determine if this is depracated
         self.output_arrays = ['fake_B', 'cycled_B', 'fake_A', 'cycled_A']

@@ -138,3 +138,4 @@ class CycleDataPipe(BaseDataPipe):
                                             self.cycled
                                             ], axis=0)
         return postnet_pipe
+        

@@ -15,7 +15,8 @@ class CycleTrain(BaseTrain):
                 save_every:int=2000,
                 spawn_subprocess:bool=False,
                 num_workers:int=11,
-                cache_size:int=50
+                cache_size:int=50,
+                **kwargs
                 ):
         super().__init__(**locals()) #TODO: May not work
 
