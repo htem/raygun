@@ -1,8 +1,9 @@
 import gunpowder as gp
 
 class BaseDataPipe(object):
-    def __init__(self):
-        pass
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
     
     def prenet_pipe(self, mode:str='train'):        
         # Make pre-net datapipe

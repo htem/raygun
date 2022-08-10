@@ -4,7 +4,7 @@ import functools
 class NLayerDiscriminator2D(torch.nn.Module):
     """Defines a PatchGAN discriminator"""
 
-    def __init__(self, input_nc, ngf=64, n_layers=3, norm_layer=torch.nn.BatchNorm2d,
+    def __init__(self, input_nc=1, ngf=64, n_layers=3, norm_layer=torch.nn.BatchNorm2d,
                  kw=4, downsampling_kw=None):
         """Construct a PatchGAN discriminator
         Parameters:
@@ -75,7 +75,7 @@ class NLayerDiscriminator2D(torch.nn.Module):
 class NLayerDiscriminator3D(torch.nn.Module):
     """Defines a PatchGAN discriminator"""
 
-    def __init__(self, input_nc, ngf=64, n_layers=3, norm_layer=torch.nn.BatchNorm3d,
+    def __init__(self, input_nc=1, ngf=64, n_layers=3, norm_layer=torch.nn.BatchNorm3d,
                  kw=4, downsampling_kw=None,
                  ):
         """Construct a PatchGAN discriminator
@@ -124,7 +124,7 @@ class NLayerDiscriminator3D(torch.nn.Module):
         return self.model(input)
 
 
-class NLayerDiscriminator(torch.nn.Module):
+class NLayerDiscriminator(NLayerDiscriminator2D, NLayerDiscriminator3D):
     """Defines a PatchGAN discriminator"""
 
     def __init__(self, ndims, **kwargs):

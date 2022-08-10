@@ -4,8 +4,10 @@ from raygun.torch.models import BaseModel
 from raygun.torch.networks.utils import *
 
 class FreezableModel(BaseModel):
-    def __init__(self, freeze_norms_at=None, **kwargs):
-        super().__init__(**locals())
+    def __init__(self, freeze_norms_at=None, **kwargs):        
+        kwargs = locals()
+        del kwargs['self']
+        super().__init__(**kwargs)
     
     def set_norm_modes(self, mode:str='train'):
         for net in self.nets:

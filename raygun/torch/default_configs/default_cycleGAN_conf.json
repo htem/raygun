@@ -38,7 +38,6 @@
             "lr": 1e-5,
             "weight_decay": 0
         },
-    "min_coefvar": null,
     "interp_order": null,
     "side_length": 64, // in common sized voxels
     "batch_size": 1,

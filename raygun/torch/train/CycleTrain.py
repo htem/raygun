@@ -18,7 +18,9 @@ class CycleTrain(BaseTrain):
                 cache_size:int=50,
                 **kwargs
                 ):
-        super().__init__(**locals()) #TODO: May not work
+        kwargs = locals()
+        del kwargs['self']
+        super().__init__(**kwargs)
 
     def postnet_pipe(self, mode:str='train'):
         if mode == 'test':

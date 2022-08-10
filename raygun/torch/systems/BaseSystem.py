@@ -3,7 +3,7 @@ from glob import glob
 import re
 import logging
 import os
-from random import random
+import random
 
 import numpy as np
 import torch
@@ -13,15 +13,18 @@ from raygun.torch import networks
 from raygun.torch.networks.utils import init_weights
 from raygun.torch import train
 
+parent_dir = os.path.dirname(os.path.dirname(__file__))
+
 class BaseSystem:
-    def __init__(self, default_config=f'{os.path.dirname(os.path.dirname(__file__))}/default_configs/blank_conf.json', config=None):
+    def __init__(self, default_config='../default_configs/blank_conf.json', config=None):
         #Add default params
-        for key, value in read_config(os.path.abspath(default_config)).items():
+        default_config = default_config.replace('..', parent_dir)
+        for key, value in read_config(default_config).items():
             setattr(self, key, value)
         
         if config is not None:
             #Get this configuration
-            for key, value in read_config(os.path.abspath(config)).items():
+            for key, value in read_config(config).items():
                 setattr(self, key, value)
                 
         if self.checkpoint is None:
@@ -126,14 +129,14 @@ class BaseSystem:
                                 torch.nn.Tanh()
                                 )            
         elif net_type == 'resnet':
-            net = networks.ResNet(**net_kwargs)
+            net = networks.ResNet(self.ndims, **net_kwargs)
         elif net_type == 'classic':
             norm_instance = {
                                 2: torch.nn.InstanceNorm2d,
                                 3: torch.nn.InstanceNorm3d,
                             }[self.ndims]
             net_kwargs['norm_layer'] = functools.partial(norm_instance, affine=False, track_running_stats=False)
-            net = networks.NLayerDiscriminator(**net_kwargs)
+            net = networks.NLayerDiscriminator(self.ndims, **net_kwargs)
         elif hasattr(networks, net_type):
             net = getattr(networks, net_type)(**net_kwargs)
         else:

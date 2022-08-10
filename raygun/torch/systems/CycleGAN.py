@@ -12,7 +12,7 @@ torch.backends.cudnn.benchmark = True
 
 from raygun.torch.models import CycleModel
 from raygun.torch.losses import LinkCycleLoss, SplitCycleLoss
-from raygun.torch.optimizers import BaseDummyOptimizer
+from raygun.torch.optimizers import BaseDummyOptimizer, get_base_optimizer
 from raygun.torch.systems import BaseSystem
 
 class CycleGAN(BaseSystem):
@@ -21,7 +21,7 @@ class CycleGAN(BaseSystem):
         self.logger = logging.Logger(__name__, 'INFO')
 
         if self.common_voxel_size is None:
-            self.common_voxel_size = gp.Coordinate(daisy.open_ds(self.sources['B'].path, self.sources['B'].name).voxel_size)
+            self.common_voxel_size = gp.Coordinate(daisy.open_ds(self.sources['B']['path'], self.sources['B']['name']).voxel_size)
         else:
             self.common_voxel_size = gp.Coordinate(self.common_voxel_size)
         if self.ndims is None:
@@ -127,22 +127,17 @@ class CycleGAN(BaseSystem):
                                 freeze_norms_at=self.freeze_norms_at)
     
     def setup_optimization(self):
-        if isinstance(self.optim, str):
-            base_optim = getattr(torch.optim, self.optim)
-        else:
-            base_optim = self.optim
-
-        self.optimizer_D = base_optim(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), **self.d_optim_kwargs)
+        self.optimizer_D = get_base_optimizer(self.d_optim_type)(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), **self.d_optim_kwargs)
 
         if self.loss_type.lower()=='link':                        
-            self.optimizer_G = base_optim(itertools.chain(self.netG1.parameters(), self.netG2.parameters()), **self.g_optim_kwargs)
+            self.optimizer_G = get_base_optimizer(self.g_optim_type)(itertools.chain(self.netG1.parameters(), self.netG2.parameters()), **self.g_optim_kwargs)
             self.optimizer = BaseDummyOptimizer(optimizer_G=self.optimizer_G, optimizer_D=self.optimizer_D) #TODO: May be unecessary to pass actual optimizers
             
             self.loss = LinkCycleLoss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G, self.optimizer_D, self.ndims, **self.loss_kwargs)        
     
         elif self.loss_type.lower()=='split':                 
-            self.optimizer_G1 = base_optim(self.netG1.parameters(), **self.g_optim_kwargs)
-            self.optimizer_G2 = base_optim(self.netG2.parameters(), **self.g_optim_kwargs)
+            self.optimizer_G1 = get_base_optimizer(self.g_optim_type)(self.netG1.parameters(), **self.g_optim_kwargs)
+            self.optimizer_G2 = get_base_optimizer(self.g_optim_type)(self.netG2.parameters(), **self.g_optim_kwargs)
             self.optimizer = BaseDummyOptimizer(optimizer_G1=self.optimizer_G1, optimizer_G2=self.optimizer_G2, optimizer_D=self.optimizer_D)
             
             self.loss = SplitCycleLoss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G1, self.optimizer_G2, self.optimizer_D, self.ndims, **self.loss_kwargs)        
@@ -152,7 +147,7 @@ class CycleGAN(BaseSystem):
 
     def setup_datapipes(self):
         self.arrays = {}
-        for id, src in self.sources:
+        for id, src in self.sources.items():
             self.datapipes[id] = CycleDataPipe(id, src, self.ndims, self.common_voxel_size, self.interp_order, self.batch_size)
             self.arrays.update(self.datapipes[id].arrays)
 
@@ -167,6 +162,6 @@ class CycleGAN(BaseSystem):
 
 if __name__ == '__main__':
     system = CycleGAN(config='./train_conf.json')
+    system.logger.info('CycleGAN system loaded. Training...')
     _ = system.train()
     system.logger.info('Done training!')
-    

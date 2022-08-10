@@ -6,12 +6,12 @@ import numpy as np
 from raygun.data import BaseDataPipe
 
 class CycleDataPipe(BaseDataPipe):
-    def __init__(self, id, src, ndims, common_voxel_size=None, interp_order=None, batch_size=1):
-        for key, value in locals():
-            setattr(self, key, value)
-        super().__init__()
+    def __init__(self, id, src, ndims, common_voxel_size=None, interp_order=None, batch_size=1):        
+        kwargs = locals()
+        del kwargs['self']
+        super().__init__(**kwargs)
 
-        self.src_voxel_size = daisy.open_ds(self.src.path, self.src.real_name).voxel_size
+        self.src_voxel_size = daisy.open_ds(self.src['path'], self.src['real_name']).voxel_size
         
         # declare arrays to use in the pipelines
         array_names = ['real', 
@@ -58,27 +58,27 @@ class CycleDataPipe(BaseDataPipe):
         # setup data sources
         if 'out_path' in src.keys():
             self.out_path = src['out_path']        
-        self.src_names = {self.real_src: self.src.real_name}
+        self.src_names = {self.real_src: self.src['real_name']}
         self.src_specs = {self.real_src: gp.ArraySpec(interpolatable=True, voxel_size=self.src_voxel_size)}
         if self.masked: 
             self.mask_name = src['mask_name']
             self.src_names[self.mask_src] = self.mask_name
             self.src_specs[self.mask_src] = gp.ArraySpec(interpolatable=False)
 
-        if self.src.path.endswith('.zarr') or self.src.path.endswith('.n5'):
+        if self.src['path'].endswith('.zarr') or self.src['path'].endswith('.n5'):
             self.source = gp.ZarrSource(    # add the data source
-                        self.src.path,  
+                        self.src['path'],  
                         self.src_names,  # which dataset to associate to the array key
                         self.src_specs  # meta-information
             )
-        elif self.src.path.endswith('.h5') or self.src.path.endswith('.hdf'):
+        elif self.src['path'].endswith('.h5') or self.src['path'].endswith('.hdf'):
             self.source = gp.Hdf5Source(    # add the data source
-                        self.src.path,  
+                        self.src['path'],  
                         self.src_names,  # which dataset to associate to the array key
                         self.src_specs  # meta-information
             )
         else:
-            raise NotImplemented(f'Datasource type of {self.src.path} not implemented yet. Feel free to contribute its implementation!')
+            raise NotImplemented(f'Datasource type of {self.src["path"]} not implemented yet. Feel free to contribute its implementation!')
         
         # setup rejections
         self.reject = None

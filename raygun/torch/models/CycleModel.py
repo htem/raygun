@@ -2,8 +2,11 @@ from raygun.torch.models import FreezableModel
 import torch.nn.functional as F
 
 class CycleModel(FreezableModel):
-    def __init__(self, netG1, netG2, scale_factor_A=None, scale_factor_B=None, split=False, **kwargs):
-        super().__init__(**locals())
+    def __init__(self, netG1, netG2, scale_factor_A=None, scale_factor_B=None, split=False, **kwargs):        
+        kwargs = locals()
+        del kwargs['self']
+        super().__init__(**kwargs)
+
         self.cycle = True
         self.crop_pad = None #TODO: Determine if this is depracated
         self.output_arrays = ['fake_B', 'cycled_B', 'fake_A', 'cycled_A']

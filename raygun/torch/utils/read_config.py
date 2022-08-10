@@ -51,8 +51,8 @@ def read_config(file):
     configs = []
     configs.append(loadJsonFile(file))
     last_file = file
-    while 'include' in configs[-1].keys():
-        include_file = configs[-1]['include']
+    while 'include_config' in configs[-1].keys():
+        include_file = configs[-1]['include_config']
         if '..' in include_file:
             include_file = include_file.replace('..', os.path.dirname(os.path.dirname(last_file)))
         configs.append(loadJsonFile(include_file))
