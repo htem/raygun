@@ -16,7 +16,7 @@ from raygun.torch.optimizers import BaseDummyOptimizer
 from raygun.torch.systems import BaseSystem
 
 class CycleGAN(BaseSystem):
-    def __init__(self, config=None):
+    def __init__(self, config=None):        
         super().__init__(default_config='../default_configs/default_cycleGAN_conf.json', config=config)
         self.logger = logging.Logger(__name__, 'INFO')
 
@@ -164,4 +164,9 @@ class CycleGAN(BaseSystem):
                 extents = self.get_extents(array_name=array.identifier)
                 request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
         return request
-           
+
+if __name__ == '__main__':
+    system = CycleGAN(config='./train_conf.json')
+    _ = system.train()
+    system.logger.info('Done training!')
+    

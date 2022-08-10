@@ -11,7 +11,7 @@ class FreezableModel(BaseModel):
         for net in self.nets:
             set_norm_mode(net, mode)
 
-    def add_log(self, writer, iter):
+    def add_log(self, writer, step):
         means = []
         vars = []
         for net in self.nets:
@@ -21,7 +21,8 @@ class FreezableModel(BaseModel):
             
         hists = {"means": torch.cat(means), "vars": torch.cat(vars)}
         for tag, values in hists:
-            writer.add_histogram(tag, values, global_step=iter)
-        
-        if self.freeze_norms_at is not None and iter >= self.freeze_norms_at:
-            self.set_norm_modes(mode='fix_norms')
+            writer.add_histogram(tag, values, global_step=step)
+    
+    def update_status(self, step):
+        if self.freeze_norms_at is not None and step >= self.freeze_norms_at:
+            self.set_norm_modes(mode='fix_norms')            

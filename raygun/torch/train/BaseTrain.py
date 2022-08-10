@@ -84,10 +84,16 @@ class BaseTrain(object):
             pbar = trange(iter)
             for i in pbar:
                 self.batch = training_pipeline.request_batch(self.batch_request)
+
                 if hasattr(self.loss, 'loss_dict'):
                     pbar.set_postfix(self.loss.loss_dict)
+
+                if hasattr(self.model, 'update_status'):
+                    self.model.update_status(self.train_node.iteration)
+
                 if i % self.log_every == 0:
                     self.batch_tBoard_write()
+                    
         return self.batch
     
     def test(self, mode:str='train'):
