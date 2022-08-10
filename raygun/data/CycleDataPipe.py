@@ -7,12 +7,9 @@ from raygun.data import BaseDataPipe
 
 class CycleDataPipe(BaseDataPipe):
     def __init__(self, id, src, ndims, common_voxel_size=None, interp_order=None, batch_size=1):
-        self.id = id        # id needed to ensure unique ArrayKeys
-        self.src = src     
-        self.ndims = ndims
-        self.common_voxel_size = common_voxel_size
-        self.interp_order = interp_order
-        self.batch_size = batch_size
+        for key, value in locals():
+            setattr(self, key, value)
+        super().__init__()
 
         self.src_voxel_size = daisy.open_ds(self.src.path, self.src.real_name).voxel_size
         
@@ -25,7 +22,8 @@ class CycleDataPipe(BaseDataPipe):
             self.masked = True
         else:
             self.masked = False
-                
+        
+        self.arrays = {}
         for array in array_names:
             if 'fake' in array:
                 other_side = ['A','B']
@@ -35,7 +33,7 @@ class CycleDataPipe(BaseDataPipe):
                 array_name = array + '_' + id
             array_key = gp.ArrayKey(array_name.upper())
             setattr(self, array, array_key) # add ArrayKeys to object
-            self.arrays += [array_key]
+            self.arrays[array_name] = array_key
 
             #add normalizations and scaling, if appropriate        
             if 'mask' not in array:            
@@ -47,10 +45,10 @@ class CycleDataPipe(BaseDataPipe):
         #Setup sources and resampling nodes
         if common_voxel_size is not None and common_voxel_size != self.src_voxel_size:
             self.real_src = gp.ArrayKey(f'REAL_{id}_SRC')
-            self.resample = gp.Resample(self.real_src, common_voxel_size, self.real, ndim=self.ndims, interp_order=interp_order)
+            self.resample = gp.Resample(self.real_src, common_voxel_size, self.real, ndim=ndims, interp_order=interp_order)
             if self.masked: 
                 self.mask_src = gp.ArrayKey(f'MASK_{id}_SRC')
-                self.resample += gp.Resample(self.mask_src, common_voxel_size, self.mask, ndim=self.ndims, interp_order=interp_order)
+                self.resample += gp.Resample(self.mask_src, common_voxel_size, self.mask, ndim=ndims, interp_order=interp_order)
         else:            
             self.real_src = self.real
             self.resample = None
@@ -93,30 +91,31 @@ class CycleDataPipe(BaseDataPipe):
             else:
                 self.reject += gp.RejectConstant(self.real_src, min_coefvar = src['min_coefvar'])
 
-        self.augment_axes = list(np.arange(3)[-self.ndims:])
+        self.preprocess = self.normalize_real + self.scaleimg2tanh_real
+
+        self.augment_axes = list(np.arange(3)[-ndims:])
         self.augment = gp.SimpleAugment(mirror_only = self.augment_axes, transpose_only = self.augment_axes)
-        self.augment += self.normalize_real
-        self.augment += self.scaleimg2tanh_real
         self.augment += gp.ElasticAugment( #TODO: MAKE THESE SPECS PART OF CONFIG
                     control_point_spacing=100, # self.side_length//2,
-                    # jitter_sigma=(5.0,)*self.ndims,
-                    jitter_sigma=(0., 5.0, 5.0,)[-self.ndims:],
+                    # jitter_sigma=(5.0,)*ndims,
+                    jitter_sigma=(0., 5.0, 5.0,)[-ndims:],
                     rotation_interval=(0, math.pi/2),
                     subsample=4,
-                    spatial_dims=self.ndims
+                    spatial_dims=ndims
         )
 
         # add "channel" dimensions if neccessary, else use z dimension as channel
-        if self.ndims == len(self.common_voxel_size):
+        if ndims == len(self.common_voxel_size):
             self.unsqueeze = gp.Unsqueeze([self.real])
         else:
             self.unsqueeze = None
         
         self.stack = gp.Stack(batch_size)# add "batch" dimensions
         
-    def postnet_pipe(self, cycle=True):
+    def postnet_pipe(self, cycle:bool=True, batch_size=None):
         # Make post-net data pipes
-
+        if batch_size is None:
+            batch_size = self.batch_size
         # remove "channel" dimensions if neccessary
         postnet_pipe = self.scaletanh2img_real + self.scaletanh2img_fake        
         if cycle:
@@ -129,5 +128,13 @@ class CycleDataPipe(BaseDataPipe):
             if cycle:
                 postnet_pipe += gp.Squeeze([self.cycled,
                                             ], axis=1) # remove channel dimension for grayscale
-        
+                
+        if batch_size == 1:
+            postnet_pipe += gp.Squeeze([self.real,  # remove batch dimension
+                                        self.fake, 
+                                        ], axis=0) # remove channel dimension for grayscale
+            if cycle:
+                postnet_pipe += gp.Squeeze([
+                                            self.cycled
+                                            ], axis=0)
         return postnet_pipe

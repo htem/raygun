@@ -1,19 +1,11 @@
-#%%
-from copy import deepcopy
 import itertools
 import logging
-import random
 from matplotlib import pyplot as plt
+from raygun.data import CycleDataPipe
 import torch
-import glob
-import zarr
 import daisy
-import os
 
 import gunpowder as gp
-import math
-import functools
-from tqdm import tqdm
 import numpy as np
 
 torch.backends.cudnn.benchmark = True
@@ -34,11 +26,7 @@ class CycleGAN(BaseSystem):
             self.common_voxel_size = gp.Coordinate(self.common_voxel_size)
         if self.ndims is None:
             self.ndims = sum(np.array(self.common_voxel_size) == np.min(self.common_voxel_size))
-            
-        self.build_machine()
-        self.training_pipeline = None
-        self.test_training_pipeline = None    
-
+        
     def batch_show(self, batch=None, i=0, show_mask=False):
         if batch is None:
             batch = self.batch
@@ -73,13 +61,13 @@ class CycleGAN(BaseSystem):
 
     def write_tBoard_graph(self, batch=None):
         if batch is None:
-            batch = self.batch
+            batch = self.trainer.batch
         
         ex_inputs = []
-        if self.real_A in batch:
-            ex_inputs += [torch.tensor(batch[self.real_A].data)]
-        if self.real_B in batch:
-            ex_inputs += [torch.tensor(batch[self.real_B].data)]
+        for id in ['A', 'B']:
+            array = self.datapipes[id].real
+            if array in batch:
+                ex_inputs += [torch.tensor(batch[array].data)]
 
         for i, ex_input in enumerate(ex_inputs):
             if self.ndims == len(self.common_voxel_size): # add channel dimension if necessary
@@ -89,7 +77,7 @@ class CycleGAN(BaseSystem):
             ex_inputs[i] = ex_input
         
         try:
-            self.trainer.summary_writer.add_graph(self.model, ex_inputs)                
+            self.trainer.train_node.summary_writer.add_graph(self.model, ex_inputs)                
         except:
             self.logger.warning('Failed to add model graph to tensorboard.')
 
@@ -157,105 +145,18 @@ class CycleGAN(BaseSystem):
         else:
             raise NotImplementedError("Unexpected Loss Style. Accepted options are 'cycle' or 'split'")
 
-    def build_machine(self):       
-        # initialize needed variables
-        self.arrays = []
+    def setup_datapipes(self):
+        self.arrays = {}
+        for id, src in self.sources:
+            self.datapipes[id] = CycleDataPipe(id, src, self.ndims, self.common_voxel_size, self.interp_order, self.batch_size)
+            self.arrays.update(self.datapipes[id].arrays)
 
-        # define our network model for training
-        self.setup_networks()        
-        self.setup_model()
-
-        # get performance stats
-        self.performance = gp.PrintProfilingStats(every=self.log_every)
-
-        # setup a cache
-        self.cache = gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)#os.cpu_count())
-
-        # define axes for mirroring and transpositions
-        self.augment_axes = list(np.arange(3)[-self.ndims:]) #TODO: Maybe limit to xy?
-
-        # build datapipes
-        self.datapipe_A = self.get_datapipe('A')
-        self.datapipe_B = self.get_datapipe('B') #datapipe has: train_pipe, source, reject, resample, augment, unsqueeze, etc.}
-
-    def build_training_pipeline(self):
-        # create a train node using our model, loss, and optimizer
-        self.trainer = gp.torch.Train(
-                            self.model,
-                            self.loss,
-                            self.optimizer,
-                            inputs = {
-                                'real_A': self.real_A,
-                                'real_B': self.real_B
-                            },
-                            outputs = {
-                                0: self.fake_B,
-                                1: self.cycled_B,
-                                2: self.fake_A,
-                                3: self.cycled_A
-                            },
-                            loss_inputs = {
-                                0: self.real_A,
-                                1: self.fake_A,
-                                2: self.cycled_A,
-                                3: self.real_B,
-                                4: self.fake_B,
-                                5: self.cycled_B,
-                            },
-                            log_dir=self.tensorboard_path,
-                            log_every=self.log_every,
-                            checkpoint_basename=self.model_path+self.model_name,
-                            save_every=self.save_every,
-                            spawn_subprocess=self.spawn_subprocess
-                            )
-
-        # assemble pipeline
-        self.training_pipeline = (self.pipe_A, self.pipe_B) + gp.MergeProvider() #merge upstream pipelines for two sources
-        self.training_pipeline += self.trainer        
-        self.training_pipeline += self.datapipe_A.postnet_pipe.cycle + self.datapipe_B.postnet_pipe.cycle
-        if self.batch_size == 1:
-            self.training_pipeline += gp.Squeeze([self.real_A, 
-                                            self.fake_A, 
-                                            self.cycled_A, 
-                                            self.real_B, 
-                                            self.fake_B, 
-                                            self.cycled_B
-                                            ], axis=0)
-        self.test_training_pipeline = self.training_pipeline.copy() + self.performance
-        self.training_pipeline += self.cache
-
+    def make_request(self, mode:str='train'):    
         # create request
-        self.train_request = gp.BatchRequest()
-        for array in self.arrays:            
-            extents = self.get_extents(array_name=array.identifier)
-            self.train_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
+        request = gp.BatchRequest()
+        for array_name, array in self.arrays.items():
+            if mode != 'predict' or 'cycle' not in array_name:
+                extents = self.get_extents(array_name=array.identifier)
+                request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
+        return request
             
-    def test(self, mode='train'):
-        if self.test_training_pipeline is None:
-            self.build_training_pipeline()
-        getattr(self.model, mode)() # set to 'train' or 'eval'
-        with gp.build(self.test_training_pipeline):
-            self.batch = self.test_training_pipeline.request_batch(self.train_request)
-        self.batch_show()
-        return self.batch
-
-    def train(self):
-        if self.training_pipeline is None:
-            self.build_training_pipeline()
-        self.model.train()
-        with gp.build(self.training_pipeline):
-            for i in tqdm(range(self.num_epochs)):
-                # this_request = copy.deepcopy(self.train_request)
-                # this_request._random_seed = random.randint(0, 2**32)
-                # self.batch = self.training_pipeline.request_batch(this_request)
-                self.batch = self.training_pipeline.request_batch(self.train_request)
-                if i == 1:
-                    self.write_tBoard_graph()
-                if hasattr(self.loss, 'loss_dict'):
-                    print(self.loss.loss_dict)
-                if i % self.log_every == 0:
-                    self.batch_tBoard_write()
-        return self.batch
-
-
-# %%

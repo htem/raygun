@@ -11,6 +11,7 @@ import torch
 from raygun.torch.utils import read_config
 from raygun.torch import networks
 from raygun.torch.networks.utils import init_weights
+from raygun.torch import train
 
 class BaseSystem:
     def __init__(self, default_config=f'{os.path.dirname(os.path.dirname(__file__))}/default_configs/blank_conf.json', config=None):
@@ -32,6 +33,10 @@ class BaseSystem:
 
         if self.random_seed is not None:
             self.set_random_seed()
+
+    def batch_show(self):
+        '''Implement in subclasses.'''
+        raise NotImplementedError()
 
     def set_random_seed(self):
         if self.random_seed is None:
@@ -56,6 +61,9 @@ class BaseSystem:
         torch.cuda.set_device(id)
 
     def load_saved_model(self, checkpoint=None, cuda_available=None):
+        if not hasattr(self, 'model'):
+            self.setup_model()
+
         if cuda_available is None:
             cuda_available = torch.cuda.is_available()
         if checkpoint is None:
@@ -93,11 +101,7 @@ class BaseSystem:
             iteration = int(checkpoint.split('_')[-1])
             return checkpoint, iteration
 
-        return None, 0
-    
-    def batch_tBoard_write(self):
-        self.trainer.summary_writer.flush()
-        self.n_iter = self.trainer.iteration
+        return None, 0    
 
     def get_downsample_factors(self, net_kwargs):
         if 'downsample_factors' not in net_kwargs:
@@ -159,7 +163,7 @@ class BaseSystem:
         return np.ceil((np.array(shape) - np.array(result.shape)) / 2)[-self.ndims:]
 
     def setup_networks(self):
-        '''Implement network setups in subclasses.'''
+        '''Implement in subclasses.'''
         raise NotImplementedError()
         
     def setup_model(self):
@@ -167,15 +171,53 @@ class BaseSystem:
         raise NotImplementedError()
         
     def setup_optimization(self):
-        '''Implement optimization setup in subclasses.'''
+        '''Implement in subclasses.'''
         raise NotImplementedError()
     
-    def build_system(self):
-        # initialize needed variables
-        self.arrays = []
+    def setup_datapipes(self):
+        '''Implement in subclasses.'''
+        raise NotImplementedError()
+        
+    def make_request(self, mode):
+        '''Implement in subclasses.'''
+        raise NotImplementedError()
 
+    def setup_trainer(self):
+        trainer_base = getattr(train, self.trainer_base)
+        self.trainer = trainer_base(self.datapipes,
+                                    self.make_request(mode='train'),
+                                    self.model,
+                                    self.loss,
+                                    self.optimizer,
+                                    self.tensorboard_path,
+                                    self.log_every,
+                                    self.checkpoint_basename,
+                                    self.save_every,
+                                    self.spawn_subprocess,
+                                    self.num_workers,
+                                    self.cache_size
+            )
+
+    def build_system(self):
         # define our network model for training
         self.setup_networks()        
         self.setup_model()
         self.setup_optimization()
-        ...#TODO
+        self.setup_datapipes()
+        self.setup_trainer()
+        
+    def train(self):
+        if not hasattr(self, 'trainer'):
+            self.build_system()
+        self.batch = self.trainer.train(self.num_epochs)
+        return self.batch
+
+    def test(self, mode:str='train'): # set to 'train' or 'eval'
+        if not hasattr(self, 'trainer'):
+            self.build_system()
+        self.batch = self.trainer.test(mode)
+        try:
+            self.batch_show()
+        except:
+            pass # if not implemented
+        return self.batch

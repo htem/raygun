@@ -17,7 +17,7 @@ def get_running_norm_stats(net):
     vars = torch.cat(vars)
     return means, vars
 
-def set_mode(net, mode='train'):
+def set_norm_mode(net, mode='train'):
     if mode == 'fix_stats':
         net.train()
         for m in net.modules():
