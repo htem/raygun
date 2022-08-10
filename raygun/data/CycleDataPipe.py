@@ -6,12 +6,13 @@ import numpy as np
 from raygun.data import BaseDataPipe
 
 class CycleDataPipe(BaseDataPipe):
-    def __init__(self, id, src, ndims, common_voxel_size=None, interp_order=None):
+    def __init__(self, id, src, ndims, common_voxel_size=None, interp_order=None, batch_size=1):
         self.id = id        # id needed to ensure unique ArrayKeys
         self.src = src     
         self.ndims = ndims
         self.common_voxel_size = common_voxel_size
         self.interp_order = interp_order
+        self.batch_size = batch_size
 
         self.src_voxel_size = daisy.open_ds(self.src.path, self.src.real_name).voxel_size
         
@@ -110,40 +111,23 @@ class CycleDataPipe(BaseDataPipe):
             self.unsqueeze = gp.Unsqueeze([self.real])
         else:
             self.unsqueeze = None
-
+        
+        self.stack = gp.Stack(batch_size)# add "batch" dimensions
+        
+    def postnet_pipe(self, cycle=True):
         # Make post-net data pipes
+
         # remove "channel" dimensions if neccessary
-        self.postnet_pipe = type('SubDataPipe', (object,), {})
-        self.postnet_pipe.nocycle = self.scaletanh2img_real + self.scaletanh2img_fake
-        self.postnet_pipe.cycle = self.scaletanh2img_real + self.scaletanh2img_fake + self.scaletanh2img_cycled
+        postnet_pipe = self.scaletanh2img_real + self.scaletanh2img_fake        
+        if cycle:
+            postnet_pipe = self.scaletanh2img_cycled
+        
         if self.ndims == len(self.common_voxel_size):
-            self.postnet_pipe.nocycle += gp.Squeeze([self.real, 
-                                            self.fake, 
-                                            ], axis=1) # remove channel dimension for grayscale
-            self.postnet_pipe.cycle += gp.Squeeze([self.real, 
-                                            self.fake, 
-                                            self.cycled,
+            postnet_pipe += gp.Squeeze([self.real, 
+                                        self.fake, 
+                                        ], axis=1) # remove channel dimension for grayscale
+            if cycle:
+                postnet_pipe += gp.Squeeze([self.cycled,
                                             ], axis=1) # remove channel dimension for grayscale
         
-        # Make training datapipe
-        self.train_pipe = self.source + gp.RandomLocation()
-        if self.reject:
-            self.train_pipe += self.reject
-        if self.resample:
-            self.train_pipe += self.resample
-        self.train_pipe += self.augment
-        if self.unsqueeze:
-            self.train_pipe += self.unsqueeze # add "channel" dimensions if neccessary, else use z dimension as channel
-        # self.train_pipe += gp.Stack(src.batch_size)# add "batch" dimensions    #TODO: ADD IN TRAINING PIP
-
-
-        # Make predicting datapipe
-        self.predict_pipe = self.source
-        if self.reject:
-            self.predict_pipe += self.reject
-        if self.resample:
-            self.predict_pipe += self.resample
-        self.predict_pipe += self.normalize_real + self.scaleimg2tanh_real
-        if self.unsqueeze:
-            self.predict_pipe += self.unsqueeze # add "channel" dimensions if neccessary, else use z dimension as channel
-        self.predict_pipe += gp.Stack(1)# add "batch" dimensions    
+        return postnet_pipe

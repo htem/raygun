@@ -230,10 +230,10 @@ class CycleGAN(BaseSystem):
             extents = self.get_extents(array_name=array.identifier)
             self.train_request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
             
-    def test_train(self):
+    def test(self, mode='train'):
         if self.test_training_pipeline is None:
             self.build_training_pipeline()
-        self.model.train()
+        getattr(self.model, mode)() # set to 'train' or 'eval'
         with gp.build(self.test_training_pipeline):
             self.batch = self.test_training_pipeline.request_batch(self.train_request)
         self.batch_show()
@@ -256,69 +256,6 @@ class CycleGAN(BaseSystem):
                 if i % self.log_every == 0:
                     self.batch_tBoard_write()
         return self.batch
-        
-    def test_prediction(self, side='A', side_length=None, cycle=True):
-        #set model into evaluation mode
-        self.model.eval()
-        self.model.cycle = cycle
-        # model_outputs = {
-        #     0: self.fake_B,
-        #     1: self.cycled_B,
-        #     2: self.fake_A,
-        #     3: self.cycled_A}
 
-        #datapipe has: train_pipe, source, reject, resample, augment, unsqueeze, etc.}
-        datapipe = getattr(self, 'datapipe_'+side)
-        arrays = [datapipe.real, datapipe.fake]
-        if cycle:
-            arrays += [datapipe.cycled]
-        squeeze_arrays = arrays.copy()
-        if datapipe.masked:
-            arrays += [datapipe.mask]
-
-        input_dict = {'real_'+side: datapipe.real}
-
-        if side=='A':
-            output_dict = {0: datapipe.fake}
-            if cycle:
-                output_dict[3] = datapipe.cycled
-        else:        
-            output_dict = {2: datapipe.fake}
-            if cycle:
-                output_dict[1] = datapipe.cycled   
-
-        predict_pipe = datapipe.source + gp.RandomLocation() 
-        if datapipe.reject: predict_pipe += datapipe.reject
-        if datapipe.resample: predict_pipe += datapipe.resample
-        predict_pipe += datapipe.normalize_real
-        predict_pipe += datapipe.scaleimg2tanh_real
-
-        if datapipe.unsqueeze: # add "channel" dimensions if neccessary, else use z dimension as channel
-            predict_pipe += datapipe.unsqueeze
-        predict_pipe += gp.Unsqueeze([datapipe.real]) # add batch dimension
-
-        predict_pipe += gp.torch.Predict(self.model,
-                                inputs = input_dict,
-                                outputs = output_dict,
-                                checkpoint = self.checkpoint
-                                )
-        
-        if cycle:
-            predict_pipe += datapipe.postnet_pipe.cycle
-        else:
-            predict_pipe += datapipe.postnet_pipe.nocycle
-
-        predict_pipe += gp.Squeeze(squeeze_arrays, axis=0) # remove batch dimension
-
-        request = gp.BatchRequest(random_seed=random.randint(0, 4294967295))
-        for array in arrays:            
-            extents = self.get_extents(side_length, array_name=array.identifier)
-            request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
-
-        with gp.build(predict_pipe):
-            self.batch = predict_pipe.request_batch(request)
-
-        self.batch_show()
-        return self.batch
 
 # %%
