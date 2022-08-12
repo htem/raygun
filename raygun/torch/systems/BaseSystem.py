@@ -36,6 +36,12 @@ class BaseSystem:
 
         if self.random_seed is not None:
             self.set_random_seed()
+        
+        if not hasattr(self, 'checkpoint_basename'):
+            try:
+                self.checkpoint_basename = os.path.join(self.model_path, self.model_name)
+            except:
+                self.checkpoint_basename = './models/model'
 
     def batch_show(self):
         '''Implement in subclasses.'''

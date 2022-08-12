@@ -1,13 +1,12 @@
-import torch.nn.functional as F
+import torch
 
 from raygun.torch.models import BaseModel
 from raygun.torch.networks.utils import *
+from raygun.utils import passing_locals
 
 class FreezableModel(BaseModel):
     def __init__(self, freeze_norms_at=None, **kwargs):        
-        kwargs = locals()
-        del kwargs['self']
-        super().__init__(**kwargs)
+        super().__init__(**passing_locals(locals()))
     
     def set_norm_modes(self, mode:str='train'):
         for net in self.nets:

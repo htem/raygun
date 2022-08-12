@@ -1,6 +1,7 @@
 import gunpowder as gp
 
 from raygun.torch.train import BaseTrain
+from raygun.utils import passing_locals
 
 class CycleTrain(BaseTrain):
     def __init__(self,
@@ -18,9 +19,8 @@ class CycleTrain(BaseTrain):
                 cache_size:int=50,
                 **kwargs
                 ):
-        kwargs = locals()
-        del kwargs['self']
-        super().__init__(**kwargs)
+        super().__init__(**passing_locals(locals()))
+
 
     def postnet_pipe(self, mode:str='train'):
         if mode == 'test':

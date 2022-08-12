@@ -1,16 +1,22 @@
 from raygun.torch.models import FreezableModel
+from raygun.utils import passing_locals
 import torch.nn.functional as F
 
 class CycleModel(FreezableModel):
-    def __init__(self, netG1, netG2, scale_factor_A=None, scale_factor_B=None, split=False, **kwargs):        
-        kwargs = locals()
-        del kwargs['self']
-        super().__init__(**kwargs)
+    def __init__(self, 
+                netG1, 
+                netG2, 
+                scale_factor_A=None, 
+                scale_factor_B=None, 
+                split=False, 
+                **kwargs
+                ):        
+        output_arrays = ['fake_B', 'cycled_B', 'fake_A', 'cycled_A']
+        nets = [netG1, netG2]
+        super().__init__(**passing_locals(locals()))
 
         self.cycle = True
         self.crop_pad = None #TODO: Determine if this is depracated
-        self.output_arrays = ['fake_B', 'cycled_B', 'fake_A', 'cycled_A']
-        self.nets = [netG1, netG2]
     
     def sampling_bottleneck(self, array, scale_factor):
         size = array.shape[-len(scale_factor):]
@@ -62,3 +68,4 @@ class CycleModel(FreezableModel):
             self.cycled_B = None
 
         return self.fake_B, self.cycled_B, self.fake_A, self.cycled_A
+

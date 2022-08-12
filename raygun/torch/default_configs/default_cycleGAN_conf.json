@@ -1,7 +1,6 @@
 {
     "common_voxel_size": null, // voxel size to resample A and B into for training
     "ndims": null,
-    "model_name": "CycleGAN",
     "gnet_type": "unet",
     "dnet_type": "classic",
     "dnet_kwargs": {
@@ -48,6 +47,7 @@
     "log_every": 20,
     "save_every": 2000,
     "model_path": "./models/",    
+    "model_name": "CycleGAN",
     "tensorboard_path": "./tensorboard/",
     "verbose": true,
     "checkpoint": null, // Used for prediction/rendering, training always starts from latest   

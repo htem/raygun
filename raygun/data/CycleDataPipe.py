@@ -4,12 +4,11 @@ import gunpowder as gp
 import numpy as np
 
 from raygun.data import BaseDataPipe
+from raygun.utils import passing_locals
 
 class CycleDataPipe(BaseDataPipe):
-    def __init__(self, id, src, ndims, common_voxel_size=None, interp_order=None, batch_size=1):        
-        kwargs = locals()
-        del kwargs['self']
-        super().__init__(**kwargs)
+    def __init__(self, id, src, ndims, common_voxel_size=None, interp_order=None, batch_size=1, **kwargs):        
+        super().__init__(**passing_locals(locals()))
 
         self.src_voxel_size = daisy.open_ds(self.src['path'], self.src['real_name']).voxel_size
         
@@ -38,9 +37,9 @@ class CycleDataPipe(BaseDataPipe):
             #add normalizations and scaling, if appropriate        
             if 'mask' not in array:            
                 setattr(self, 'scaletanh2img_'+array, gp.IntensityScaleShift(array_key, 0.5, 0.5))
-            elif 'real' in array:                        
-                setattr(self, 'normalize_'+array, gp.Normalize(array_key))
-                setattr(self, 'scaleimg2tanh_'+array, gp.IntensityScaleShift(array_key, 2, -1))
+                if 'real' in array:                        
+                    setattr(self, 'normalize_'+array, gp.Normalize(array_key))
+                    setattr(self, 'scaleimg2tanh_'+array, gp.IntensityScaleShift(array_key, 2, -1))
         
         #Setup sources and resampling nodes
         if common_voxel_size is not None and common_voxel_size != self.src_voxel_size:

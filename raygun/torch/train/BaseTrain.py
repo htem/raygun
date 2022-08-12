@@ -2,6 +2,8 @@ import inspect
 from tqdm import trange
 import gunpowder as gp
 
+from raygun.utils import passing_locals
+
 class BaseTrain(object):
     def __init__(self,
                 datapipes:dict, 
@@ -18,7 +20,8 @@ class BaseTrain(object):
                 cache_size:int=50,
                 **kwargs
                 ):
-        for key, value in locals():
+        kwargs = passing_locals(locals())
+        for key, value in kwargs.items():
             setattr(self, key, value)
         
         self.arrays = {}
