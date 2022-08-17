@@ -156,7 +156,7 @@ class CycleGAN(BaseSystem):
         # create request
         request = gp.BatchRequest()
         for array_name, array in self.arrays.items():
-            if mode != 'predict' or 'cycle' not in array_name:
+            if (mode == 'prenet' and ('real' in array_name or 'mask' in array_name)) or (mode != 'prenet' and (mode != 'predict' or 'cycle' not in array_name)):
                 extents = self.get_extents(array_name=array.identifier)
                 request.add(array, self.common_voxel_size * extents, self.common_voxel_size)
         return request

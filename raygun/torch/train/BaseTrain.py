@@ -1,6 +1,7 @@
 import inspect
 from tqdm import trange
 import gunpowder as gp
+import numpy as np
 
 from raygun.utils import passing_locals
 
@@ -34,8 +35,10 @@ class BaseTrain(object):
                 self.input_dict[array_name] = self.arrays[array_name]
                 
         self.output_dict = {}
-        for array_name in model.output_arrays:
-            self.output_dict[array_name] = self.arrays[array_name]
+        for i, array_name in enumerate(model.output_arrays):
+            if array_name not in self.arrays.keys():
+                self.arrays[array_name] = gp.ArrayKey(array_name.upper())
+            self.output_dict[i] = self.arrays[array_name]
 
         self.loss_input_dict = {}
         for array_name in inspect.signature(loss.forward).parameters.keys():
@@ -58,7 +61,7 @@ class BaseTrain(object):
                             )
 
     def prenet_pipe(self, mode:str='train'):        
-        return (dp.prenet_pipe(mode) for dp in self.datapipes.values()) + gp.MergeProvider() #merge upstream pipelines for multiple sources
+        return tuple([dp.prenet_pipe(mode) for dp in self.datapipes.values()]) + gp.MergeProvider() #merge upstream pipelines for multiple sources
     
     def postnet_pipe(self):
         '''Implement in subclasses.'''
@@ -68,7 +71,8 @@ class BaseTrain(object):
         # assemble pipeline
         training_pipe = self.prenet_pipe(mode)
         training_pipe += self.train_node        
-        training_pipe += self.postnet_pipe(mode)
+        for section in self.postnet_pipe(mode):
+            training_pipe += section
         if mode == 'test':
             return training_pipe + gp.PrintProfilingStats(every=self.log_every)
         else:
@@ -76,7 +80,25 @@ class BaseTrain(object):
     
     def batch_tBoard_write(self):
         if hasattr(self.model, 'add_log'):
-            self.model.add_log(self.train_node.summary_writer, self.train_node.iteration)
+            self.model.add_log(self.train_node.summary_writer, self.train_node.iteration)        
+
+        if hasattr(self.loss, 'add_log'):
+            self.loss.add_log(self.train_node.summary_writer, self.train_node.iteration)
+        
+        for array in self.loss_inputs.values():
+                if len(self.batch[array].data.shape) > 3: # pull out self.batch dimension if necessary
+                    img = self.batch[array].data[0].squeeze()
+                else:
+                    img = self.batch[array].data.squeeze()
+                if len(img.shape) == 3:
+                    mid = img.shape[0] // 2 # for 3D volume
+                    data = img[mid]
+                else:
+                    data = img
+                if (data.dtype == np.float32) and (data.min() < 0) and (data.min() >= -1.) and (data.max() <= 1.): # scale data to [0,1] if necessary
+                    data = (data * 0.5) + 0.5
+                self.train_node.summary_writer.add_image(array.identifier, data, global_step=self.batch.iteration, dataformats='HW')
+
         self.train_node.summary_writer.flush()
         self.n_iter = self.train_node.iteration
 
@@ -93,6 +115,9 @@ class BaseTrain(object):
 
                 if hasattr(self.model, 'update_status'):
                     self.model.update_status(self.train_node.iteration)
+                                
+                if hasattr(self.loss, 'update_status'):
+                    self.loss.update_status(self.train_node.iteration)
 
                 if i % self.log_every == 0:
                     self.batch_tBoard_write()

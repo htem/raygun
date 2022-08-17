@@ -5,9 +5,8 @@ class BaseModel(torch.nn.Module):
         super().__init__()
         for key, value in kwargs.items():
             setattr(self, key, value)
-        
-        for array in self.output_arrays:
-            setattr(self, array, torch.Tensor())
+                
+        assert hasattr(self, 'output_arrays'), "Model object must have list attribute `output_arrays` indicating what arrays are output by the model's forward pass, in order."
     
     def add_log(self, writer, iter):        
         pass

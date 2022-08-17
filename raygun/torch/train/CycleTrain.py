@@ -28,5 +28,5 @@ class CycleTrain(BaseTrain):
         else:
             stack = lambda dp: dp.batch_size
 
-        return (dp.postnet_pipe(batch_size=stack(dp)) for dp in self.datapipes.values())
+        return [dp.postnet_pipe(batch_size=stack(dp)) for dp in self.datapipes.values()]
     

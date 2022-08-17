@@ -1,17 +1,18 @@
 
 import torch
-from raygun.torch.losses import GANLoss
+from raygun.torch.losses import BaseCompetentLoss
+from raygun.utils import passing_locals
 
 import logging
 logger = logging.Logger(__name__, 'INFO')
 
-class SplitCycleLoss(torch.nn.Module):
+class SplitCycleLoss(BaseCompetentLoss):
     """CycleGAN loss function"""
     def __init__(self, 
-                netD1, 
-                netG1, 
-                netD2, 
-                netG2, 
+                netD1,  # differentiates between fake and real Bs
+                netG1,  # turns As into Bs
+                netD2,  # differentiates between fake and real As
+                netG2,  # turns Bs into As
                 optimizer_G1, 
                 optimizer_G2, 
                 optimizer_D, 
@@ -27,57 +28,9 @@ class SplitCycleLoss(torch.nn.Module):
                 d_lambda_dict= {'A': {'real': 1, 'fake': 1, 'cycled': 0},
                                 'B': {'real': 1, 'fake': 1, 'cycled': 0},
                             },
-                gan_mode='lsgan'
-                 ):
-        super().__init__()
-        self.l1_loss = l1_loss
-        self.gan_loss = GANLoss(gan_mode=gan_mode)
-        self.netD1 = netD1 # differentiates between fake and real Bs
-        self.netG1 = netG1 # turns As into Bs
-        self.netD2 = netD2 # differentiates between fake and real As
-        self.netG2 = netG2 # turns Bs into As
-        self.optimizer_G1 = optimizer_G1
-        self.optimizer_G2 = optimizer_G2
-        self.optimizer_D = optimizer_D
-        self.g_lambda_dict = g_lambda_dict
-        self.d_lambda_dict = d_lambda_dict
-        self.gan_mode = gan_mode
-        self.dims = dims
-        self.loss_dict = {}
-
-    def set_requires_grad(self, nets, requires_grad=False):
-        """Set requies_grad=False for all the networks to avoid unnecessary computations
-        Parameters:
-            nets (network list)   -- a list of networks
-            requires_grad (bool)  -- whether the networks require gradients or not
-        """
-        if not isinstance(nets, list):
-            nets = [nets]
-        for net in nets:
-            if net is not None:
-                for param in net.parameters():
-                    param.requires_grad = requires_grad
-
-    def crop(self, x, shape):
-        '''Center-crop x to match spatial dimensions given by shape.'''
-
-        x_target_size = x.size()[:-self.dims] + shape
-
-        offset = tuple(
-            (a - b)//2
-            for a, b in zip(x.size(), x_target_size))
-
-        slices = tuple(
-            slice(o, o + s)
-            for o, s in zip(offset, x_target_size))
-
-        return x[slices]
-                
-    def clamp_weights(self, net, min=-0.01, max=0.01):
-        for module in net.model:
-            if hasattr(module, 'weight') and hasattr(module.weight, 'data'):
-                temp = module.weight.data
-                module.weight.data = temp.clamp(min, max)
+                gan_mode='lsgan',
+                **kwargs):        
+        super().__init__(**passing_locals(locals()))
 
     def backward_D(self, side, dnet, data_dict):
         """Calculate losses for a discriminator"""        

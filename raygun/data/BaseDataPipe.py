@@ -20,7 +20,7 @@ class BaseDataPipe(object):
         for section in sections:
             if isinstance(section, str) and hasattr(self, section) and getattr(self, section) is not None:
                 prenet_pipe += getattr(self, section)
-            else:
+            elif isinstance(section, gp.nodes.BatchFilter):
                 prenet_pipe += section
         
         return prenet_pipe
