@@ -41,9 +41,9 @@ class BaseTrain(object):
             self.output_dict[i] = self.arrays[array_name]
 
         self.loss_input_dict = {}
-        for array_name in inspect.signature(loss.forward).parameters.keys():
+        for i, array_name in enumerate(inspect.signature(loss.forward).parameters.keys()):
             if array_name is not 'self':
-                self.loss_input_dict[array_name] = self.arrays[array_name]
+                self.loss_input_dict[i] = self.arrays[array_name]
 
         # create a train node using our model, loss, and optimizer
         self.train_node = gp.torch.Train(
@@ -78,14 +78,14 @@ class BaseTrain(object):
         else:
             return training_pipe + gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)
     
-    def batch_tBoard_write(self):
+    def batch_tBoard_write(self):#TODO: This will break if spawn_subprocess==True
         if hasattr(self.model, 'add_log'):
             self.model.add_log(self.train_node.summary_writer, self.train_node.iteration)        
 
         if hasattr(self.loss, 'add_log'):
             self.loss.add_log(self.train_node.summary_writer, self.train_node.iteration)
         
-        for array in self.loss_inputs.values():
+        for array in self.train_node.loss_inputs.values():
                 if len(self.batch[array].data.shape) > 3: # pull out self.batch dimension if necessary
                     img = self.batch[array].data[0].squeeze()
                 else:

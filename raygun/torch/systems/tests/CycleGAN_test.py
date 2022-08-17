@@ -4,9 +4,9 @@ import tempfile
 from raygun.torch.systems import CycleGAN
 import torch
 
-torch.cuda.set_device(2)
+torch.cuda.set_device(3)
 
-config_path = '/n/groups/htem/users/jlr54/raygun/experiments/ieee-isbi-2022/01_cycle_gans/test_conf.json'
+config_path = '/n/groups/htem/users/jlr54/raygun/experiments/ieee-isbi-2022/01_cycle_gans/test_conf.json' #TODO: make relative path
 system = CycleGAN(config_path)
 #%%
 cur_dir = os.getcwd()

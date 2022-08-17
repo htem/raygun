@@ -33,7 +33,7 @@ class CycleGAN(BaseSystem):
         if not hasattr(self, 'col_dict'): 
             self.col_dict = {'REAL':0, 'FAKE':1, 'CYCL':2}
         if show_mask: self.col_dict['MASK'] = 3
-        rows = (self.real_A in batch.arrays) + (self.real_B in batch.arrays)       
+        rows = (self.arrays['real_A'] in batch.arrays) + (self.arrays['real_B'] in batch.arrays)       
         cols = 0
         for key in self.col_dict.keys():
             cols += key in [array.identifier[:4] for array in batch.arrays] 
