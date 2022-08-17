@@ -67,7 +67,7 @@ class BaseSystem:
     def set_device(self, id=0):
         self.device_id = id
         os.environ["CUDA_VISIBLE_DEVICES"] = str(id)
-        torch.cuda.set_device(id)
+        # torch.cuda.set_device(id) # breaks spawning subprocesses
 
     def load_saved_model(self, checkpoint=None, cuda_available=None):
         if not hasattr(self, 'model'):
