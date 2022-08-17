@@ -2,6 +2,9 @@
 import os
 import tempfile
 from raygun.torch.systems import CycleGAN
+import torch
+
+torch.cuda.set_device(2)
 
 config_path = '/n/groups/htem/users/jlr54/raygun/experiments/ieee-isbi-2022/01_cycle_gans/test_conf.json'
 system = CycleGAN(config_path)
