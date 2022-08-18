@@ -37,7 +37,7 @@ class CycleGAN(BaseSystem):
         cols = 0
         for key in self.col_dict.keys():
             cols += key in [array.identifier[:4] for array in batch.arrays] 
-        fig, axes = plt.subplots(rows, cols, figsize=(10*cols, 10*rows))
+        fig, axes = plt.subplots(rows, cols, figsize=(5*cols, 5*rows))
         for array, value in batch.items():
             label = array.identifier
             if label[:4] in self.col_dict:

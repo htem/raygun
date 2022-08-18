@@ -118,7 +118,7 @@ class CycleDataPipe(BaseDataPipe):
         # remove "channel" dimensions if neccessary
         postnet_pipe = self.scaletanh2img_real + self.scaletanh2img_fake        
         if cycle:
-            postnet_pipe = self.scaletanh2img_cycled
+            postnet_pipe += self.scaletanh2img_cycled
         
         if self.ndims == len(self.common_voxel_size):
             postnet_pipe += gp.Squeeze([self.real, 
