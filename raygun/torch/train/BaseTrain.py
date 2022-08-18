@@ -70,20 +70,22 @@ class BaseTrain(object):
     def training_pipe(self, mode:str='train'):
         # assemble pipeline
         training_pipe = self.prenet_pipe(mode)
+        if mode == 'train':
+            training_pipe += gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)
         training_pipe += self.train_node        
         for section in self.postnet_pipe(mode):
             training_pipe += section
         if mode == 'test':
-            return training_pipe + gp.PrintProfilingStats(every=self.log_every)
-        else:
-            return training_pipe + gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)
-    
-    def batch_tBoard_write(self):#TODO: This will break if spawn_subprocess==True
-        if hasattr(self.model, 'add_log'):
-            self.model.add_log(self.train_node.summary_writer, self.train_node.iteration)        
+            training_pipe += gp.PrintProfilingStats() #TODO: Figure out why this doesn't print / print from batch.profiling_stats
 
-        if hasattr(self.loss, 'add_log'):
-            self.loss.add_log(self.train_node.summary_writer, self.train_node.iteration)
+        return training_pipe
+    
+    def batch_tBoard_write(self):#TODO: This will not work if spawn_subprocess==True
+        # if hasattr(self.model, 'add_log'):
+        #     self.model.add_log(self.train_node.summary_writer, self.train_node.iteration)        
+
+        # if hasattr(self.loss, 'add_log'):
+        #     self.loss.add_log(self.train_node.summary_writer, self.train_node.iteration)
         
         for array in self.train_node.loss_inputs.values():
                 if len(self.batch[array].data.shape) > 3: # pull out self.batch dimension if necessary
@@ -99,28 +101,60 @@ class BaseTrain(object):
                     data = (data * 0.5) + 0.5
                 self.train_node.summary_writer.add_image(array.identifier, data, global_step=self.batch.iteration, dataformats='HW')
 
-        self.train_node.summary_writer.flush()
+        # self.train_node.summary_writer.flush()
         self.n_iter = self.train_node.iteration
+
+    def print_profiling_stats(self):
+        stats = "\n"
+        stats += "Profiling Stats\n"
+        stats += "===============\n"
+        stats += "\n"
+        stats += "NODE".ljust(20)
+        stats += "METHOD".ljust(20)
+        stats += "COUNTS".ljust(20)
+        stats += "MIN".ljust(20)
+        stats += "MAX".ljust(20)
+        stats += "MEAN".ljust(20)
+        stats += "MEDIAN".ljust(20)
+        stats += "\n"
+
+        summaries = list(self.batch.profiling_stats.get_timing_summaries().items())
+        summaries.sort()
+
+        for (node_name, method_name), summary in summaries:
+
+            if summary.counts() > 0:
+                stats += node_name[:19].ljust(20)
+                stats += method_name[:19].ljust(20) if method_name is not None else ' '*20
+                stats += ("%d"%summary.counts())[:9].ljust(20)
+                stats += ("%.2f"%summary.min())[:9].ljust(20)
+                stats += ("%.2f"%summary.max())[:9].ljust(20)
+                stats += ("%.2f"%summary.mean())[:9].ljust(20)
+                stats += ("%.2f"%summary.median())[:9].ljust(20)
+                stats += "\n"
+
+        stats += "\n"
+
+        print(stats)
 
     def train(self, iter:int):
         self.model.train()
         training_pipeline = self.training_pipe()
         with gp.build(training_pipeline):
             pbar = trange(iter)
-            for i in pbar:
+            for _ in pbar:
                 self.batch = training_pipeline.request_batch(self.batch_request)
+                pbar.set_postfix(self.batch.loss)
+                self.n_iter = self.train_node.iteration
 
-                if hasattr(self.loss, 'loss_dict'):
-                    pbar.set_postfix(self.loss.loss_dict)
-
-                if hasattr(self.model, 'update_status'):
-                    self.model.update_status(self.train_node.iteration)
+                # if hasattr(self.model, 'update_status'):
+                #     self.model.update_status(self.train_node.iteration)
                                 
-                if hasattr(self.loss, 'update_status'):
-                    self.loss.update_status(self.train_node.iteration)
+                # if hasattr(self.loss, 'update_status'):
+                #     self.loss.update_status(self.train_node.iteration)
 
-                if i % self.log_every == 0:
-                    self.batch_tBoard_write()
+                # if i % self.log_every == 0:
+                #     self.batch_tBoard_write()
     
     def test(self, mode:str='train'):
         getattr(self.model, mode)() 
@@ -128,4 +162,4 @@ class BaseTrain(object):
         with gp.build(training_pipeline):
             self.batch = training_pipeline.request_batch(self.batch_request)
             
-        return self.batch, self.train_node.loss.loss_dict
+        return self.batch

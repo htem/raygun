@@ -112,6 +112,7 @@ class LinkCycleLoss(BaseCompetentLoss):
         return loss_G1, loss_G2
 
     def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
+        self.data_dict = {'real_A': real_A, 'fake_A': fake_A, 'cycled_A': cycled_A, 'real_B': real_B, 'fake_B': fake_B, 'cycled_B': cycled_B}
         
         # crop if necessary
         if real_A.size()[-self.dims:] != fake_B.size()[-self.dims:]:

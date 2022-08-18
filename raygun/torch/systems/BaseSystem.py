@@ -47,6 +47,17 @@ class BaseSystem:
         '''Implement in subclasses.'''
         raise NotImplementedError()
 
+    def arrays_min_max(self, batch=None):
+        if batch is None:
+            if hasattr(self, 'batch'):
+                batch = self.batch
+            else:
+                print('No batch arrays available.')
+                return
+
+        for name, array in self.arrays.items():
+            print(f'{name}: min={batch[array].data.min()}  <--> max={batch[array].data.max()}')
+            
     def set_random_seed(self):
         if self.random_seed is None:
             self.random_seed = 42
@@ -223,10 +234,10 @@ class BaseSystem:
     def test(self, mode:str='train'): # set to 'train' or 'eval'
         if not hasattr(self, 'trainer'):
             self.build_system()
-        self.batch, loss = self.trainer.test(mode)
+        self.batch = self.trainer.test(mode)
         try:
             self.batch_show()
         except:
             pass # if not implemented
-        return self.batch, loss
+        return self.batch
         

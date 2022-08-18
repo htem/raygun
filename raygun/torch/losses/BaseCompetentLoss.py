@@ -1,4 +1,6 @@
 import torch
+import numpy as np
+
 from raygun.utils import passing_locals
 from raygun.torch.losses import GANLoss
 
@@ -51,8 +53,24 @@ class BaseCompetentLoss(torch.nn.Module):
                 module.weight.data = temp.clamp(min, max)
 
     def add_log(self, writer, step):
+        # add loss values
         for key, loss in self.loss_dict.items():
             writer.add_scalar(key, loss, step)
+        
+        # add loss input image examples
+        for name, data in self.data_dict.items():
+                if len(data.shape) > 3: # pull out batch dimension if necessary
+                    img = data[0].squeeze()
+                else:
+                    img = data.squeeze()
+
+                if len(img.shape) == 3:
+                    mid = img.shape[0] // 2 # for 3D volume
+                    img = img[mid]
+                    
+                if (img.dtype == np.float32) and (img.min() < 0) and (img.min() >= -1.) and (img.max() <= 1.): # scale img to [0,1] if necessary
+                    img = (img * 0.5) + 0.5
+                writer.add_image(name, img, global_step=step, dataformats='HW')
     
     def update_status(self, step):
         pass
