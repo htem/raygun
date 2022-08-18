@@ -16,12 +16,12 @@ class FreezableModel(BaseModel):
         means = []
         vars = []
         for net in self.nets:
-            mean, var = get_running_norm_stats(getattr(self, net))
+            mean, var = get_running_norm_stats(net)
             means.append(mean)
             vars.append(var)        
             
         hists = {"means": torch.cat(means), "vars": torch.cat(vars)}
-        for tag, values in hists:
+        for tag, values in hists.items():
             writer.add_histogram(tag, values, global_step=step)
     
     def update_status(self, step):

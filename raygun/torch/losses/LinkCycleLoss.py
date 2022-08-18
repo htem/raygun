@@ -51,7 +51,7 @@ class LinkCycleLoss(BaseCompetentLoss):
 
     def backward_Ds(self, data_dict, n_loop=5):
         self.set_requires_grad([self.netG1, self.netG2], False)  # G does not require gradients when optimizing D
-        self.set_requires_grad([self.netD1, self.netD2], True)  # enable backprop for D
+
         self.optimizer_D.zero_grad(set_to_none=True)     # set D's gradients to zero
 
         if self.gan_mode.lower() == 'wgangp': # Wasserstein Loss
@@ -65,6 +65,8 @@ class LinkCycleLoss(BaseCompetentLoss):
             loss_D1 = self.backward_D('B', self.netD1, data_dict['B'])
             loss_D2 = self.backward_D('A', self.netD2, data_dict['A'])
             self.optimizer_D.step()          # update D's weights            
+        
+        self.set_requires_grad([self.netG1, self.netG2], True)  # Turn G gradients back on
         
         #return losses
         return loss_D1, loss_D2
@@ -98,13 +100,14 @@ class LinkCycleLoss(BaseCompetentLoss):
 
     def backward_Gs(self, data_dict):
         self.set_requires_grad([self.netD1, self.netD2], False)  # D requires no gradients when optimizing G
-        self.set_requires_grad([self.netG1, self.netG2], True)  # Turn G gradients back on
 
         self.optimizer_G.zero_grad(set_to_none=True)        # set G1's gradients to zero
         loss_G1 = self.backward_G('B', self.netG1, self.netD1, data_dict['B'])                   # calculate gradient for G
         loss_G2 = self.backward_G('A', self.netG2, self.netD2, data_dict['A'])                   # calculate gradient for G
         self.optimizer_G.step()             # udpate G1's weights
 
+        self.set_requires_grad([self.netD1, self.netD2], True)  # re-enable backprop for D
+        
         #return losses
         return loss_G1, loss_G2
 

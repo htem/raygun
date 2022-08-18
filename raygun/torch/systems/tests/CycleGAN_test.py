@@ -17,7 +17,7 @@ os.chdir(temp_dir.name)
 print(f'Executing test in {os.getcwd()}')
 
 #%%
-batch = system.test()
+batch, loss = system.test()
 
 #%%
 system.train()
@@ -25,3 +25,4 @@ system.train()
 # %%
 os.chdir(cur_dir)
 temp_dir.cleanup()
+# %%

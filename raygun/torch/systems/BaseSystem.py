@@ -218,16 +218,15 @@ class BaseSystem:
     def train(self):
         if not hasattr(self, 'trainer'):
             self.build_system()
-        self.batch = self.trainer.train(self.num_epochs)
-        return self.batch
+        self.trainer.train(self.num_epochs)
 
     def test(self, mode:str='train'): # set to 'train' or 'eval'
         if not hasattr(self, 'trainer'):
             self.build_system()
-        self.batch = self.trainer.test(mode)
+        self.batch, loss = self.trainer.test(mode)
         try:
             self.batch_show()
         except:
             pass # if not implemented
-        return self.batch
+        return self.batch, loss
         

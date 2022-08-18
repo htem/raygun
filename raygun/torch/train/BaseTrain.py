@@ -121,12 +121,11 @@ class BaseTrain(object):
 
                 if i % self.log_every == 0:
                     self.batch_tBoard_write()
-                    
-        return self.batch
     
     def test(self, mode:str='train'):
         getattr(self.model, mode)() 
         training_pipeline = self.training_pipe(mode='test')
         with gp.build(training_pipeline):
             self.batch = training_pipeline.request_batch(self.batch_request)
-        return self.batch
+            
+        return self.batch, self.train_node.loss.loss_dict

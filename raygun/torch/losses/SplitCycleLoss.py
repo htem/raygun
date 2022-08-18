@@ -52,7 +52,6 @@ class SplitCycleLoss(BaseCompetentLoss):
 
     def backward_Ds(self, data_dict, n_loop=5):
         self.set_requires_grad([self.netG1, self.netG2], False)  # G does not require gradients when optimizing D
-        self.set_requires_grad([self.netD1, self.netD2], True)  # enable backprop for D
         self.optimizer_D.zero_grad(set_to_none=True)     # set D's gradients to zero
 
         if self.gan_mode.lower() == 'wgangp': # Wasserstein Loss
@@ -66,6 +65,8 @@ class SplitCycleLoss(BaseCompetentLoss):
             loss_D1 = self.backward_D('B', self.netD1, data_dict['B'])
             loss_D2 = self.backward_D('A', self.netD2, data_dict['A'])
             self.optimizer_D.step()          # update D's weights            
+        
+        self.set_requires_grad([self.netG1, self.netG2], True)  # Turn G gradients back on
         
         #return losses
         return loss_D1, loss_D2
@@ -99,7 +100,6 @@ class SplitCycleLoss(BaseCompetentLoss):
 
     def backward_Gs(self, data_dict):
         self.set_requires_grad([self.netD1, self.netD2], False)  # D requires no gradients when optimizing G
-        self.set_requires_grad([self.netG1, self.netG2], True)  # Turn G gradients back on
 
         #G1 first
         self.set_requires_grad([self.netG1], True)  # G1 requires gradients when optimizing
@@ -116,7 +116,8 @@ class SplitCycleLoss(BaseCompetentLoss):
         self.optimizer_G2.step()             # udpate G2's weights
 
         # Turn gradients back on
-        self.set_requires_grad([self.netG1], True)
+        self.set_requires_grad([self.netG1, self.netD1, self.netD2], True)
+        
         #return losses
         return loss_G1, loss_G2
 
