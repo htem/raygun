@@ -47,7 +47,7 @@ class BaseSystem:
         '''Implement in subclasses.'''
         raise NotImplementedError()
 
-    def arrays_min_max(self, batch=None):
+    def arrays_min_max(self, batch=None, lims={bool:[True, True], np.float32: [0,1]}, test=True, show=False):
         if batch is None:
             if hasattr(self, 'batch'):
                 batch = self.batch
@@ -55,8 +55,13 @@ class BaseSystem:
                 print('No batch arrays available.')
                 return
 
-        for name, array in self.arrays.items():
-            print(f'{name}: min={batch[array].data.min()}  <--> max={batch[array].data.max()}')
+        for name, array in batch.arrays.items():
+            if show:
+                print(f'{name}: min={array.data.min()}  <--> max={array.data.max()}')
+            
+            if test and array.data.dtype in lims.keys():
+                assert array.data.min() >= lims[array.data.dtype][0]
+                assert array.data.max() <= lims[array.data.dtype][1]
             
     def set_random_seed(self):
         if self.random_seed is None:

@@ -52,12 +52,16 @@ class CycleGAN(BaseSystem):
                     data = img[mid]
                 else:
                     data = img
+
                 if rows == 1:
-                    axes[c].imshow(data, cmap='gray', vmin=0, vmax=1)
-                    axes[c].set_title(label)                
+                    ax = axes[c]
+                elif cols == 1:
+                    ax = axes[r]      
                 else:
-                    axes[r, c].imshow(data, cmap='gray', vmin=0, vmax=1)
-                    axes[r, c].set_title(label)
+                    ax = axes[r, c]
+                
+                ax.imshow(data, cmap='gray', vmin=-int(data.min()<0), vmax=1+254*int(data.max()>1))
+                ax.set_title(label)
 
     def write_tBoard_graph(self, batch=None):
         if batch is None:

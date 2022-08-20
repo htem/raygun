@@ -68,7 +68,7 @@ class BaseCompetentLoss(torch.nn.Module):
                     mid = img.shape[0] // 2 # for 3D volume
                     img = img[mid]
                     
-                if (img.dtype == np.float32) and (img.min() < 0) and (img.min() >= -1.) and (img.max() <= 1.): # scale img to [0,1] if necessary
+                if (img.min() < 0) and (img.min() >= -1.) and (img.max() <= 1.): # scale img to [0,1] if necessary
                     img = (img * 0.5) + 0.5
                 writer.add_image(name, img, global_step=step, dataformats='HW')
     
