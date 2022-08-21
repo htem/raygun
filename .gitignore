@@ -10,3 +10,4 @@ events.out.tfevents.*
 .nfs*
 */igneous_tasks
 TransformParameters*
+raygun.egg*

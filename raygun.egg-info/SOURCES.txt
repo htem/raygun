@@ -1,8 +1,0 @@
-LICENSE
-README.md
-setup.py
-raygun/__init__.py
-raygun.egg-info/PKG-INFO
-raygun.egg-info/SOURCES.txt
-raygun.egg-info/dependency_links.txt
-raygun.egg-info/top_level.txt

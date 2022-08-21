@@ -1,3 +1,0 @@
-"""
-    RAYGUN testing
-"""
