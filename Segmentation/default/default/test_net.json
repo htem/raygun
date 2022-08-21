@@ -1,1 +1,0 @@
-{"input_shape": [284, 284, 284], "output_shape": [192, 192, 192], "inputs": ["raw"], "outputs": {"affs": {"out_dims": 3, "out_dtype": "uint8"}}}

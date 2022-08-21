@@ -1,0 +1,14 @@
+{
+    "model_name": "model",
+    "model_path": "./models/",
+    "ndims": 2,
+    "side_length": 256,
+    "tensorboard_path": "./tensorboard/",
+    "log_every": 20,
+    "checkpoint_basename": "./models/model",
+    "num_epochs": 200,
+    "save_every": 200,
+    "spawn_subprocess": false,
+    "num_workers": 1,
+    "cache_size": 16
+}
