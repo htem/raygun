@@ -1,0 +1,13 @@
+events.out.tfevents.*
+*checkpoint*
+.vscode*
+*__pycache__*
+*.zarr
+*Task*.config
+.run_configs*
+.daisy_logs_BlockwiseTask*
+*.out
+.nfs*
+*/igneous_tasks
+TransformParameters*
+raygun.egg*

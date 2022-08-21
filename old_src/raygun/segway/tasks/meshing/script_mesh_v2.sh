@@ -1,0 +1,5 @@
+# python segway/tasks/meshing/task_meshing.py /n/vast/htem/Segmentation/cb2_v3/output.zarr volumes/super_1x2x2_segmentation_0.400_mipmap/s3 /n/vast/htem/Segmentation/cb2_v3/output.zarr/meshes_s3/precomputed --block_size 4000 8192 8192 --roi_offset 3800 114688 131072 --roi_shape 42600 524288 524288 --no_launch_workers 1
+# python segway/tasks/meshing/task_meshing.py /n/vast/htem/Segmentation/cb2_v3/output.zarr volumes/super_1x2x2_segmentation_0.400_mipmap/s0 /n/vast/htem/Segmentation/cb2_v3/output.zarr/meshes_new/precomputed --block_size 4000 8192 8192 --roi_offset 3800 114688 131072 --roi_shape 4000 16384 16384 --no_launch_workers 0 --downsample 2 4 4
+
+python segway/tasks/meshing/task_meshing.py /n/groups/htem/temcagt/datasets/cb2/segmentation/tri/cb2_segmentation/outputs/cb2/201906_purkinje_cell/output.zarr volumes/chunkwise_2x8x8_segmentation_0.400_mipmap/s1 /n/vast/htem/Segmentation/cb2_v2/output.zarr/meshes/precomputed --block_size 8000 16384 16384 --roi_offset 4000 88064 108544 --roi_shape 16000 348160 344064 --no_launch_workers 0 --downsample 2 16 16 --num_workers 8
+ # --overwrite 1

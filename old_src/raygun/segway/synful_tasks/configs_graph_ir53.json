@@ -1,0 +1,168 @@
+{
+
+    "general_params" : "configs_common_ir53.json",
+    
+    "input_method" : "user_list",
+    "mode_weights" : "count", 
+    "weights_with_dist" : 0, 
+
+    "input_neurons_list": 
+                  [
+                    "interneuron_41",
+                    "interneuron_51", 
+                    "interneuron_68",
+                    "interneuron_55",
+                    "interneuron_64",
+                    "interneuron_31",
+                    "interneuron_95",
+                    "interneuron_96",
+                    "interneuron_97",
+                    "interneuron_98",
+                    "interneuron_99",
+                    "interneuron_100",
+                    "interneuron_101",
+                    "interneuron_102",
+                    "interneuron_103",
+                    "interneuron_104",
+                    "interneuron_21",
+                    "interneuron_22",
+                    "interneuron_105",
+                    "interneuron_106",
+                    "interneuron_107",
+                    "interneuron_108",
+                    "interneuron_109",
+                    "interneuron_8",
+                    "interneuron_111",
+                    "interneuron_54",
+                    "interneuron_84",
+                    "interneuron_145",
+                    "interneuron_146",
+                    "interneuron_147",
+                    "interneuron_148",
+                    "interneuron_149",
+                    "purkinje_0",
+                    "pc_0",
+                    "pc_1",
+                    "purkinje_1",
+                    "pc_2",
+                    "pc_4",
+                    "pc_5",
+                    "pc_6",
+                    "pc_7",
+                    "pc_8",
+                    "pc_9",
+                    "pc_3",
+                    "pc_10",
+                    "pc_11",
+                    "pc_12",
+                    "pc_15",
+                    "pc_16"
+                 ],
+
+    "add_edge_list" : [],
+
+    "exclude_neurons": ["interneuron_31", "interneuron_41"],
+    "tags_to_exclude" : [["pc", "oob_dendrite"],
+                        ["basket", "oob_axon"], 
+                        ["stellate", "oob_axon"],
+                        ["cc", "oob_axon"],
+                        ["interneuron", "oob_axon"]],
+   
+    "exclude_edges" : [],
+
+    "exclude_synapses" : [[115602, 90196, 385], [115748, 90368, 402]],
+
+    "debug_edges" : 1,
+    "debug_edges_list": [["interneuron_100", "purkinje_1"], 
+                        ["purkinje_1", "interneuron_104"]],
+
+    "output_debug_edges" : "output_debug_edges.csv",
+
+    "rename_rules": [["interneuron_", "basket_", {"cell_type": "basket"}],
+                    ["interneuron_", "stellate_", {"cell_type" : "stellate"}],               
+                    ["interneuron_", "f_interneuron_", {"finished": true, "cell_type" : "interneuron"}],  
+                    ["purkinje_0", "pc_88", {}],
+                    ["purkinje_1", "pc_99", {}] 
+                   ],
+        
+    "excitatoy_neurons" : [],
+    "inhibitory_neurons" : [],
+
+    "overwrite" : 0,
+    "output_edges" : "output_edges.csv",
+    "output_graph" : "output_graph.gpickle",
+    "output_graph_pp" : "output_graph_pp.gpickle", 
+
+    "plots" : [
+        {
+            "analysis_type" : "adj_plot_all",
+            "adj_plot_thresh": 0,
+            "weights_threshold" : 1,
+            "output_plot" : "Adj_mat.png"
+        },
+
+        {
+            "analysis_type": "adj_plot_pre", 
+            "adj_plot_thresh": 0,
+            "weights_threshold" : 1,   
+            "list" : ["stellate_100", 
+                      "stellate_101",
+                      "stellate_22",
+                      "basket_102",
+                      "basket_104",
+                      "basket_106",
+                      "pc_15",
+                      "pc_16",
+                      "pc_7",
+                      "pc_9",
+                      "pc_88"
+                     ],
+            "output_plot": "Adj_mat_pre.png",
+            "output_file": "output_debug_edges_pre.csv"
+        },
+
+        {
+            "analysis_type": "adj_plot_post",
+            "adj_plot_thresh": 0,
+            "weights_threshold" : 1,
+            "list" : ["stellate_100", 
+                      "stellate_101",
+                      "stellate_22",
+                      "basket_102",
+                      "basket_104",
+                      "basket_106",
+                      "pc_15",
+                      "pc_16",
+                      "pc_7",
+                      "pc_9",
+                      "pc_88"
+                     ],
+            "output_plot": "Adj_mat_post.png",
+            "output_file": "output_debug_edges_post.csv"
+        },
+
+        {
+            "analysis_type" : "adj_plot_some", 
+            "adj_plot_thresh": 0,
+            "weights_threshold" : 1,
+            "list" : ["stellate_100", 
+                      "stellate_101",
+                      "stellate_22",
+                      "basket_102",
+                      "basket_104",
+                      "basket_106",
+                      "pc_15",
+                      "pc_16",
+                      "pc_7",
+                      "pc_9",
+                      "pc_88"
+                     ],
+            "output_plot": "Adj_mat_small.png",
+            "output_file": "output_debug_edges_small.csv"
+
+        }
+
+
+    ]
+
+}

@@ -1,0 +1,13 @@
+{
+	"db_host" : "mongodb://10.117.28.250:27018/",
+    "db_name" : "production_200107_cb2_v4_synapse_setup09_synapsedb",
+    "db_name_n" : "neurondb_cb2_v4" ,
+
+    "input_roi_offset" : [0, 0, 0],
+    "input_roi_size" : [4, 4, 4],
+
+    "voxel_size_xyz" : [4, 4, 40],
+
+    "syn_score_threshold" : 0.60
+
+}
