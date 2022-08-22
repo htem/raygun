@@ -4,7 +4,7 @@ import tempfile
 import numpy as np
 from raygun.torch.systems import CycleGAN
 
-os.environ["CUDA_VISIBLE_DEVICES"] = str(3)
+# os.environ["CUDA_VISIBLE_DEVICES"] = str(3)
 
 config_path = '/n/groups/htem/users/jlr54/raygun/experiments/ieee-isbi-2022/01_cycle_gans/test_conf.json' #TODO: Use importlib.resources instead
 system = CycleGAN(config_path)
@@ -40,5 +40,3 @@ print(f'View tensorboard by running the following:\n\ttensorboard --logdir {os.g
 # %% Cleanup
 os.chdir(cur_dir)
 temp_dir.cleanup()
-
-# %%

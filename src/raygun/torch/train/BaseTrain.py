@@ -31,7 +31,7 @@ class BaseTrain(object):
 
         self.input_dict = {}
         for array_name in inspect.signature(model.forward).parameters.keys():
-            if array_name is not 'self':
+            if array_name != 'self':
                 self.input_dict[array_name] = self.arrays[array_name]
                 
         self.output_dict = {}
@@ -42,7 +42,7 @@ class BaseTrain(object):
 
         self.loss_input_dict = {}
         for i, array_name in enumerate(inspect.signature(loss.forward).parameters.keys()):
-            if array_name is not 'self':
+            if array_name != 'self':
                 self.loss_input_dict[i] = self.arrays[array_name]
 
         # create a train node using our model, loss, and optimizer

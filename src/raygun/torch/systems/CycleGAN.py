@@ -1,7 +1,7 @@
 import itertools
 import logging
 from matplotlib import pyplot as plt
-from raygun.data import CycleDataPipe
+from raygun.io import CycleDataPipe
 import torch
 import daisy
 
