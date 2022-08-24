@@ -40,3 +40,5 @@ print(f'View tensorboard by running the following:\n\ttensorboard --logdir {os.g
 # %% Cleanup
 os.chdir(cur_dir)
 temp_dir.cleanup()
+
+# %%
