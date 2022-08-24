@@ -14,6 +14,6 @@ def passing_locals(local_dict):
 def get_config_name(config_path, base_folder):
         config_name = os.path.dirname(config_path)
         config_name = config_name.replace(base_folder, '')
-        config_name = '_'.join(config_name.split('/'))
+        config_name = '_'.join(config_name.split('/'))[1:]
 
         return config_name

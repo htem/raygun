@@ -6,7 +6,7 @@ from raygun.torch.systems import CycleGAN
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = str(3)
 
-config_path = '/n/groups/htem/users/jlr54/raygun/experiments/ieee-isbi-2022/01_cycle_gans/test_conf.json' #TODO: Use importlib.resources instead
+config_path = 'CycleGAN_conf.json' #TODO: Add testing resources to package
 system = CycleGAN(config_path)
 
 #%% Setup
