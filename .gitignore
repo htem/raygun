@@ -1,5 +1,9 @@
+# Generated files
 *__pycache__*
 *raygun.egg*
+*.vscode*
+
+# Parts of experiments
 *.out
 *.zarr
 *.n5

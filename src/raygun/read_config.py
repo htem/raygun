@@ -3,9 +3,21 @@ from functools import partial
 from io import StringIO
 import json
 import os
-import torch
-
 from jsmin import jsmin
+
+import logging
+logger = logging.getLogger(__name__)
+
+try:
+    import torch
+except:
+    logger.warning('PyTorch unavailable.')
+
+try:
+    import jax
+except:
+    logger.warning('JAX unavailable.')
+
 
 def loadJsonFile(fin):
     with open(fin, 'r') as f:
