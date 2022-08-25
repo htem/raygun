@@ -95,7 +95,7 @@ class LinkCycleLoss(BaseCompetentLoss):
                     loss += lambda_ * this_loss
         
         # calculate gradients
-        loss.backward()
+        loss.backward(retain_graph=True)
         return loss
 
     def backward_Gs(self, data_dict):

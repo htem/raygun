@@ -1,4 +1,5 @@
 import inspect
+import os
 from tqdm import trange
 import gunpowder as gp
 import numpy as np
@@ -59,6 +60,8 @@ class BaseTrain(object):
                             save_every=save_every,
                             spawn_subprocess=spawn_subprocess
                             )
+        
+        os.makedirs(os.path.dirname(checkpoint_basename), exist_ok=True)
 
     def prenet_pipe(self, mode:str='train'):        
         return tuple([dp.prenet_pipe(mode) for dp in self.datapipes.values()]) + gp.MergeProvider() #merge upstream pipelines for multiple sources

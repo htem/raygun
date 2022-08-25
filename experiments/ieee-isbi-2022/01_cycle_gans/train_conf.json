@@ -25,7 +25,7 @@
     "common_voxel_size": [30, 30, 30], //voxel size to cast all data into
     "ndims": 3,
 
-    "batch_size": 1,
+    "batch_size": 3,
     "num_workers": 16,
     "cache_size": 96,
     "min_coefvar":  1e-02,
@@ -76,8 +76,8 @@
         // "constant_upsample": True, // unet specific
         // "fmap_inc_factor": 2, // unet specific
         // "residual": True, // unet specific
-        "n_blocks": 9, // resnet specific
-        "n_downsampling": 0
+        "n_blocks": 9 // resnet specific
+        // "n_downsampling": 0
     },
     "pretrain_gnet": false,
 
@@ -92,7 +92,7 @@
     },
 
     "spawn_subprocess": true,
-    "side_length": 128, // requires odd number for valid resnet9 (which gives odd output)        
+    "side_length": 96, // requires odd number for valid resnet9 (which gives odd output)        
     "num_epochs": 600000,
     "freeze_norms_at": 300000,
     "log_every": 20

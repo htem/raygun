@@ -102,7 +102,7 @@ def batch_train(base_folder=None):
 
     config_paths = _batch_train('.')
 
-
+    os.makedirs(os.path.join(base_folder, 'tensorboards'), exist_ok=True)
     while len(config_paths) > 0:
         sleep(5)
         for config_path in config_paths:

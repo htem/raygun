@@ -136,6 +136,7 @@ class BaseSystem:
         return net_kwargs
 
     def get_network(self, net_type='unet', net_kwargs=None):
+        #TODO: make general call of: net = getattr(networks, net_type)(**net_kwargs)
         if net_type == 'unet':
             net_kwargs = self.get_downsample_factors(net_kwargs)
 
@@ -192,7 +193,7 @@ class BaseSystem:
         raise NotImplementedError()
         
     def setup_model(self):
-        '''Implement model setup in subclasses.'''
+        '''Implement in subclasses.'''
         raise NotImplementedError()
         
     def setup_optimization(self):
