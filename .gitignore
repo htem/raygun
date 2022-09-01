@@ -1,12 +1,11 @@
-events.out.tfevents.*
-*checkpoint*
-.vscode*
-__pycache__*
-*.zarr
-*Task*.config
-.run_configs*
-.daisy_logs_BlockwiseTask*
+# Generated files
+*__pycache__*
+*raygun.egg*
+*.vscode*
+
+# Parts of experiments
 *.out
-.nfs*
-*/igneous_tasks
-TransformParameters*
+*tensorboard*
+*checkpoint*
+*.zarr
+*.n5
