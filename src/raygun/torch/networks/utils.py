@@ -10,7 +10,10 @@ def get_norm_layers(net):
 def get_running_norm_stats(net):
     means = []
     vars = []
-    for norm in get_norm_layers(net):
+    norms = get_norm_layers(net)
+    if len(norms) == 0:
+        return None, None
+    for norm in norms:
         means.append(norm.running_mean)
         vars.append(norm.running_var)
     means = torch.cat(means)

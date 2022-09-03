@@ -75,14 +75,18 @@
         "ngf": 16,
         // "constant_upsample": True, // unet specific
         "fmap_inc_factor": 4, // unet specific
-        "kernel_size_down": [[[7, 7, 7], [7, 7, 7], [7, 7, 7]],
+        "kernel_size_down": [
+                            [[7, 7, 7], [7, 7, 7], [7, 7, 7]],
                             [[5, 5, 5], [5, 5, 5], [5, 5, 5]],
-                            [[3, 3, 3], [3, 3, 3], [3, 3, 3]],
-                            [[3, 3, 3], [3, 3, 3], [3, 3, 3]]], // unet specific
-        "kernel_size_up": [[[7, 7, 7], [7, 7, 7], [7, 7, 7]],
-                            [[5, 5, 5], [5, 5, 5], [5, 5, 5]],
-                            [[3, 3, 3], [3, 3, 3], [3, 3, 3]]], // unet specific
-        "num_downs": 4
+                            [[3, 3, 3], [3, 3, 3], [3, 3, 3]]
+                            // [[3, 3, 3], [3, 3, 3], [3, 3, 3]]
+                            ], // unet specific
+        "kernel_size_up": [
+                            [[7, 7, 7], [7, 7, 7], [7, 7, 7]],
+                            [[5, 5, 5], [5, 5, 5], [5, 5, 5]]
+                            // [[3, 3, 3], [3, 3, 3], [3, 3, 3]]
+                            ], // unet specific
+        "num_downs": 3
         // "residual": True, // unet specific
         // "n_blocks": 9 // resnet specific
         // "n_downsampling": 0
@@ -101,7 +105,8 @@
 
     "spawn_subprocess": true,
     "side_length": 96, // requires odd number for valid resnet9 (which gives odd output)        
-    "num_epochs": 600000,
-    "freeze_norms_at": 300000,
-    "log_every": 20
+    "num_epochs": 300000,
+    "freeze_norms_at": 150000,
+    "log_every": 20,
+    "save_every": 2000
 }
