@@ -1,13 +1,21 @@
 {
+    "framework": "torch",
+    "system": "CycleGAN",
+    "job_command": ["bsub",
+                    "-n 16",
+                    "-gpu \"num=1\"",
+                    "-q gpu_a100"
+                ],
+
     "sources": {
         "A":{ //TODO: Make list to allow for multiple sources
-                "path": "/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/CBxs_lobV_overview_90nm_rec5iter_db9_l20p15_.n5",
+                "path": "/nrs/funke/rhoadesj/data/XNH/CBv/CBxs_lobV_overview_90nm_rec5iter_db9_l20p15_.n5",
                 "real_name": "volumes/raw",
                 "mask_name": "volumes/training_mask",
                 "min_coefvar":  1e-02
         },
         "B":{
-                "path": "/n/groups/htem/ESRF_id16a/tomo_ML/ResolutionEnhancement/jlr54_tests/volumes/CBxs_lobV_bottomp100um_30nm_rec_db9_.n5",
+                "path": "/nrs/funke/rhoadesj/data/XNH/CBv/CBxs_lobV_bottomp100um_30nm_rec_db9_.n5",
                 "real_name": "volumes/raw",
                 "mask_name": "volumes/volume_mask",
                 "min_coefvar":  1e-02
@@ -15,11 +23,12 @@
     },
     
     "common_voxel_size": [30, 30, 30], //voxel size to cast all data into
-    "ndims": 2,
+    "ndims": 3,
 
-    "batch_size": 1,
+    "batch_size": 3,
     "num_workers": 16,
     "cache_size": 96,
+    "min_coefvar":  1e-02,
     "optim_kwargs": {"betas": [0.5, 0.999],
                     "weight_decay": 0
             },
@@ -38,7 +47,7 @@
         },
 
     // "sampling_bottleneck": True,
-    "loss_type": "split",
+    // "loss_type": "link",
     "loss_kwargs": {"g_lambda_dict": {
                             "A": {
                                     "l1_loss": {"cycled": 3, "identity": 0},
@@ -59,20 +68,20 @@
     "gnet_kwargs": {
         "input_nc": 1,
         "output_nc": 1,
-        "norm_layer": "#partial(torch.nn.InstanceNorm2d, track_running_stats=True, momentum=0.01)#",
-        // "padding_type": "valid",
+        "norm_layer": "#partial(torch.nn.InstanceNorm3d, track_running_stats=True, momentum=0.01)#",
+        "padding_type": "same",
         // "activation": torch.nn.SELU,//torch.nn.Tanh, //torch.nn.SiLU,//
         // "add_noise": True,
         "ngf": 64,
         // "constant_upsample": True, // unet specific
         // "fmap_inc_factor": 2, // unet specific
         // "residual": True, // unet specific
-        "n_blocks": 9, // resnet specific
-        "n_downsampling": 0
+        "n_blocks": 9 // resnet specific
+        // "n_downsampling": 0
     },
     "pretrain_gnet": false,
 
-    "dnet_type": "classic", //"resnet",
+    "dnet_type": "patchdiscriminator", //"resnet",
     "dnet_kwargs": {
         "input_nc": 1,
         // "downsampling_kw": 2,
@@ -83,9 +92,8 @@
     },
 
     "spawn_subprocess": true,
-    "side_length": 64, // requires odd number for valid resnet9 (which gives odd output)        
-    "num_epochs": 240,
-    "freeze_norms_at": 120,
-    "random_seed": 42,
+    "side_length": 96, // requires odd number for valid resnet9 (which gives odd output)        
+    "num_epochs": 600000,
+    "freeze_norms_at": 300000,
     "log_every": 20
 }

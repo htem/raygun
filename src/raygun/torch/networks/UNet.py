@@ -181,7 +181,6 @@ class ConvDownsample(torch.nn.Module):
                     output_nc,
                     kernel_sizes,
                     stride=downsample_factor,
-                    # padding=padding, #TODO: Make work with same padding
                     padding='valid', 
                     padding_mode=padding_mode
                     ))

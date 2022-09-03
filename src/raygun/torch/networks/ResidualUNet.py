@@ -127,7 +127,7 @@ class ConvPass(torch.nn.Module):
             if not self.final:
                 return self.activation(init_x + res)
             else:
-                return (init_x + res)            
+                return init_x + res
 
 class ConvDownsample(torch.nn.Module):
 

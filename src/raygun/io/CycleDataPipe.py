@@ -90,7 +90,7 @@ class CycleDataPipe(BaseDataPipe):
             else:
                 self.reject += gp.RejectConstant(self.real_src, min_coefvar = src['min_coefvar'])
 
-        self.preprocess = self.normalize_real + self.scaleimg2tanh_real
+        self.preprocess = self.normalize_real
 
         self.augment_axes = list(np.arange(3)[-ndims:])
         self.augment = gp.SimpleAugment(mirror_only = self.augment_axes, transpose_only = self.augment_axes)
@@ -116,12 +116,10 @@ class CycleDataPipe(BaseDataPipe):
         if batch_size is None:
             batch_size = self.batch_size
         # remove "channel" dimensions if neccessary
-        postnet_pipe = self.scaletanh2img_real + self.scaletanh2img_fake        
-        if cycle:
-            postnet_pipe += self.scaletanh2img_cycled
-        
+        postnet_pipe = None
+
         if self.ndims == len(self.common_voxel_size):
-            postnet_pipe += gp.Squeeze([self.real, 
+            postnet_pipe = gp.Squeeze([self.real, 
                                         self.fake, 
                                         ], axis=1) # remove channel dimension for grayscale
             if cycle:
@@ -129,7 +127,12 @@ class CycleDataPipe(BaseDataPipe):
                                             ], axis=1) # remove channel dimension for grayscale
                 
         if batch_size == 1:
-            postnet_pipe += gp.Squeeze([self.real,  # remove batch dimension
+            if postnet_pipe is not None:
+                postnet_pipe += gp.Squeeze([self.real,  # remove batch dimension
+                                        self.fake, 
+                                        ], axis=0) # remove channel dimension for grayscale
+            else:
+                postnet_pipe = gp.Squeeze([self.real,  # remove batch dimension
                                         self.fake, 
                                         ], axis=0) # remove channel dimension for grayscale
             if cycle:

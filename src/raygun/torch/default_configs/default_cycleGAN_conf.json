@@ -2,7 +2,12 @@
     "common_voxel_size": null, // voxel size to resample A and B into for training
     "ndims": null,
     "gnet_type": "unet",
-    "dnet_type": "classic",
+    "gnet_kwargs": {
+        "input_nc": 1,
+        "ngf": 64,
+        "padding_type": "same"
+    },
+    "dnet_type": "patchdiscriminator",
     "dnet_kwargs": {
             "input_nc": 1,
             "downsampling_kw": 2, // downsampling factor

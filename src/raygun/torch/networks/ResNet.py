@@ -8,11 +8,11 @@ class ResnetGenerator2D(torch.nn.Module):
     We adapt Torch code and idea from Justin Johnson's neural style transfer project(https://github.com/jcjohnson/fast-neural-style)
     """
 
-    def __init__(self, input_nc=1, output_nc=1, ngf=64, norm_layer=torch.nn.InstanceNorm2d, use_dropout=False, n_blocks=6, padding_type='reflect', activation=torch.nn.ReLU, add_noise=False, n_downsampling=2):
+    def __init__(self, input_nc=1, output_nc=None, ngf=64, norm_layer=torch.nn.InstanceNorm2d, use_dropout=False, n_blocks=6, padding_type='reflect', activation=torch.nn.ReLU, add_noise=False, n_downsampling=2):
         """Construct a Resnet-based generator
         Parameters:
             input_nc (int)      -- the number of channels in input images
-            output_nc (int)     -- the number of channels in output images
+            output_nc (int)     -- the number of channels in output images (default is ngf)
             ngf (int)           -- the number of filters in the last conv layer
             norm_layer          -- normalization layer
             use_dropout (bool)  -- if use dropout layers
@@ -29,10 +29,13 @@ class ResnetGenerator2D(torch.nn.Module):
         else:
             use_bias = norm_layer == torch.nn.InstanceNorm2d
 
+        if output_nc is None:
+            output_nc = ngf
+            
         p = 0
         updown_p = 1
         padder = []
-        if padding_type.lower() == 'reflect':
+        if padding_type.lower() == 'reflect' or padding_type.lower() == 'same':
             padder = [torch.nn.ReflectionPad2d(3)]
         elif padding_type.lower() == 'replicate':
             padder = [torch.nn.ReplicationPad2d(3)]
@@ -74,8 +77,7 @@ class ResnetGenerator2D(torch.nn.Module):
                       norm_layer(int(ngf * mult / 2)),
                       activation()]
         model += padder.copy()
-        model += [torch.nn.Conv2d(ngf, output_nc, kernel_size=7, padding=p)]
-        model += [torch.nn.Tanh()]
+        model += [torch.nn.Conv2d(ngf, ngf, kernel_size=7, padding=p)]
 
         self.model = torch.nn.Sequential(*model)
 
@@ -110,7 +112,7 @@ class ResnetBlock2D(torch.nn.Module):
         """
         p = 0
         padder = []
-        if padding_type == 'reflect':
+        if padding_type == 'reflect' or padding_type.lower() == 'same':
             padder = [torch.nn.ReflectionPad2d(1)]
         elif padding_type == 'replicate':
             padder = [torch.nn.ReplicationPad2d(1)]
@@ -163,7 +165,7 @@ class ResnetGenerator3D(torch.nn.Module):
     We adapt Torch code and idea from Justin Johnson's neural style transfer project(https://github.com/jcjohnson/fast-neural-style)
     """
 
-    def __init__(self, input_nc=1, output_nc=1, ngf=64, norm_layer=torch.nn.InstanceNorm3d, use_dropout=False, n_blocks=6, padding_type='reflect', activation=torch.nn.ReLU, add_noise=False, n_downsampling=2):
+    def __init__(self, input_nc=1, output_nc=None, ngf=64, norm_layer=torch.nn.InstanceNorm3d, use_dropout=False, n_blocks=6, padding_type='reflect', activation=torch.nn.ReLU, add_noise=False, n_downsampling=2):
         """Construct a Resnet-based generator
         Parameters:
             input_nc (int)      -- the number of channels in input images
@@ -184,10 +186,13 @@ class ResnetGenerator3D(torch.nn.Module):
         else:
             use_bias = norm_layer == torch.nn.InstanceNorm3d
         
+        if output_nc is None:
+            output_nc = ngf
+
         p = 0
         updown_p = 1
         padder = []
-        if padding_type.lower() == 'reflect':
+        if padding_type.lower() == 'reflect' or padding_type.lower() == 'same':
             padder = [torch.nn.ReflectionPad3d(3)]
         elif padding_type.lower() == 'replicate':
             padder = [torch.nn.ReplicationPad3d(3)]
@@ -230,7 +235,6 @@ class ResnetGenerator3D(torch.nn.Module):
                       activation()]
         model += padder.copy()
         model += [torch.nn.Conv3d(ngf, output_nc, kernel_size=7, padding=p)]
-        model += [torch.nn.Tanh()]
 
         self.model = torch.nn.Sequential(*model)
 
@@ -265,7 +269,7 @@ class ResnetBlock3D(torch.nn.Module):
         """
         p = 0
         padder = []
-        if padding_type == 'reflect':
+        if padding_type == 'reflect' or padding_type.lower() == 'same':
             padder = [torch.nn.ReflectionPad3d(1)]
         elif padding_type == 'replicate':
             padder = [torch.nn.ReplicationPad3d(1)]
@@ -322,7 +326,7 @@ class ResNet(ResnetGenerator2D, ResnetGenerator3D):
         """Construct a Resnet-based generator
         Parameters:
             input_nc (int)      -- the number of channels in input images
-            output_nc (int)     -- the number of channels in output images
+            output_nc (int)     -- the number of channels in output images (default is ngf)
             ngf (int)           -- the number of filters in the last conv layer
             norm_layer          -- normalization layer
             use_dropout (bool)  -- if use dropout layers

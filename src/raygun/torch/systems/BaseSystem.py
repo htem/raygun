@@ -137,35 +137,63 @@ class BaseSystem:
 
     def get_network(self, net_type='unet', net_kwargs=None):
         #TODO: make general call of: net = getattr(networks, net_type)(**net_kwargs)
+        if 'final_activation' in net_kwargs.keys():
+            final_activation = net_kwargs.pop('final_activation')
+        else:
+            final_activation = None
+        
+        if 'output_nc' in net_kwargs.keys():
+            output_nc = net_kwargs.pop('output_nc')
+        else:
+            output_nc = net_kwargs['input_nc']
+        
+        if isinstance(final_activation, str):
+            final_activation = getattr(torch.nn, final_activation)
+        
+        add_final = True
         if net_type == 'unet':
             net_kwargs = self.get_downsample_factors(net_kwargs)
 
-            net = torch.nn.Sequential(
-                                networks.UNet(**net_kwargs),
-                                torch.nn.Tanh()
-                                )        
+            net = networks.UNet(**net_kwargs)
+
         elif net_type == 'residualunet':
             net_kwargs = self.get_downsample_factors(net_kwargs)
             
-            net = torch.nn.Sequential(
-                                networks.ResidualUNet(**net_kwargs), 
-                                torch.nn.Tanh()
-                                )            
+            net = networks.ResidualUNet(**net_kwargs)
+
         elif net_type == 'resnet':
             net = networks.ResNet(self.ndims, **net_kwargs)
-        elif net_type == 'classic':
+
+        elif net_type == 'patchdiscriminator':
             norm_instance = {
                                 2: torch.nn.InstanceNorm2d,
                                 3: torch.nn.InstanceNorm3d,
                             }[self.ndims]
             net_kwargs['norm_layer'] = functools.partial(norm_instance, affine=False, track_running_stats=False)
             net = networks.NLayerDiscriminator(self.ndims, **net_kwargs)
+            add_final = False
+
         elif hasattr(networks, net_type):
             net = getattr(networks, net_type)(**net_kwargs)
+
         else:
-            raise f'Unknown discriminator type requested: {net_type}'
+            raise f'Unknown discriminator type requested: {net_type}'        
         
-        activation = net_kwargs['activation'] if 'activation' in net_kwargs else torch.nn.ReLU        
+        if add_final:
+            layers = [net,
+                    getattr(torch.nn, f'Conv{self.ndims}d')(
+                            net_kwargs['ngf'],
+                            output_nc,
+                            (1,)*self.ndims,
+                            padding = 'valid' if 'padding_type' not in net_kwargs.keys() else net_kwargs['padding_type']
+                        )
+            ]
+            if final_activation is not None:
+                layers.append(final_activation)
+
+            net = torch.nn.Sequential(*layers)        
+        
+        activation = net_kwargs['activation'] if 'activation' in net_kwargs else torch.nn.ReLU
         if activation is not None:
             init_weights(net, init_type='kaiming', nonlinearity=activation.__class__.__name__.lower())
         elif net_type == 'classic':
