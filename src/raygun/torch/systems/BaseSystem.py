@@ -1,3 +1,4 @@
+from abc import abstractmethod
 import functools
 from glob import glob
 import re
@@ -216,22 +217,27 @@ class BaseSystem:
         result = net(torch.zeros(*shape, device=pars[0].device))
         return np.ceil((np.array(shape) - np.array(result.shape)) / 2)[-self.ndims:]
 
+    @abstractmethod
     def setup_networks(self):
         '''Implement in subclasses.'''
         raise NotImplementedError()
         
+    @abstractmethod
     def setup_model(self):
         '''Implement in subclasses.'''
         raise NotImplementedError()
         
+    @abstractmethod
     def setup_optimization(self):
         '''Implement in subclasses.'''
         raise NotImplementedError()
     
+    @abstractmethod
     def setup_datapipes(self):
         '''Implement in subclasses.'''
         raise NotImplementedError()
         
+    @abstractmethod
     def make_request(self, mode):
         '''Implement in subclasses.'''
         raise NotImplementedError()

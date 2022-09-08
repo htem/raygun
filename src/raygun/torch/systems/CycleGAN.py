@@ -153,7 +153,12 @@ class CycleGAN(BaseSystem):
         self.arrays = {}
         self.datapipes = {}
         for id, src in self.sources.items():
-            self.datapipes[id] = CycleDataPipe(id, src, self.ndims, self.common_voxel_size, self.interp_order, self.batch_size)
+            self.datapipes[id] = CycleDataPipe(id, 
+                                            src, 
+                                            self.ndims, 
+                                            self.common_voxel_size, 
+                                            self.interp_order, 
+                                            self.batch_size)
             self.arrays.update(self.datapipes[id].arrays)
 
     def make_request(self, mode:str='train'):    
