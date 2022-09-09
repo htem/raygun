@@ -10,12 +10,12 @@ import numpy as np
 
 torch.backends.cudnn.benchmark = True
 
-from raygun.torch.models import CycleModel
-from raygun.torch.losses import LinkCycleLoss, SplitCycleLoss
+from raygun.torch.models import NotACycleModel
+from raygun.torch.losses import NotACycleLoss
 from raygun.torch.optimizers import BaseDummyOptimizer, get_base_optimizer
 from raygun.torch.systems import BaseSystem
 
-class CycleGAN(BaseSystem):
+class NotACycleGAN(BaseSystem):
     def __init__(self, config=None):        
         super().__init__(default_config='../default_configs/default_cycleGAN_conf.json', config=config)
         self.logger = logging.Logger(__name__, 'INFO')
