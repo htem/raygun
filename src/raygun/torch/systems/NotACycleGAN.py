@@ -17,7 +17,7 @@ from raygun.torch.systems import BaseSystem
 
 class NotACycleGAN(BaseSystem):
     def __init__(self, config=None):        
-        super().__init__(default_config='../default_configs/default_cycleGAN_conf.json', config=config)
+        super().__init__(default_config='../default_configs/default_NaC_conf.json', config=config)
         self.logger = logging.Logger(__name__, 'INFO')
 
         if self.common_voxel_size is None:
@@ -89,49 +89,33 @@ class NotACycleGAN(BaseSystem):
         if side_length is None:
             side_length = self.side_length
 
-        if ('padding_type' in self.gnet_kwargs) and (self.gnet_kwargs['padding_type'].lower() == 'valid'):
-            if array_name is not None and not ('real' in array_name.lower() or 'mask' in array_name.lower()):
-                shape = (1,1) + (side_length,) * self.ndims
-                pars = [par for par in self.netG1.parameters()]
-                result = self.netG1(torch.zeros(*shape, device=pars[0].device))
-                if 'fake' in array_name.lower():
-                    side_length = result.shape[-1]
-                elif 'cycle' in array_name.lower():
-                    result = self.netG1(result)
-                    side_length = result.shape[-1]
+        #TODO: Make work for 'VALID' padding
+        # if ('padding_type' in self.gnet_kwargs) and (self.gnet_kwargs['padding_type'].lower() == 'valid'):
+        #     if array_name is not None and not ('real' in array_name.lower() or 'mask' in array_name.lower()):
+        #         shape = (1,1) + (side_length,) * self.ndims
+        #         pars = [par for par in self.netG1.parameters()]
+        #         result = self.netG1(torch.zeros(*shape, device=pars[0].device))
+        #         if 'fake' in array_name.lower():
+        #             side_length = result.shape[-1]
+        #         elif 'cycle' in array_name.lower():
+        #             result = self.netG1(result)
+        #             side_length = result.shape[-1]
 
         extents = np.ones((len(self.common_voxel_size)))
         extents[-self.ndims:] = side_length # assumes first dimension is z (i.e. the dimension breaking isotropy)
         return gp.Coordinate(extents)
 
     def setup_networks(self):
-        self.netG1 = self.get_network(self.gnet_type, self.gnet_kwargs)
-        self.netG2 = self.get_network(self.gnet_type, self.gnet_kwargs)
-        
-        self.netD1 = self.get_network(self.dnet_type, self.dnet_kwargs)
-        self.netD2 = self.get_network(self.dnet_type, self.dnet_kwargs)
+        self.netD = self.get_network(self.dnet_type, self.dnet_kwargs)
         
     def setup_model(self):
-        if not hasattr(self, 'netG1'):
+        if not hasattr(self, 'netD'):
             self.setup_networks()
-
-        if self.sampling_bottleneck:
-            scale_factor_A = tuple(np.divide(self.common_voxel_size, self.A_voxel_size)[-self.ndims:])
-            if not any([s < 1 for s in scale_factor_A]): scale_factor_A = None
-            scale_factor_B = tuple(np.divide(self.common_voxel_size, self.B_voxel_size)[-self.ndims:])
-            if not any([s < 1 for s in scale_factor_B]): scale_factor_B = None
-        else:
-            scale_factor_A, scale_factor_B = None, None
         
-        self.model = CycleModel(self.netG1, 
-                                self.netG2, 
-                                scale_factor_A, 
-                                scale_factor_B, 
-                                split=self.loss_type.lower()=='split', 
-                                freeze_norms_at=self.freeze_norms_at)
+        self.model = NotACycleModel()
     
     def setup_optimization(self):
-        self.optimizer_D = get_base_optimizer(self.d_optim_type)(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), **self.d_optim_kwargs)
+        self.optimizer_D = get_base_optimizer(self.d_optim_type)(self.netD.parameters(), **self.d_optim_kwargs)
 
         if hasattr(self, 'scheduler'):
             scheduler = self.scheduler
@@ -140,22 +124,11 @@ class NotACycleGAN(BaseSystem):
             scheduler = None
             scheduler_kwargs = {}
 
-        if self.loss_type.lower()=='link':                        
-            self.optimizer_G = get_base_optimizer(self.g_optim_type)(itertools.chain(self.netG1.parameters(), self.netG2.parameters()), **self.g_optim_kwargs)
-            self.optimizer = BaseDummyOptimizer(optimizer_G=self.optimizer_G, optimizer_D=self.optimizer_D, scheduler=scheduler, scheduler_kwargs=scheduler_kwargs)
-            
-            self.loss = LinkCycleLoss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G, self.optimizer_D, self.ndims, **self.loss_kwargs)        
-    
-        elif self.loss_type.lower()=='split':                 
-            self.optimizer_G1 = get_base_optimizer(self.g_optim_type)(self.netG1.parameters(), **self.g_optim_kwargs)
-            self.optimizer_G2 = get_base_optimizer(self.g_optim_type)(self.netG2.parameters(), **self.g_optim_kwargs)
-            self.optimizer = BaseDummyOptimizer(optimizer_G1=self.optimizer_G1, optimizer_G2=self.optimizer_G2, optimizer_D=self.optimizer_D, scheduler=scheduler, scheduler_kwargs=scheduler_kwargs)
-            
-            self.loss = SplitCycleLoss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G1, self.optimizer_G2, self.optimizer_D, self.ndims, **self.loss_kwargs)        
-    
-        else:
-            raise NotImplementedError("Unexpected Loss Style. Accepted options are 'cycle' or 'split'")
-
+        self.optimizer_G = get_base_optimizer(self.g_optim_type)(itertools.chain(*[net.parameters() for net in self.model.NaC_nets]), **self.g_optim_kwargs)
+        self.optimizer = BaseDummyOptimizer(optimizer_G=self.optimizer_G, optimizer_D=self.optimizer_D, scheduler=scheduler, scheduler_kwargs=scheduler_kwargs)
+        
+        self.loss = NotACycleLoss(self.netD, self.model.NaC_nets, self.optimizer_G, self.optimizer_D, self.ndims, **self.loss_kwargs)        
+         
     def setup_datapipes(self):
         self.arrays = {}
         self.datapipes = {}
@@ -178,7 +151,7 @@ class NotACycleGAN(BaseSystem):
         return request
 
 if __name__ == '__main__':
-    system = CycleGAN(config='./train_conf.json')
+    system = NotACycleGAN(config='./train_conf.json')
     system.logger.info('CycleGAN system loaded. Training...')
     _ = system.train()
     system.logger.info('Done training!')

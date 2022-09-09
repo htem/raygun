@@ -255,7 +255,8 @@ class BaseSystem:
                                     self.save_every,
                                     self.spawn_subprocess,
                                     self.num_workers,
-                                    self.cache_size
+                                    self.cache_size,
+                                    snapshot_every=self.snapshot_every
             )
 
     def build_system(self):

@@ -20,6 +20,7 @@ class BaseTrain(object):
                 spawn_subprocess:bool=False,
                 num_workers:int=11,
                 cache_size:int=50,
+                snapshot_every=None,
                 **kwargs
                 ):
         kwargs = passing_locals(locals())
@@ -73,14 +74,37 @@ class BaseTrain(object):
     def training_pipe(self, mode:str='train'):
         # assemble pipeline
         training_pipe = self.prenet_pipe(mode)
+        
         if mode == 'train':
             training_pipe += gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)
+        
         training_pipe += self.train_node        
+        
         for section in self.postnet_pipe(mode):
-            training_pipe += section
+            if isinstance(section, list) or isinstance(section, tuple):
+                for s in section:
+                    training_pipe += s
+
+            else:
+                training_pipe += section
+        
         if mode == 'test':
             training_pipe += gp.PrintProfilingStats() #TODO: Figure out why this doesn't print / print from batch.profiling_stats
+        
+        if mode == 'train' and self.snapshot_every is not None:
+            snapshot_names = {}
+            for key, value in self.loss_input_dict.items():
+                if isinstance(key, str):
+                    snapshot_names[value] = key
+                else:
+                    snapshot_names[value] = value.identifier
 
+            training_pipe += gp.Snapshot(
+                    dataset_names = snapshot_names,
+                    output_filename="{iteration}.zarr",
+                    every=self.snapshot_every
+                ) # add Snapshot node to save volumes
+            
         return training_pipe
 
     def print_profiling_stats(self):

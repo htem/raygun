@@ -1,4 +1,4 @@
-
+#%%
 import torch
 from raygun.torch.losses import BaseCompetentLoss
 from raygun.utils import passing_locals
@@ -9,101 +9,102 @@ logger = logging.Logger(__name__, 'INFO')
 class NotACycleLoss(BaseCompetentLoss):
     """NotACycleGAN loss function"""
     def __init__(self, 
-                netD1,  # differentiates between fake and real Bs
-                netD2,  # differentiates between fake and real As
-                NaC_nets,  # Encoders, latent, and decders
+                netD,  # differentiates between which of A or B inputs are fake
+                NaC_nets,  # Encoders, latent, and decoders
                 optimizer_G, 
                 optimizer_D, 
                 dims,
                 l1_loss = torch.nn.SmoothL1Loss(), 
-                g_lambda_dict= {'A': {'l1_loss': {'cycled': 3},
-                                    'gan_loss': {'fake': 1, 'cycled': 0},
+                g_lambda_dict= {'A': {'l1_loss': 3, #cycled
+                                    'gan_loss': 1, #fake
                                     },
-                                'B': {'l1_loss': {'cycled': 3},
-                                    'gan_loss': {'fake': 1, 'cycled': 0},
+                                'B': {'l1_loss': 3,
+                                    'gan_loss': 1,
                                     },
                             },
-                d_lambda_dict= {'A': {'real': 1, 'fake': 1, 'cycled': 0},
-                                'B': {'real': 1, 'fake': 1, 'cycled': 0},
+                d_lambda_dict= {'A': 1,
+                                'B': 1,
                             },
                 gan_mode='lsgan',
                 **kwargs):        
         super().__init__(**passing_locals(locals()))
 
-    def backward_D(self, side, dnet, data_dict):
-        """Calculate losses for a discriminator"""        
-        loss = 0
-        for key, lambda_ in self.d_lambda_dict[side].items():
-            if lambda_ != 0:
-                this_loss = self.gan_loss(dnet(data_dict[key].detach()), key == 'real')
-                
-                self.loss_dict.update({f'Discriminator_{side}/{key}': this_loss})
-                loss += lambda_ * this_loss
+    def _backward_D(self, data_dict):
+        
+        A_test = torch.cat([data_dict['A']['real'], data_dict['B']['fake'].detach()], 1)
+        loss_A = self.d_lambda_dict['A'] * self.gan_loss(self.netD(A_test), True)
+        
+        B_test = torch.cat([data_dict['B']['real'], data_dict['A']['fake'].detach()], 1)
+        loss_B = self.d_lambda_dict['B'] * self.gan_loss(self.netD(B_test), False)
 
+        loss = loss_A + loss_B
         loss.backward()
-        return loss
+        self.optimizer_D.step()          # update D's weights
 
-    def backward_Ds(self, data_dict, n_loop=5):
-        self.set_requires_grad([self.netG1, self.netG2], False)  # G does not require gradients when optimizing D
+        return loss_A, loss_B
+
+    def backward_D(self, data_dict, n_loop=5):
+        """Calculate losses for discriminator"""        
+        self.set_requires_grad(self.NaC_nets, False)  # G does not require gradients when optimizing D
+        self.set_requires_grad([self.netD], True)  # D does require gradients when optimizing D
 
         self.optimizer_D.zero_grad(set_to_none=True)     # set D's gradients to zero
 
         if self.gan_mode.lower() == 'wgangp': # Wasserstein Loss
             for _ in range(n_loop):
-                loss_D1 = self.backward_D('B', self.netD1, data_dict['B'])
-                loss_D2 = self.backward_D('A', self.netD2, data_dict['A'])
-                self.optimizer_D.step()          # update D's weights
+                loss_A, loss_B = self._backward_D(data_dict)
                 self.clamp_weights(self.netD1)
                 self.clamp_weights(self.netD2)
         else:
-            loss_D1 = self.backward_D('B', self.netD1, data_dict['B'])
-            loss_D2 = self.backward_D('A', self.netD2, data_dict['A'])
-            self.optimizer_D.step()          # update D's weights            
+            loss_A, loss_B = self._backward_D(data_dict)
+
+        self.set_requires_grad(self.NaC_nets, True)  # Turn G gradients back on
         
-        self.set_requires_grad([self.netG1, self.netG2], True)  # Turn G gradients back on
-        
+        self.loss_dict.update({ 
+            'Discriminator/A': float(loss_A),
+            'Discriminator/B': float(loss_B),
+        })
+
         #return losses
-        return loss_D1, loss_D2
+        return loss_A + loss_B
 
-    def backward_G(self, side, gnet, dnet, data_dict):
-        """Calculate losses for a generator"""        
-        loss = 0
-        real = data_dict['real']
-        for fcn_name, lambdas in self.g_lambda_dict[side].items():
-            loss_fcn = getattr(self, fcn_name)
-            for key, lambda_ in lambdas.items():
-                if lambda_ != 0:
-                    if key == 'identity' and key not in data_dict:
-                        data_dict['identity'] = gnet(real)
-                    pred = data_dict[key]
-
-                    if fcn_name == 'l1_loss':
-                        if real.size()[-self.dims:] != pred.size()[-self.dims:]:
-                            this_loss = loss_fcn(self.crop(real, pred.size()[-self.dims:]), pred)
-                        else:
-                            this_loss = loss_fcn(real, pred)
-                    elif fcn_name == 'gan_loss':
-                        this_loss = loss_fcn(dnet(pred), True)
-                    
-                    self.loss_dict.update({f'{fcn_name}/{key}_{side}': this_loss})
-                    loss += lambda_ * this_loss
-        
-        # calculate gradients
-        loss.backward(retain_graph=True)
-        return loss
-
-    def backward_Gs(self, data_dict):
-        self.set_requires_grad([self.netD1, self.netD2], False)  # D requires no gradients when optimizing G
+    def backward_G(self, data_dict):
+        """Calculate losses for generators"""        
+        self.set_requires_grad([self.netD], False)  # D requires no gradients when optimizing G
+        self.set_requires_grad(self.NaC_nets, True)  # G does not require gradients when optimizing D
 
         self.optimizer_G.zero_grad(set_to_none=True)        # set G1's gradients to zero
-        loss_G1 = self.backward_G('B', self.netG1, self.netD1, data_dict['B'])                   # calculate gradient for G
-        loss_G2 = self.backward_G('A', self.netG2, self.netD2, data_dict['A'])                   # calculate gradient for G
+        losses = {}
+
+        #First L1 losses
+        cyc_size = data_dict['A']['cycled'].size()[-self.dims:]
+        if data_dict['A']['real'].size()[-self.dims:] != cyc_size:
+            losses['A', 'l1_loss'] = self.l1_loss(self.crop(data_dict['A']['real'], cyc_size), data_dict['A']['cycled'])
+            losses['B', 'l1_loss'] = self.l1_loss(self.crop(data_dict['B']['real'], cyc_size), data_dict['B']['cycled'])
+        else:            
+            losses['A', 'l1_loss'] = self.l1_loss(data_dict['A']['real'], data_dict['A']['cycled'])
+            losses['B', 'l1_loss'] = self.l1_loss(data_dict['B']['real'], data_dict['B']['cycled'])
+
+        #Then Discriminator losses        
+        A_test = torch.cat([data_dict['A']['real'], data_dict['B']['fake'].detach()], 1)
+        losses['A', 'gan_loss'] = self.gan_loss(self.netD(A_test), False)
+        
+        B_test = torch.cat([data_dict['B']['real'], data_dict['A']['fake'].detach()], 1)
+        losses['B', 'gan_loss'] = self.gan_loss(self.netD(B_test), True)
+        
+        #Sum and add to loss dictionary for logging
+        loss = 0
+        for (side, fcn_name), this_loss in losses.items():
+            self.loss_dict.update({f'{fcn_name}/{side}': this_loss})
+            loss += self.g_lambda_dict[side][fcn_name] * this_loss
+        
+        # calculate gradients
+        # loss.backward(retain_graph=True)
+        loss.backward()
         self.optimizer_G.step()             # udpate G1's weights
 
-        self.set_requires_grad([self.netD1, self.netD2], True)  # re-enable backprop for D
-        
-        #return losses
-        return loss_G1, loss_G2
+        self.set_requires_grad([self.netD], True)  # re-enable backprop for D        
+        return loss
 
     def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
         self.data_dict = {'real_A': real_A, 'fake_A': fake_A, 'cycled_A': cycled_A, 'real_B': real_B, 'fake_B': fake_B, 'cycled_B': cycled_B}
@@ -116,22 +117,22 @@ class NotACycleLoss(BaseCompetentLoss):
         data_dict = {'A': {'real': real_A, 'fake': fake_A, 'cycled': cycled_A},
                      'B': {'real': real_B, 'fake': fake_B, 'cycled': cycled_B}
                     }
-        # update Gs
-        loss_G1, loss_G2 = self.backward_Gs(data_dict)
-        
-        # update Ds
-        loss_D1, loss_D2 = self.backward_Ds(data_dict)        
 
-        self.loss_dict.update({
-            'Total_Loss/D1': float(loss_D1),
-            'Total_Loss/D2': float(loss_D2),
-            'Total_Loss/G1': float(loss_G1),
-            'Total_Loss/G2': float(loss_G2),
+        # update D
+        loss_D = self.backward_D(data_dict)
+
+        # update G
+        loss_G = self.backward_G(data_dict)        
+
+        self.loss_dict.update({ 
+            'Total_Loss/D': float(loss_D),
+            'Total_Loss/G': float(loss_G),
         })
 
-        total_loss = loss_G1 + loss_G2 + loss_D1 + loss_D2
+        total_loss = loss_D + loss_G
         # define dummy backward pass to disable Gunpowder's Train node loss.backward() call
         total_loss.backward = lambda: None
 
         logger.info(self.loss_dict)
         return total_loss
+# %%

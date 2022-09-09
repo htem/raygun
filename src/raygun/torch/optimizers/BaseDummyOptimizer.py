@@ -5,8 +5,7 @@ class BaseDummyOptimizer(torch.nn.Module):
     def __init__(self, scheduler=None, scheduler_kwargs={}, **optimizers):
         super().__init__()
 
-        if scheduler is not None:
-            self.schedulers = {}
+        self.schedulers = {}
 
         for name, optimizer in optimizers.items():
             setattr(self, name, optimizer)
@@ -30,11 +29,8 @@ class BaseDummyOptimizer(torch.nn.Module):
 
             elif scheduler is not None:
                 self.schedulers[name] = scheduler(optimizer, **scheduler_kwargs)
-            else:
-                self.schedulers[name] = scheduler
 
     def step(self):
-        if self.schedulers is not None:
-            for name, scheduler in self.schedulers.items():
-                scheduler.step()
+        for name, scheduler in self.schedulers.items():
+            scheduler.step()
         

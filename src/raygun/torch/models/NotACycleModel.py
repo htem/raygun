@@ -3,6 +3,7 @@
 import itertools
 from raygun.utils import passing_locals
 from raygun.torch.losses import GANLoss
+from raygun.torch.networks.utils import init_weights
 import torch.nn.functional as F
 import torch.nn as nn
 from torch.optim import Adam
@@ -12,8 +13,8 @@ class NotACycleModel(nn.Module):
     def __init__(self, 
                 **kwargs
                 ):        
-        output_arrays = ['fake_B', 'cycled_B', 'fake_A', 'cycled_A']
-        # nets = [netG1, netG2]
+        # output_arrays = ['fake_B', 'cycled_B', 'fake_A', 'cycled_A']
+        self.output_arrays = ['fake_B', 'cycled_B', 'fake_A', 'cycled_A']
         # super().__init__(**passing_locals(locals()))
         super().__init__()
 
@@ -125,6 +126,9 @@ class NotACycleModel(nn.Module):
         self.perseverate = 3
 
         self.loss_dict = {}
+        self.NaC_nets = [self.A_encoder, self.B_encoder, self.latent, self.A_decoder, self.B_decoder]
+        for net in self.NaC_nets + [self.critic]:
+            init_weights(net)
 
     # def set_crop_pad(self, crop_pad, ndims):
         # self.crop_pad = (slice(None,None,None),)*2 + (slice(crop_pad,-crop_pad),)*ndims
