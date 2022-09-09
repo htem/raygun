@@ -34,6 +34,7 @@ system.trainer.print_profiling_stats()
 
 #%% Full test
 system.train()
+system.batch_show()
 
 print(f'View tensorboard by running the following:\n\ttensorboard --logdir {os.getcwd()}/tensorboard &')
 

@@ -86,10 +86,10 @@ class NotACycleLoss(BaseCompetentLoss):
             losses['B', 'l1_loss'] = self.l1_loss(data_dict['B']['real'], data_dict['B']['cycled'])
 
         #Then Discriminator losses        
-        A_test = torch.cat([data_dict['A']['real'], data_dict['B']['fake'].detach()], 1)
+        A_test = torch.cat([data_dict['A']['real'], data_dict['B']['fake']], 1)
         losses['A', 'gan_loss'] = self.gan_loss(self.netD(A_test), False)
         
-        B_test = torch.cat([data_dict['B']['real'], data_dict['A']['fake'].detach()], 1)
+        B_test = torch.cat([data_dict['B']['real'], data_dict['A']['fake']], 1)
         losses['B', 'gan_loss'] = self.gan_loss(self.netD(B_test), True)
         
         #Sum and add to loss dictionary for logging
