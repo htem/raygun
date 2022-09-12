@@ -1,0 +1,57 @@
+{
+    "common_voxel_size": null, // voxel size to resample A and B into for training
+    "ndims": null,
+    "dnet_type": "patchdiscriminator",
+    "dnet_kwargs": {
+            "input_nc": 2,
+            "downsampling_kw": 2, // downsampling factor
+            "kw": 3, // kernel size
+            "n_layers": 3, // number of layers in Discriminator networks
+            "ngf": 64
+        },    
+    "g_optim_type": "Adam",
+    "g_optim_kwargs": {
+            "betas": [0.9, 0.999],
+            "lr": 1e-5,
+            "weight_decay": 0
+        },
+    "d_optim_type": "Adam",
+    "d_optim_kwargs": {
+            "betas": [0.9, 0.999],
+            "lr": 1e-5,
+            "weight_decay": 0
+        },    
+    "loss_kwargs": {"g_lambda_dict": {
+                            "A": {
+                                    "l1_loss": 3,
+                                    "gan_loss": 1
+                                },
+                            "B": {
+                                "l1_loss": 3,
+                                "gan_loss": 1
+                                }
+                        },
+                    "d_lambda_dict": {
+                        "A": 1,
+                        "B": 1
+                        }
+                    },
+    "interp_order": null,
+    "side_length": 64, // in common sized voxels
+    "batch_size": 1,
+    "num_workers": 11,
+    "cache_size": 50,
+    "spawn_subprocess": false,
+    "num_epochs": 20000,
+    "log_every": 20,
+    "save_every": 2000,
+    "model_path": "./models/",    
+    "model_name": "NotACycleGAN",
+    "tensorboard_path": "./tensorboard/",
+    "verbose": true,
+    "checkpoint": null, // Used for prediction/rendering, training always starts from latest   
+    "random_seed": 42,
+    "trainer_base": "CycleTrain",
+    "freeze_norms_at": null,
+    "snapshot_every": null
+}

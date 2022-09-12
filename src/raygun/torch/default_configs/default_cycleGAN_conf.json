@@ -59,5 +59,6 @@
     "pretrain_gnet": false,
     "random_seed": 42,
     "trainer_base": "CycleTrain",
-    "freeze_norms_at": null
+    "freeze_norms_at": null,
+    "snapshot_every": null
 }

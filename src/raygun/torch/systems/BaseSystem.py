@@ -1,3 +1,4 @@
+from abc import abstractmethod
 import functools
 from glob import glob
 import re
@@ -91,6 +92,7 @@ class BaseSystem:
 
         if cuda_available is None:
             cuda_available = torch.cuda.is_available()
+            
         if checkpoint is None:
             checkpoint = self.checkpoint
         else:
@@ -216,22 +218,27 @@ class BaseSystem:
         result = net(torch.zeros(*shape, device=pars[0].device))
         return np.ceil((np.array(shape) - np.array(result.shape)) / 2)[-self.ndims:]
 
+    @abstractmethod
     def setup_networks(self):
         '''Implement in subclasses.'''
         raise NotImplementedError()
         
+    @abstractmethod
     def setup_model(self):
         '''Implement in subclasses.'''
         raise NotImplementedError()
         
+    @abstractmethod
     def setup_optimization(self):
         '''Implement in subclasses.'''
         raise NotImplementedError()
     
+    @abstractmethod
     def setup_datapipes(self):
         '''Implement in subclasses.'''
         raise NotImplementedError()
         
+    @abstractmethod
     def make_request(self, mode):
         '''Implement in subclasses.'''
         raise NotImplementedError()
@@ -249,7 +256,8 @@ class BaseSystem:
                                     self.save_every,
                                     self.spawn_subprocess,
                                     self.num_workers,
-                                    self.cache_size
+                                    self.cache_size,
+                                    snapshot_every=self.snapshot_every
             )
 
     def build_system(self):

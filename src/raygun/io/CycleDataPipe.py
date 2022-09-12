@@ -116,28 +116,24 @@ class CycleDataPipe(BaseDataPipe):
         if batch_size is None:
             batch_size = self.batch_size
         # remove "channel" dimensions if neccessary
-        postnet_pipe = None
+        postnet_pipe = []
 
         if self.ndims == len(self.common_voxel_size):
-            postnet_pipe = gp.Squeeze([self.real, 
+            postnet_pipe.append(gp.Squeeze([self.real, 
                                         self.fake, 
-                                        ], axis=1) # remove channel dimension for grayscale
+                                        ], axis=1)) # remove channel dimension for grayscale
             if cycle:
-                postnet_pipe += gp.Squeeze([self.cycled,
-                                            ], axis=1) # remove channel dimension for grayscale
+                postnet_pipe.append(gp.Squeeze([self.cycled,
+                                            ], axis=1)) # remove channel dimension for grayscale
                 
         if batch_size == 1:
-            if postnet_pipe is not None:
-                postnet_pipe += gp.Squeeze([self.real,  # remove batch dimension
+            postnet_pipe.append(gp.Squeeze([self.real,  # remove batch dimension
                                         self.fake, 
-                                        ], axis=0) # remove channel dimension for grayscale
-            else:
-                postnet_pipe = gp.Squeeze([self.real,  # remove batch dimension
-                                        self.fake, 
-                                        ], axis=0) # remove channel dimension for grayscale
+                                        ], axis=0)) # remove channel dimension for grayscale
             if cycle:
-                postnet_pipe += gp.Squeeze([
+                postnet_pipe.append(gp.Squeeze([
                                             self.cycled
-                                            ], axis=0)
+                                            ], axis=0))
+        
         return postnet_pipe
         

@@ -1,3 +1,4 @@
+from abc import abstractmethod
 import gunpowder as gp
 
 class BaseDataPipe(object):
@@ -24,3 +25,7 @@ class BaseDataPipe(object):
                 prenet_pipe += section
         
         return prenet_pipe
+
+    @abstractmethod
+    def postnet_pipe(self):
+        raise NotImplementedError()

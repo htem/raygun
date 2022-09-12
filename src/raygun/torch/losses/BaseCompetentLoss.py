@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 
 from raygun.utils import passing_locals
 from raygun.torch.losses import GANLoss

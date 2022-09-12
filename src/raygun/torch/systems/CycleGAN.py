@@ -133,16 +133,23 @@ class CycleGAN(BaseSystem):
     def setup_optimization(self):
         self.optimizer_D = get_base_optimizer(self.d_optim_type)(itertools.chain(self.netD1.parameters(), self.netD2.parameters()), **self.d_optim_kwargs)
 
+        if hasattr(self, 'scheduler'):
+            scheduler = self.scheduler
+            scheduler_kwargs = self.scheduler_kwargs
+        else:
+            scheduler = None
+            scheduler_kwargs = {}
+
         if self.loss_type.lower()=='link':                        
             self.optimizer_G = get_base_optimizer(self.g_optim_type)(itertools.chain(self.netG1.parameters(), self.netG2.parameters()), **self.g_optim_kwargs)
-            self.optimizer = BaseDummyOptimizer(optimizer_G=self.optimizer_G, optimizer_D=self.optimizer_D) #TODO: May be unecessary to pass actual optimizers
+            self.optimizer = BaseDummyOptimizer(optimizer_G=self.optimizer_G, optimizer_D=self.optimizer_D, scheduler=scheduler, scheduler_kwargs=scheduler_kwargs)
             
             self.loss = LinkCycleLoss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G, self.optimizer_D, self.ndims, **self.loss_kwargs)        
     
         elif self.loss_type.lower()=='split':                 
             self.optimizer_G1 = get_base_optimizer(self.g_optim_type)(self.netG1.parameters(), **self.g_optim_kwargs)
             self.optimizer_G2 = get_base_optimizer(self.g_optim_type)(self.netG2.parameters(), **self.g_optim_kwargs)
-            self.optimizer = BaseDummyOptimizer(optimizer_G1=self.optimizer_G1, optimizer_G2=self.optimizer_G2, optimizer_D=self.optimizer_D)
+            self.optimizer = BaseDummyOptimizer(optimizer_G1=self.optimizer_G1, optimizer_G2=self.optimizer_G2, optimizer_D=self.optimizer_D, scheduler=scheduler, scheduler_kwargs=scheduler_kwargs)
             
             self.loss = SplitCycleLoss(self.netD1, self.netG1, self.netD2, self.netG2, self.optimizer_G1, self.optimizer_G2, self.optimizer_D, self.ndims, **self.loss_kwargs)        
     
@@ -153,7 +160,12 @@ class CycleGAN(BaseSystem):
         self.arrays = {}
         self.datapipes = {}
         for id, src in self.sources.items():
-            self.datapipes[id] = CycleDataPipe(id, src, self.ndims, self.common_voxel_size, self.interp_order, self.batch_size)
+            self.datapipes[id] = CycleDataPipe(id, 
+                                            src, 
+                                            self.ndims, 
+                                            self.common_voxel_size, 
+                                            self.interp_order, 
+                                            self.batch_size)
             self.arrays.update(self.datapipes[id].arrays)
 
     def make_request(self, mode:str='train'):    
