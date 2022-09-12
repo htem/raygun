@@ -92,6 +92,7 @@ class BaseSystem:
 
         if cuda_available is None:
             cuda_available = torch.cuda.is_available()
+            
         if checkpoint is None:
             checkpoint = self.checkpoint
         else:

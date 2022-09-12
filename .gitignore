@@ -9,3 +9,4 @@
 *checkpoint*
 *.zarr
 *.n5
+*.pytest*

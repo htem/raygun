@@ -11,6 +11,7 @@ from torch.optim import Adam
 # class NotACycleModel(FreezableModel):
 class NotACycleModel(nn.Module):
     def __init__(self, 
+                perseverate = 3,
                 **kwargs
                 ):        
         # output_arrays = ['fake_B', 'cycled_B', 'fake_A', 'cycled_A']
@@ -40,17 +41,17 @@ class NotACycleModel(nn.Module):
             )
         
         self.B_encoder = nn.Sequential(
-                nn.Conv3d(1, 16, 9, padding='same'),
+                nn.Conv3d(1, 16, 9, padding='same'),                
                 nn.ReLU(),
                 nn.Conv3d(16, 16, 7, padding='same'),
                 nn.ReLU(),
-                nn.Conv3d(16, 32, 5, 2, padding=2), # Downsample with preservation
+                nn.Conv3d(16, 32, 5, 2, padding=2), # Downsample with "preservation"
                 nn.ReLU(),
                 nn.Conv3d(32, 32, 3, padding='same'),
                 nn.ReLU(),
                 nn.Conv3d(32, 32, 3, padding='same'),
                 nn.ReLU(),
-                nn.Conv3d(32, 64, 3, 2, padding=1), # Downsample with preservation
+                nn.Conv3d(32, 64, 3, 2, padding=1), # Downsample with "preservation"
                 nn.ReLU(),
                 nn.Conv3d(64, 64, 3, padding='same'),
                 nn.ReLU(),
@@ -61,10 +62,10 @@ class NotACycleModel(nn.Module):
         self.latent = nn.Sequential(                
                 nn.Conv3d(64, 128, 5, padding='same'),
                 nn.ReLU(),               
-                # nn.Conv3d(128, 256, 3, padding='same'),
-                # nn.ReLU(),               
-                # nn.Conv3d(256, 128, 3, padding='same'),
-                # nn.ReLU(),               
+                nn.Conv3d(128, 256, 3, padding='same'),
+                nn.ReLU(),               
+                nn.Conv3d(256, 128, 3, padding='same'),
+                nn.ReLU(),               
                 nn.Conv3d(128, 128, 3, padding='same'),
                 nn.ReLU(),
             )
@@ -74,13 +75,13 @@ class NotACycleModel(nn.Module):
                 nn.ReLU(),
                 nn.Conv3d(128, 64, 3, padding='same'),
                 nn.ReLU(),
-                nn.ConvTranspose3d(64, 32, 2, 2), # Upsample with preservation
+                nn.ConvTranspose3d(64, 32, 2, 2), # Upsample with "preservation"
                 nn.ReLU(),
                 nn.Conv3d(32, 32, 3, padding='same'),
                 nn.ReLU(),
                 nn.Conv3d(32, 32, 3, padding='same'),
                 nn.ReLU(),
-                nn.ConvTranspose3d(32, 16, 2, 2), # Upsample with preservation
+                nn.ConvTranspose3d(32, 16, 2, 2), # Upsample with "preservation"
                 nn.ReLU(),
                 nn.Conv3d(16, 16, 7, padding='same'),
                 nn.ReLU(),
@@ -107,13 +108,13 @@ class NotACycleModel(nn.Module):
         
         self.critic = nn.Sequential(
                 nn.Conv3d(128, 256, 2),
-                nn.BatchNorm3d(256),
+                nn.InstanceNorm3d(256),
                 nn.LeakyReLU(),
                 nn.Conv3d(256, 128, 2),
-                nn.BatchNorm3d(128),
+                nn.InstanceNorm3d(128),
                 nn.LeakyReLU(),
                 nn.Conv3d(128, 64, 2),
-                nn.BatchNorm3d(64),
+                nn.InstanceNorm3d(64),
                 nn.LeakyReLU(),
                 nn.Conv3d(64, 1, 2),
             )
@@ -123,12 +124,12 @@ class NotACycleModel(nn.Module):
         self.encode_optimizer = Adam(itertools.chain(self.A_encoder.parameters(), self.B_encoder.parameters(), self.latent.parameters()), lr=1e-4)
         self.critic_optimizer = Adam(self.critic.parameters(), lr=1e-4)
         
-        self.perseverate = 3
+        self.perseverate = perseverate
 
         self.loss_dict = {}
         self.NaC_nets = [self.A_encoder, self.B_encoder, self.latent, self.A_decoder, self.B_decoder]
         for net in self.NaC_nets + [self.critic]:
-            init_weights(net)
+            init_weights(net, 'kaiming')
 
     # def set_crop_pad(self, crop_pad, ndims):
         # self.crop_pad = (slice(None,None,None),)*2 + (slice(crop_pad,-crop_pad),)*ndims

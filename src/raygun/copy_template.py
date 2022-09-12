@@ -21,8 +21,7 @@ def include_patterns(inc_patterns, ig_patterns):
     return _ignore_patterns
 
 def copy_template(source, destination):
-    copytree(source, destination, ignore=include_patterns(['*_conf.json', 'retrain.sh'], ['tensorboard', 'models', 'tensorboards']))
-
+    copytree(source, destination, ignore=include_patterns(['*_conf.json', 'retrain.sh'], ['tensorboard', 'models', 'tensorboards', 'snapshots']))
 
 if __name__ == '__main__':
     copy_template(sys.argv[1], sys.argv[2])
