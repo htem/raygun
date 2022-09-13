@@ -1,0 +1,20 @@
+{
+    "compressor": {  "id": "blosc", 
+                    "clevel": 3,
+                    "cname": "blosclz",
+                    "blocksize": [64,64,64]
+                    },
+    
+    "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13/train_conf.json",
+    
+    "source_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5",
+    "source_dataset": "volumes/raw_30nm",
+
+    "net_name": "netG2",
+    "checkpoint": 162000,
+    "read_size": 64,
+    "crop": 16,
+
+    "num_workers": 1,//23,
+    "max_retries": 2
+}
