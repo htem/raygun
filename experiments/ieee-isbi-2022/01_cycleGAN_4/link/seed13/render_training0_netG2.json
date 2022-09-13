@@ -1,9 +1,9 @@
-{
-    "compressor": {  "id": "blosc", 
-                    "clevel": 3,
-                    "cname": "blosclz",
-                    "blocksize": [64,64,64]
-                    },
+{   
+    // "compressor": {"id": "blosc", 
+    //                 "clevel": 3,
+    //                 "cname": "blosclz",
+    //                 "blocksize": 64
+    //                 },
     
     "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13/train_conf.json",
     
@@ -15,6 +15,8 @@
     "read_size": 64,
     "crop": 16,
 
-    "num_workers": 1,//23,
-    "max_retries": 2
+    "num_workers": 16,
+    "max_retries": 2,
+
+    "launch_command": "bsub -n 16 -gpu \"num=1\" -q gpu_tesla -o predict.log"
 }

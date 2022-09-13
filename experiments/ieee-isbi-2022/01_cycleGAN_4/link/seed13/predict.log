@@ -1,271 +1,574 @@
 WARNING:raygun.read_config:JAX unavailable.
-INFO:__main__:Loading prediction config...
-INFO:daisy.datasets:Reusing existing dataset
-INFO:__main__:Running blockwise prediction...
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:00<?, ?blocks/s]render_training0_netG2 ▶:   0%|          | 0/29791 [00:00<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/14 with read ROI [18480:20400, 49200:51120, 960:2880] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 1440:2400] (960, 960, 960) failed in worker 0 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:16<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:16<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:16<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/39 with read ROI [18480:20400, 49200:51120, 2880:4800] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 3360:4320] (960, 960, 960) failed in worker 0 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:16<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:16<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:16<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/88 with read ROI [18480:20400, 49200:51120, 4800:6720] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 5280:6240] (960, 960, 960) failed in worker 0 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:16<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:16<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:17<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/169 with read ROI [18480:20400, 49200:51120, 6720:8640] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 7200:8160] (960, 960, 960) failed in worker 0 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:17<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:17<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=0 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:17<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:17<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/290 with read ROI [18480:20400, 49200:51120, 8640:10560] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 9120:10080] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:17<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:21<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:21<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/459 with read ROI [18480:20400, 49200:51120, 10560:12480] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 11040:12000] (960, 960, 960) failed in worker 1 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/684 with read ROI [18480:20400, 49200:51120, 12480:14400] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 12960:13920] (960, 960, 960) failed in worker 1 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/973 with read ROI [18480:20400, 49200:51120, 14400:16320] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 14880:15840] (960, 960, 960) failed in worker 1 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1334 with read ROI [18480:20400, 49200:51120, 16320:18240] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 16800:17760] (960, 960, 960) failed in worker 1 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=1 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1775 with read ROI [18480:20400, 49200:51120, 18240:20160] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 18720:19680] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:23<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:27<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:27<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2304 with read ROI [18480:20400, 49200:51120, 20160:22080] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 20640:21600] (960, 960, 960) failed in worker 2 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:29<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:29<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:29<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2929 with read ROI [18480:20400, 49200:51120, 22080:24000] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 22560:23520] (960, 960, 960) failed in worker 2 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:29<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:29<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:29<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/3658 with read ROI [18480:20400, 49200:51120, 24000:25920] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 24480:25440] (960, 960, 960) failed in worker 2 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:29<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:29<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:30<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/4499 with read ROI [18480:20400, 49200:51120, 25920:27840] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 26400:27360] (960, 960, 960) failed in worker 2 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:30<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:30<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=2 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:30<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:30<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/5460 with read ROI [18480:20400, 49200:51120, 27840:29760] (1920, 1920, 1920) and write ROI [18960:19920, 49680:50640, 28320:29280] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:30<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:34<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:34<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/46 with read ROI [18480:20400, 51120:53040, 960:2880] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 1440:2400] (960, 960, 960) failed in worker 3 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:36<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:36<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:36<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/95 with read ROI [18480:20400, 51120:53040, 2880:4800] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 3360:4320] (960, 960, 960) failed in worker 3 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:36<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:36<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:36<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/176 with read ROI [18480:20400, 51120:53040, 4800:6720] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 5280:6240] (960, 960, 960) failed in worker 3 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:36<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:36<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:36<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/297 with read ROI [18480:20400, 51120:53040, 6720:8640] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 7200:8160] (960, 960, 960) failed in worker 3 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:36<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:36<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=3 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:37<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:37<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/466 with read ROI [18480:20400, 51120:53040, 8640:10560] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 9120:10080] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:37<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:41<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:41<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/691 with read ROI [18480:20400, 51120:53040, 10560:12480] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 11040:12000] (960, 960, 960) failed in worker 4 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:42<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:42<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:42<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/980 with read ROI [18480:20400, 51120:53040, 12480:14400] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 12960:13920] (960, 960, 960) failed in worker 4 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:42<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:42<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:43<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1341 with read ROI [18480:20400, 51120:53040, 14400:16320] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 14880:15840] (960, 960, 960) failed in worker 4 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:43<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:43<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:43<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1782 with read ROI [18480:20400, 51120:53040, 16320:18240] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 16800:17760] (960, 960, 960) failed in worker 4 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:43<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:43<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=4 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:43<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:43<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2311 with read ROI [18480:20400, 51120:53040, 18240:20160] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 18720:19680] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:43<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:47<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:47<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2936 with read ROI [18480:20400, 51120:53040, 20160:22080] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 20640:21600] (960, 960, 960) failed in worker 5 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/3665 with read ROI [18480:20400, 51120:53040, 22080:24000] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 22560:23520] (960, 960, 960) failed in worker 5 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/4506 with read ROI [18480:20400, 51120:53040, 24000:25920] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 24480:25440] (960, 960, 960) failed in worker 5 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/5467 with read ROI [18480:20400, 51120:53040, 25920:27840] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 26400:27360] (960, 960, 960) failed in worker 5 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=5 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/6556 with read ROI [18480:20400, 51120:53040, 27840:29760] (1920, 1920, 1920) and write ROI [18960:19920, 51600:52560, 28320:29280] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:49<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:53<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:53<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/106 with read ROI [18480:20400, 53040:54960, 960:2880] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 1440:2400] (960, 960, 960) failed in worker 6 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:55<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:55<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:55<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/187 with read ROI [18480:20400, 53040:54960, 2880:4800] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 3360:4320] (960, 960, 960) failed in worker 6 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:55<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:55<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:55<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/308 with read ROI [18480:20400, 53040:54960, 4800:6720] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 5280:6240] (960, 960, 960) failed in worker 6 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:55<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:55<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:56<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/477 with read ROI [18480:20400, 53040:54960, 6720:8640] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 7200:8160] (960, 960, 960) failed in worker 6 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:56<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:56<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=6 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:56<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [00:56<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/702 with read ROI [18480:20400, 53040:54960, 8640:10560] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 9120:10080] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [00:56<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:00<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:00<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/991 with read ROI [18480:20400, 53040:54960, 10560:12480] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 11040:12000] (960, 960, 960) failed in worker 7 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1352 with read ROI [18480:20400, 53040:54960, 12480:14400] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 12960:13920] (960, 960, 960) failed in worker 7 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1793 with read ROI [18480:20400, 53040:54960, 14400:16320] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 14880:15840] (960, 960, 960) failed in worker 7 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2322 with read ROI [18480:20400, 53040:54960, 16320:18240] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 16800:17760] (960, 960, 960) failed in worker 7 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=7 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2947 with read ROI [18480:20400, 53040:54960, 18240:20160] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 18720:19680] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:02<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:06<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:06<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/3676 with read ROI [18480:20400, 53040:54960, 20160:22080] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 20640:21600] (960, 960, 960) failed in worker 8 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:08<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:08<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:08<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/4517 with read ROI [18480:20400, 53040:54960, 22080:24000] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 22560:23520] (960, 960, 960) failed in worker 8 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:08<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:08<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:08<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/5478 with read ROI [18480:20400, 53040:54960, 24000:25920] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 24480:25440] (960, 960, 960) failed in worker 8 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:08<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:08<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:08<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/6567 with read ROI [18480:20400, 53040:54960, 25920:27840] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 26400:27360] (960, 960, 960) failed in worker 8 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:08<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:08<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=8 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:09<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:09<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/7792 with read ROI [18480:20400, 53040:54960, 27840:29760] (1920, 1920, 1920) and write ROI [18960:19920, 53520:54480, 28320:29280] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:09<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:13<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:13<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/202 with read ROI [18480:20400, 54960:56880, 960:2880] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 1440:2400] (960, 960, 960) failed in worker 9 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:14<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:14<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/323 with read ROI [18480:20400, 54960:56880, 2880:4800] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 3360:4320] (960, 960, 960) failed in worker 9 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/492 with read ROI [18480:20400, 54960:56880, 4800:6720] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 5280:6240] (960, 960, 960) failed in worker 9 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/717 with read ROI [18480:20400, 54960:56880, 6720:8640] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 7200:8160] (960, 960, 960) failed in worker 9 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=9 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1006 with read ROI [18480:20400, 54960:56880, 8640:10560] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 9120:10080] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:15<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:19<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:19<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1367 with read ROI [18480:20400, 54960:56880, 10560:12480] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 11040:12000] (960, 960, 960) failed in worker 10 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:21<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:21<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:21<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1808 with read ROI [18480:20400, 54960:56880, 12480:14400] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 12960:13920] (960, 960, 960) failed in worker 10 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:21<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:21<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:21<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2337 with read ROI [18480:20400, 54960:56880, 14400:16320] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 14880:15840] (960, 960, 960) failed in worker 10 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:21<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:21<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:21<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2962 with read ROI [18480:20400, 54960:56880, 16320:18240] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 16800:17760] (960, 960, 960) failed in worker 10 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:21<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:21<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=10 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:22<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:22<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/3691 with read ROI [18480:20400, 54960:56880, 18240:20160] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 18720:19680] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:22<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:25<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:25<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/4532 with read ROI [18480:20400, 54960:56880, 20160:22080] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 20640:21600] (960, 960, 960) failed in worker 11 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:27<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:27<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:27<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/5493 with read ROI [18480:20400, 54960:56880, 22080:24000] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 22560:23520] (960, 960, 960) failed in worker 11 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:27<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:27<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:28<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/6582 with read ROI [18480:20400, 54960:56880, 24000:25920] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 24480:25440] (960, 960, 960) failed in worker 11 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:28<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:28<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:28<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/7807 with read ROI [18480:20400, 54960:56880, 25920:27840] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 26400:27360] (960, 960, 960) failed in worker 11 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:28<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:28<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=11 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:28<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:28<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/9176 with read ROI [18480:20400, 54960:56880, 27840:29760] (1920, 1920, 1920) and write ROI [18960:19920, 55440:56400, 28320:29280] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:28<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:32<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:32<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/342 with read ROI [18480:20400, 56880:58800, 960:2880] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 1440:2400] (960, 960, 960) failed in worker 12 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/511 with read ROI [18480:20400, 56880:58800, 2880:4800] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 3360:4320] (960, 960, 960) failed in worker 12 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/736 with read ROI [18480:20400, 56880:58800, 4800:6720] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 5280:6240] (960, 960, 960) failed in worker 12 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1025 with read ROI [18480:20400, 56880:58800, 6720:8640] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 7200:8160] (960, 960, 960) failed in worker 12 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=12 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1386 with read ROI [18480:20400, 56880:58800, 8640:10560] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 9120:10080] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:34<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:38<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:38<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1827 with read ROI [18480:20400, 56880:58800, 10560:12480] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 11040:12000] (960, 960, 960) failed in worker 13 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:40<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:40<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:40<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2356 with read ROI [18480:20400, 56880:58800, 12480:14400] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 12960:13920] (960, 960, 960) failed in worker 13 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:40<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:40<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:40<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2981 with read ROI [18480:20400, 56880:58800, 14400:16320] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 14880:15840] (960, 960, 960) failed in worker 13 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:41<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:41<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:41<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/3710 with read ROI [18480:20400, 56880:58800, 16320:18240] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 16800:17760] (960, 960, 960) failed in worker 13 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:41<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:41<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=13 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:41<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:41<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/4551 with read ROI [18480:20400, 56880:58800, 18240:20160] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 18720:19680] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:41<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:45<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:45<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/5512 with read ROI [18480:20400, 56880:58800, 20160:22080] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 20640:21600] (960, 960, 960) failed in worker 14 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/6601 with read ROI [18480:20400, 56880:58800, 22080:24000] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 22560:23520] (960, 960, 960) failed in worker 14 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/7826 with read ROI [18480:20400, 56880:58800, 24000:25920] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 24480:25440] (960, 960, 960) failed in worker 14 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/9195 with read ROI [18480:20400, 56880:58800, 25920:27840] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 26400:27360] (960, 960, 960) failed in worker 14 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=14 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/10716 with read ROI [18480:20400, 56880:58800, 27840:29760] (1920, 1920, 1920) and write ROI [18960:19920, 57360:58320, 28320:29280] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:47<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:51<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:51<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/534 with read ROI [18480:20400, 58800:60720, 960:2880] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 1440:2400] (960, 960, 960) failed in worker 15 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:53<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:53<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:53<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/759 with read ROI [18480:20400, 58800:60720, 2880:4800] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 3360:4320] (960, 960, 960) failed in worker 15 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:53<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:53<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:53<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1048 with read ROI [18480:20400, 58800:60720, 4800:6720] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 5280:6240] (960, 960, 960) failed in worker 15 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:54<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:54<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:54<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1409 with read ROI [18480:20400, 58800:60720, 6720:8640] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 7200:8160] (960, 960, 960) failed in worker 15 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:54<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:54<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=15 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:54<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:54<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1850 with read ROI [18480:20400, 58800:60720, 8640:10560] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 9120:10080] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [01:54<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:58<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [01:58<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2379 with read ROI [18480:20400, 58800:60720, 10560:12480] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 11040:12000] (960, 960, 960) failed in worker 16 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/3004 with read ROI [18480:20400, 58800:60720, 12480:14400] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 12960:13920] (960, 960, 960) failed in worker 16 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/3733 with read ROI [18480:20400, 58800:60720, 14400:16320] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 14880:15840] (960, 960, 960) failed in worker 16 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/4574 with read ROI [18480:20400, 58800:60720, 16320:18240] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 16800:17760] (960, 960, 960) failed in worker 16 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=16 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/5535 with read ROI [18480:20400, 58800:60720, 18240:20160] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 18720:19680] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:00<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:04<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:04<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/6624 with read ROI [18480:20400, 58800:60720, 20160:22080] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 20640:21600] (960, 960, 960) failed in worker 17 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:06<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:06<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:06<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/7849 with read ROI [18480:20400, 58800:60720, 22080:24000] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 22560:23520] (960, 960, 960) failed in worker 17 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:06<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:06<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:06<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/9218 with read ROI [18480:20400, 58800:60720, 24000:25920] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 24480:25440] (960, 960, 960) failed in worker 17 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:07<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:07<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:07<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/10739 with read ROI [18480:20400, 58800:60720, 25920:27840] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 26400:27360] (960, 960, 960) failed in worker 17 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:07<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:07<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=17 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:07<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:07<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/12420 with read ROI [18480:20400, 58800:60720, 27840:29760] (1920, 1920, 1920) and write ROI [18960:19920, 59280:60240, 28320:29280] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:07<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:11<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:11<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/786 with read ROI [18480:20400, 60720:62640, 960:2880] (1920, 1920, 1920) and write ROI [18960:19920, 61200:62160, 1440:2400] (960, 960, 960) failed in worker 18 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1075 with read ROI [18480:20400, 60720:62640, 2880:4800] (1920, 1920, 1920) and write ROI [18960:19920, 61200:62160, 3360:4320] (960, 960, 960) failed in worker 18 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1436 with read ROI [18480:20400, 60720:62640, 4800:6720] (1920, 1920, 1920) and write ROI [18960:19920, 61200:62160, 5280:6240] (960, 960, 960) failed in worker 18 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/1877 with read ROI [18480:20400, 60720:62640, 6720:8640] (1920, 1920, 1920) and write ROI [18960:19920, 61200:62160, 7200:8160] (960, 960, 960) failed in worker 18 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=18 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/2406 with read ROI [18480:20400, 60720:62640, 8640:10560] (1920, 1920, 1920) and write ROI [18960:19920, 61200:62160, 9120:10080] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:13<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:17<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:17<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/3031 with read ROI [18480:20400, 60720:62640, 10560:12480] (1920, 1920, 1920) and write ROI [18960:19920, 61200:62160, 11040:12000] (960, 960, 960) failed in worker 19 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:19<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:19<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:19<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/3760 with read ROI [18480:20400, 60720:62640, 12480:14400] (1920, 1920, 1920) and write ROI [18960:19920, 61200:62160, 12960:13920] (960, 960, 960) failed in worker 19 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:19<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:19<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:20<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/4601 with read ROI [18480:20400, 60720:62640, 14400:16320] (1920, 1920, 1920) and write ROI [18960:19920, 61200:62160, 14880:15840] (960, 960, 960) failed in worker 19 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:20<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:20<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:20<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/5562 with read ROI [18480:20400, 60720:62640, 16320:18240] (1920, 1920, 1920) and write ROI [18960:19920, 61200:62160, 16800:17760] (960, 960, 960) failed in worker 19 with TypeError('an integer is required')
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:20<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:20<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]ERROR:daisy.task_worker_pools:Worker hostname=10.36.109.11:port=15505:task_id=render_training0_netG2:worker_id=19 failed too many times, restarting this worker...
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:20<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:20<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]ERROR:daisy.server:Block render_training0_netG2/6651 with read ROI [18480:20400, 60720:62640, 18240:20160] (1920, 1920, 1920) and write ROI [18960:19920, 61200:62160, 18720:19680] (960, 960, 960) was lost, returning it to scheduler
-render_training0_netG2 ▶:   0%|          | 0/29791 [02:20<?, ?blocks/s, ⧗=26416, ▶=0, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:24<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:24<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]render_training0_netG2 ▶:   0%|          | 0/29791 [02:26<?, ?blocks/s, ⧗=26416, ▶=1, ✔=0, ✗=0, ∅=0]
-INFO:__main__:Done.
-
-Execution Summary
------------------
-
-  Task render_training0_netG2:
-
-    num blocks : 29791
-    completed ✔: 0 (skipped 0)
-    failed    ✗: 0
-    orphaned  ∅: 0
-
-    Failed Blocks:
-
-      block 14 in worker 0 with exception TypeError('an integer is required')
-      block 39 in worker 0 with exception TypeError('an integer is required')
-      block 88 in worker 0 with exception TypeError('an integer is required')
-      block 169 in worker 0 with exception TypeError('an integer is required')
-      block 459 in worker 1 with exception TypeError('an integer is required')
-      block 684 in worker 1 with exception TypeError('an integer is required')
-      block 973 in worker 1 with exception TypeError('an integer is required')
-      block 1334 in worker 1 with exception TypeError('an integer is required')
-      block 2304 in worker 2 with exception TypeError('an integer is required')
-      block 2929 in worker 2 with exception TypeError('an integer is required')
-      block 3658 in worker 2 with exception TypeError('an integer is required')
-      block 4499 in worker 2 with exception TypeError('an integer is required')
-      block 46 in worker 3 with exception TypeError('an integer is required')
-      block 95 in worker 3 with exception TypeError('an integer is required')
-      block 176 in worker 3 with exception TypeError('an integer is required')
-      block 297 in worker 3 with exception TypeError('an integer is required')
-      block 691 in worker 4 with exception TypeError('an integer is required')
-      block 980 in worker 4 with exception TypeError('an integer is required')
-      block 1341 in worker 4 with exception TypeError('an integer is required')
-      block 1782 in worker 4 with exception TypeError('an integer is required')
-      block 2936 in worker 5 with exception TypeError('an integer is required')
-      block 3665 in worker 5 with exception TypeError('an integer is required')
-      block 4506 in worker 5 with exception TypeError('an integer is required')
-      block 5467 in worker 5 with exception TypeError('an integer is required')
-      block 106 in worker 6 with exception TypeError('an integer is required')
-      block 187 in worker 6 with exception TypeError('an integer is required')
-      block 308 in worker 6 with exception TypeError('an integer is required')
-      block 477 in worker 6 with exception TypeError('an integer is required')
-      block 991 in worker 7 with exception TypeError('an integer is required')
-      block 1352 in worker 7 with exception TypeError('an integer is required')
-      block 1793 in worker 7 with exception TypeError('an integer is required')
-      block 2322 in worker 7 with exception TypeError('an integer is required')
-      block 3676 in worker 8 with exception TypeError('an integer is required')
-      block 4517 in worker 8 with exception TypeError('an integer is required')
-      block 5478 in worker 8 with exception TypeError('an integer is required')
-      block 6567 in worker 8 with exception TypeError('an integer is required')
-      block 202 in worker 9 with exception TypeError('an integer is required')
-      block 323 in worker 9 with exception TypeError('an integer is required')
-      block 492 in worker 9 with exception TypeError('an integer is required')
-      block 717 in worker 9 with exception TypeError('an integer is required')
-      block 1367 in worker 10 with exception TypeError('an integer is required')
-      block 1808 in worker 10 with exception TypeError('an integer is required')
-      block 2337 in worker 10 with exception TypeError('an integer is required')
-      block 2962 in worker 10 with exception TypeError('an integer is required')
-      block 4532 in worker 11 with exception TypeError('an integer is required')
-      block 5493 in worker 11 with exception TypeError('an integer is required')
-      block 6582 in worker 11 with exception TypeError('an integer is required')
-      block 7807 in worker 11 with exception TypeError('an integer is required')
-      block 342 in worker 12 with exception TypeError('an integer is required')
-      block 511 in worker 12 with exception TypeError('an integer is required')
-      block 736 in worker 12 with exception TypeError('an integer is required')
-      block 1025 in worker 12 with exception TypeError('an integer is required')
-      block 1827 in worker 13 with exception TypeError('an integer is required')
-      block 2356 in worker 13 with exception TypeError('an integer is required')
-      block 2981 in worker 13 with exception TypeError('an integer is required')
-      block 3710 in worker 13 with exception TypeError('an integer is required')
-      block 5512 in worker 14 with exception TypeError('an integer is required')
-      block 6601 in worker 14 with exception TypeError('an integer is required')
-      block 7826 in worker 14 with exception TypeError('an integer is required')
-      block 9195 in worker 14 with exception TypeError('an integer is required')
-      block 534 in worker 15 with exception TypeError('an integer is required')
-      block 759 in worker 15 with exception TypeError('an integer is required')
-      block 1048 in worker 15 with exception TypeError('an integer is required')
-      block 1409 in worker 15 with exception TypeError('an integer is required')
-      block 2379 in worker 16 with exception TypeError('an integer is required')
-      block 3004 in worker 16 with exception TypeError('an integer is required')
-      block 3733 in worker 16 with exception TypeError('an integer is required')
-      block 4574 in worker 16 with exception TypeError('an integer is required')
-      block 6624 in worker 17 with exception TypeError('an integer is required')
-      block 7849 in worker 17 with exception TypeError('an integer is required')
-      block 9218 in worker 17 with exception TypeError('an integer is required')
-      block 10739 in worker 17 with exception TypeError('an integer is required')
-      block 786 in worker 18 with exception TypeError('an integer is required')
-      block 1075 in worker 18 with exception TypeError('an integer is required')
-      block 1436 in worker 18 with exception TypeError('an integer is required')
-      block 1877 in worker 18 with exception TypeError('an integer is required')
-      block 3031 in worker 19 with exception TypeError('an integer is required')
-      block 3760 in worker 19 with exception TypeError('an integer is required')
-      block 4601 in worker 19 with exception TypeError('an integer is required')
-      block 5562 in worker 19 with exception TypeError('an integer is required')
-
-    See worker logs for details:
-
-      daisy_logs/render_training0_netG2/worker_0.err / .out
-      daisy_logs/render_training0_netG2/worker_0.err / .out
-      daisy_logs/render_training0_netG2/worker_0.err / .out
-      daisy_logs/render_training0_netG2/worker_0.err / .out
-      daisy_logs/render_training0_netG2/worker_1.err / .out
-      daisy_logs/render_training0_netG2/worker_1.err / .out
-      daisy_logs/render_training0_netG2/worker_1.err / .out
-      daisy_logs/render_training0_netG2/worker_1.err / .out
-      daisy_logs/render_training0_netG2/worker_2.err / .out
-      daisy_logs/render_training0_netG2/worker_2.err / .out
-      ...
+WARNING:raygun.read_config:JAX unavailable.
+WARNING:raygun.read_config:JAX unavailable.
+INFO:crop_worker_5:Launching 5...
+INFO:crop_worker_8:Launching 8...
+INFO:crop_worker_6:Launching 6...
+...
+initialize network with kaiming
+initialize network with kaiming
+initialize network with kaiming
+initialize network with kaiming
+initialize network with kaiming
+initialize network with kaiming
+initialize network with kaiming
+initialize network with kaiming
+initialize network with kaiming
+initialize network with kaiming
+initialize network with kaiming
+initialize network with kaiming
 
 ------------------------------------------------------------
-Sender: LSF System <lsfadmin@h09u01>
-Subject: Job 125251350: <python ../../../../../src/raygun/torch/predict/predict.py /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13/render_training0_netG2.json> in cluster <Janelia> Exited
+Sender: LSF System <lsfadmin@h09u15>
+Subject: Job 125260644: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
 
-Job <python ../../../../../src/raygun/torch/predict/predict.py /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13/render_training0_netG2.json> was submitted from host <e05u15> by user <rhoadesj> in cluster <Janelia> at Mon Sep 12 20:52:17 2022
-Job was executed on host(s) <16*h09u01>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Mon Sep 12 20:52:17 2022
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u15>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
 </groups/funke/home/rhoadesj> was used as the home directory.
 </nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
-Started at Mon Sep 12 20:52:17 2022
-Terminated at Mon Sep 12 20:54:53 2022
-Results reported at Mon Sep 12 20:54:53 2022
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:40 2022
+Results reported at Tue Sep 13 13:31:40 2022
 
 Your job looked like:
 
 ------------------------------------------------------------
 # LSBATCH: User input
-python ../../../../../src/raygun/torch/predict/predict.py /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13/render_training0_netG2.json
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
 ------------------------------------------------------------
 
-TERM_OWNER: job killed by owner.
-Exited with signal termination: 14.
+Successfully completed.
 
 Resource usage summary:
 
-    CPU time :                                   354.44 sec.
-    Max Memory :                                 2041 MB
-    Average Memory :                             1118.27 MB
+    CPU time :                                   11070.14 sec.
+    Max Memory :                                 1978 MB
+    Average Memory :                             1954.56 MB
     Total Requested Memory :                     491520.00 MB
-    Delta Memory :                               489479.00 MB
+    Delta Memory :                               489542.00 MB
     Max Swap :                                   -
-    Max Processes :                              4
-    Max Threads :                                46
-    Run time :                                   158 sec.
-    Turnaround time :                            156 sec.
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   562 sec.
+    Turnaround time :                            561 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h09u10>
+Subject: Job 125260652: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u10>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:40 2022
+Results reported at Tue Sep 13 13:31:40 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   11081.81 sec.
+    Max Memory :                                 1957 MB
+    Average Memory :                             1928.18 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               489563.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   562 sec.
+    Turnaround time :                            561 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h09u02>
+Subject: Job 125260649: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u02>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:23 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:23 2022
+Terminated at Tue Sep 13 13:31:40 2022
+Results reported at Tue Sep 13 13:31:40 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   11180.27 sec.
+    Max Memory :                                 1960 MB
+    Average Memory :                             1934.26 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               489560.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   561 sec.
+    Turnaround time :                            561 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h09u01>
+Subject: Job 125260643: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u01>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:41 2022
+Results reported at Tue Sep 13 13:31:41 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   11478.01 sec.
+    Max Memory :                                 1956 MB
+    Average Memory :                             1933.35 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               489564.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   563 sec.
+    Turnaround time :                            562 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h09u15>
+Subject: Job 125260646: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u15>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:41 2022
+Results reported at Tue Sep 13 13:31:41 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   10926.58 sec.
+    Max Memory :                                 1959 MB
+    Average Memory :                             1930.93 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               489561.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   562 sec.
+    Turnaround time :                            562 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h09u15>
+Subject: Job 125260645: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u15>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:41 2022
+Results reported at Tue Sep 13 13:31:41 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   10295.42 sec.
+    Max Memory :                                 1965 MB
+    Average Memory :                             1936.03 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               489555.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   562 sec.
+    Turnaround time :                            562 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h10u16>
+Subject: Job 125260656: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h10u16>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:42 2022
+Results reported at Tue Sep 13 13:31:42 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   13115.21 sec.
+    Max Memory :                                 2778 MB
+    Average Memory :                             2736.59 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               488742.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   561 sec.
+    Turnaround time :                            563 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h10u20>
+Subject: Job 125260657: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h10u20>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:43 2022
+Results reported at Tue Sep 13 13:31:43 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   12900.26 sec.
+    Max Memory :                                 2780 MB
+    Average Memory :                             2752.47 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               488740.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   561 sec.
+    Turnaround time :                            564 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h10u24>
+Subject: Job 125260658: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h10u24>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:43 2022
+Results reported at Tue Sep 13 13:31:43 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   11907.72 sec.
+    Max Memory :                                 2778 MB
+    Average Memory :                             2749.75 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               488742.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   561 sec.
+    Turnaround time :                            564 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h09u10>
+Subject: Job 125260651: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u10>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:43 2022
+Results reported at Tue Sep 13 13:31:43 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   10603.39 sec.
+    Max Memory :                                 1955 MB
+    Average Memory :                             1923.14 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               489565.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   562 sec.
+    Turnaround time :                            564 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h09u10>
+Subject: Job 125260650: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u10>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:43 2022
+Results reported at Tue Sep 13 13:31:43 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   10874.98 sec.
+    Max Memory :                                 1968 MB
+    Average Memory :                             1889.41 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               489552.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   562 sec.
+    Turnaround time :                            564 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h09u02>
+Subject: Job 125260648: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u02>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:23 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:23 2022
+Terminated at Tue Sep 13 13:31:45 2022
+Results reported at Tue Sep 13 13:31:45 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   10906.60 sec.
+    Max Memory :                                 1960 MB
+    Average Memory :                             1932.69 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               489560.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   561 sec.
+    Turnaround time :                            566 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h09u02>
+Subject: Job 125260647: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u02>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:45 2022
+Results reported at Tue Sep 13 13:31:45 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   10748.26 sec.
+    Max Memory :                                 1973 MB
+    Average Memory :                             1915.78 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               489547.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   561 sec.
+    Turnaround time :                            566 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h09u05>
+Subject: Job 125260653: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u05>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:19 2022
+Terminated at Tue Sep 13 13:31:45 2022
+Results reported at Tue Sep 13 13:31:45 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   10817.60 sec.
+    Max Memory :                                 1961 MB
+    Average Memory :                             1910.28 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               489559.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   563 sec.
+    Turnaround time :                            566 sec.
+
+The output (if any) is above this job summary.
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h09u05>
+Subject: Job 125260654: <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> in cluster <Janelia> Done
+
+Job <python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json> was submitted from host <vm7134> by user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:19 2022
+Job was executed on host(s) <16*h09u05>, in queue <gpu_tesla>, as user <rhoadesj> in cluster <Janelia> at Tue Sep 13 13:22:21 2022
+</groups/funke/home/rhoadesj> was used as the home directory.
+</nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_4/link/seed13> was used as the working directory.
+Started at Tue Sep 13 13:22:21 2022
+Terminated at Tue Sep 13 13:31:47 2022
+Results reported at Tue Sep 13 13:31:47 2022
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+python /nrs/funke/rhoadesj/raygun/src/raygun/torch/predict/worker.py render_training0_netG2.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   10293.38 sec.
+    Max Memory :                                 1968 MB
+    Average Memory :                             1910.47 MB
+    Total Requested Memory :                     491520.00 MB
+    Delta Memory :                               489552.00 MB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                78
+    Run time :                                   565 sec.
+    Turnaround time :                            568 sec.
 
 The output (if any) is above this job summary.
 
