@@ -83,14 +83,14 @@ def predict(render_config_path=None):
 
     logger.info('Saving viewer script...')
     view_script = os.path.join(os.path.dirname(config_path), f"view_{os.path.basename(source_path).rstrip('.n5').rstrip('.zarr')}.ng")
-    
+
     if not os.path.exists(view_script):
         with open(view_script, "w") as f:
             f.write(f"neuroglancer -f {source_path} -d {source_dataset} -f {dest_path} -d {dest_dataset} ")
 
     else:
         with open(view_script, "a") as f:
-            f.write("{dest_dataset} ")
+            f.write(f"{dest_dataset} ")
 
     logger.info('Done.')
 
