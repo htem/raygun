@@ -11,7 +11,7 @@
     "source_dataset": "volumes/raw_30nm",
 
     "net_name": "netG2",
-    "checkpoint": 162000,
+    "checkpoint": 164000,
     "read_size": 64,
     "crop": 16,
 

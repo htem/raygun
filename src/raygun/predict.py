@@ -1,7 +1,7 @@
 #%%
 from importlib import import_module
 import os
-from subprocess import Popen, call, run
+from subprocess import Popen
 import sys
 import tempfile
 import daisy
@@ -40,7 +40,6 @@ def predict(render_config_path=None):
     read_roi = daisy.Roi([0,0,0], source.voxel_size * read_size)
     write_size = read_size - crop*2
     write_roi = daisy.Roi(source.voxel_size * crop, source.voxel_size * write_size)
-    # chunk_size = int(write_size)
 
     destination = daisy.prepare_ds(
             dest_path, 
@@ -81,6 +80,18 @@ def predict(render_config_path=None):
 
     logger.info('Running blockwise prediction...')
     daisy.run_blockwise([task])
+
+    logger.info('Saving viewer script...')
+    view_script = os.path.join(os.path.dirname(config_path), f"view_{os.path.basename(source_path).rstrip('.n5').rstrip('.zarr')}.ng")
+    
+    if not os.path.exists(view_script):
+        with open(view_script, "w") as f:
+            f.write(f"neuroglancer -f {source_path} -d {source_dataset} -f {dest_path} -d {dest_dataset} ")
+
+    else:
+        with open(view_script, "a") as f:
+            f.write("{dest_dataset} ")
+
     logger.info('Done.')
 
         # os.chdir(cur_dir)

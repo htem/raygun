@@ -5,6 +5,7 @@
 
 # Parts of experiments
 *.out
+*.err
 *tensorboard*
 *checkpoint*
 *.zarr
@@ -12,3 +13,4 @@
 *.pytest*
 *daisy_logs*
 *snapshots*
+*.log
