@@ -26,7 +26,7 @@ def cluster_train(config_path=None):
     config = read_config(config_path)
     os.chdir(os.path.dirname(config_path))
 
-    command = config["job_command"] + [f"-oo {os.path.dirname(config_path)}/train.out", "raygun-train", config_path, "&"]
+    command = config["job_command"] + [f"-J {'.'.join(os.path.dirname(config_path).split('/')[-3:])}", f"-oo {os.path.dirname(config_path)}/train.out", "raygun-train", config_path, "&"]
     try:
         retcode = call(" ".join(command), shell=True)
         if retcode < 0:

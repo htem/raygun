@@ -16,12 +16,12 @@ def include_patterns(inc_patterns, ig_patterns):
         keep = set(name for pattern in inc_patterns
                             for name in filter(names, pattern))
         ignore = set(name for name in names
-                        if name not in keep and not isdir(join(path, name)) or name in ig_patterns)
+                        if name not in keep and not isdir(join(path, name)) or any(ig_pattern in name for ig_pattern in ig_patterns))
         return ignore
     return _ignore_patterns
 
 def copy_template(source, destination):
-    copytree(source, destination, ignore=include_patterns(['*_conf.json', 'retrain.sh'], ['tensorboard', 'models', 'tensorboards', 'snapshots']))
+    copytree(source, destination, ignore=include_patterns(['*_conf.json', 'retrain.sh'], ['tensorboard', 'models', 'tensorboards', 'snapshots', 'daisy_logs', 'log', '.n5', '.zarr']))
 
 if __name__ == '__main__':
     copy_template(sys.argv[1], sys.argv[2])

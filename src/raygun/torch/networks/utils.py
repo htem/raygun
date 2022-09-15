@@ -11,11 +11,14 @@ def get_running_norm_stats(net):
     means = []
     vars = []
     norms = get_norm_layers(net)
-    if len(norms) == 0:
-        return None, None
+
     for norm in norms:
         means.append(norm.running_mean)
         vars.append(norm.running_var)
+
+    if len(means) == 0:
+        return None, None
+
     means = torch.cat(means)
     vars = torch.cat(vars)
     return means, vars

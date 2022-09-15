@@ -76,7 +76,10 @@ class BaseTrain(object):
         training_pipe = self.prenet_pipe(mode)
         
         if mode == 'train':
-            training_pipe += gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)
+            training_pipe += gp.PreCache(num_workers=self.num_workers, cache_size=self.cache_size)        
+        
+        # if mode == 'test':
+        training_pipe += gp.PrintProfilingStats(self.save_every) #TODO: Figure out why this doesn't print / print from batch.profiling_stats
         
         training_pipe += self.train_node        
         
@@ -87,9 +90,6 @@ class BaseTrain(object):
 
             else:
                 training_pipe += section
-        
-        if mode == 'test':
-            training_pipe += gp.PrintProfilingStats() #TODO: Figure out why this doesn't print / print from batch.profiling_stats
         
         if mode == 'train' and self.snapshot_every is not None:
             snapshot_names = {}
