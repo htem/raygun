@@ -1,5 +1,6 @@
 import torch
 
+
 class WeightedMSELoss(torch.nn.MSELoss):
     def __init__(self):
         super().__init__()

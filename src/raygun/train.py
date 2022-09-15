@@ -5,10 +5,12 @@ from subprocess import call
 import sys
 import logging
 from time import sleep
+
 logger = logging.getLogger(__name__)
 
 from .read_config import read_config
 from .utils import get_config_name
+
 
 def cluster_train(config_path=None):
     """Train system via cluster job (available through CLI as raygun-train-cluster)
@@ -26,7 +28,13 @@ def cluster_train(config_path=None):
     config = read_config(config_path)
     os.chdir(os.path.dirname(config_path))
 
-    command = config["job_command"] + [f"-J {'.'.join(os.path.dirname(config_path).split('/')[-3:])}", f"-oo {os.path.dirname(config_path)}/train.out", "raygun-train", config_path, "&"]
+    command = config["job_command"] + [
+        f"-J {'.'.join(os.path.dirname(config_path).split('/')[-3:])}",
+        f"-oo {os.path.dirname(config_path)}/train.out",
+        "raygun-train",
+        config_path,
+        "&",
+    ]
     try:
         retcode = call(" ".join(command), shell=True)
         if retcode < 0:
@@ -35,7 +43,7 @@ def cluster_train(config_path=None):
             print("Child returned", retcode, file=sys.stderr)
     except OSError as e:
         print("Execution failed:", e, file=sys.stderr)
-    
+
     if wait:
         call("wait")
 
@@ -49,41 +57,46 @@ def train(config_path=None):
 
     if config_path is None:
         config_path = sys.argv[1]
-    
+
     config = read_config(config_path)
-    System = getattr(import_module('.'.join(['raygun', config['framework'], 'systems', config['system']])), config['system'])
+    System = getattr(
+        import_module(
+            ".".join(["raygun", config["framework"], "systems", config["system"]])
+        ),
+        config["system"],
+    )
     system = System(config_path)
-    
-    system.logger.info('System loaded. Training...')
+
+    system.logger.info("System loaded. Training...")
     _ = system.train()
-    system.logger.info('Done training!')
+    system.logger.info("Done training!")
 
 
 def _batch_train(folder):
     os.chdir(folder)
-    
-    subfolders = glob('*/')
+
+    subfolders = glob("*/")
     if len(subfolders) > 0:
         config_paths = []
         for subfolder in subfolders:
-            config_paths += _batch_train(subfolder)        
+            config_paths += _batch_train(subfolder)
 
     else:
-        config_path = os.path.realpath('train_conf.json')
+        config_path = os.path.realpath("train_conf.json")
         if os.path.exists(config_path):
             config = read_config(config_path)
-            
-            if 'job_command' in config.keys():
+
+            if "job_command" in config.keys():
                 cluster_train(config_path)
             else:
                 train(config_path)
-            
+
             config_paths = [config_path]
-        
+
         else:
             config_paths = []
-            
-    os.chdir('..')
+
+    os.chdir("..")
     return config_paths
 
 
@@ -92,33 +105,37 @@ def batch_train(base_folder=None):
 
     Args:
         base_folder (str, optional): Path to folder containing base training configuration json file and nested folders for batch training. Defaults to command line argument.
-    """    
-    
+    """
+
     if base_folder is None:
-        base_folder = sys.argv[1]        
-    
+        base_folder = sys.argv[1]
+
     os.chdir(base_folder)
-    base_folder = os.getcwd() # get absolute path
+    base_folder = os.getcwd()  # get absolute path
 
-    config_paths = _batch_train('.')
+    config_paths = _batch_train(".")
 
-    os.makedirs(os.path.join(base_folder, 'tensorboards'), exist_ok=True)
+    os.makedirs(os.path.join(base_folder, "tensorboards"), exist_ok=True)
     while len(config_paths) > 0:
         sleep(5)
         for config_path in config_paths:
             config_name = get_config_name(config_path, base_folder)
 
-            if not os.path.islink(os.path.join(base_folder, 'tensorboards',config_name)):
+            if not os.path.islink(
+                os.path.join(base_folder, "tensorboards", config_name)
+            ):
                 try:
-                    os.symlink(os.path.join(os.path.dirname(config_path), 'tensorboard'), 
-                        os.path.join(base_folder, 'tensorboards', config_name),
-                        target_is_directory=True)
+                    os.symlink(
+                        os.path.join(os.path.dirname(config_path), "tensorboard"),
+                        os.path.join(base_folder, "tensorboards", config_name),
+                        target_is_directory=True,
+                    )
                     config_paths.remove(config_path)
                 except:
                     logger.info(f"Waiting for {config_name} log...")
-    
+
     call("wait")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     train(sys.argv[1])
