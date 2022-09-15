@@ -10,17 +10,20 @@ def get_norm_layers(net):
 def get_running_norm_stats(net):
     means = []
     vars = []
-    norms = get_norm_layers(net)
 
-    for norm in norms:
-        means.append(norm.running_mean)
-        vars.append(norm.running_var)
+    try:
+        norms = get_norm_layers(net)
 
-    if len(means) == 0:
+        for norm in norms:
+            means.append(norm.running_mean)
+            vars.append(norm.running_var)
+
+        means = torch.cat(means)
+        vars = torch.cat(vars)
+        
+    except:
         return None, None
 
-    means = torch.cat(means)
-    vars = torch.cat(vars)
     return means, vars
 
 def set_norm_mode(net, mode='train'):
