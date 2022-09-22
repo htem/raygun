@@ -270,7 +270,7 @@ class Upsample(torch.nn.Module):
 
         else:
 
-            self.up = torch.nn.Upsample(scale_factor=scale_factor, mode=mode)
+            self.up = torch.nn.Upsample(scale_factor=tuple(scale_factor), mode=mode)
 
     def crop_to_factor(self, x, factor, kernel_sizes):
         """Crop feature maps to ensure translation equivariance with stride of
@@ -585,7 +585,9 @@ class UNet(torch.nn.Module):
                             downsample_factors[level],
                             mode="nearest" if constant_upsample else "transposed_conv",
                             input_nc=ngf * fmap_inc_factor ** (level + 1)
-                            + (level == 1 and (add_noise is not False)),
+                            + (
+                                level == 1 and (add_noise is not False)
+                            ),  # TODO Fix NoiseBlock addition...
                             output_nc=ngf * fmap_inc_factor ** (level + 1),
                             crop_factor=crop_factors[level],
                             next_conv_kernel_sizes=kernel_size_up[level],

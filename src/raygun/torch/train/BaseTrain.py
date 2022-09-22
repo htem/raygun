@@ -49,6 +49,8 @@ class BaseTrain(object):
             inspect.signature(loss.forward).parameters.keys()
         ):
             if array_name != "self":
+                if array_name not in self.arrays.keys():
+                    self.arrays[array_name] = gp.ArrayKey(array_name.upper())
                 self.loss_input_dict[i] = self.arrays[array_name]
 
         # create a train node using our model, loss, and optimizer
@@ -74,9 +76,10 @@ class BaseTrain(object):
             + gp.MergeProvider()
         )  # merge upstream pipelines for multiple sources
 
-    def postnet_pipe(self):
-        """Implement in subclasses."""
-        raise NotImplementedError()
+    def postnet_pipe(self, batch_size=1):
+        return [
+            dp.postnet_pipe(batch_size=batch_size) for dp in self.datapipes.values()
+        ]
 
     def training_pipe(self, mode: str = "train"):
         # assemble pipeline
@@ -86,11 +89,6 @@ class BaseTrain(object):
             training_pipe += gp.PreCache(
                 num_workers=self.num_workers, cache_size=self.cache_size
             )
-
-        # if mode == 'test':
-        training_pipe += gp.PrintProfilingStats(
-            self.save_every
-        )  # TODO: Figure out why this doesn't print / print from batch.profiling_stats
 
         training_pipe += self.train_node
 
@@ -104,17 +102,24 @@ class BaseTrain(object):
 
         if mode == "train" and self.snapshot_every is not None:
             snapshot_names = {}
-            for key, value in self.loss_input_dict.items():
-                if isinstance(key, str):
-                    snapshot_names[value] = key
-                else:
-                    snapshot_names[value] = value.identifier
+            if hasattr(self, "snapshot_arrays") and self.snapshot_arrays is not None:
+                for array in self.snapshot_arrays:
+                    snapshot_names[self.arrays[array]] = array
+            else:
+                for key, value in self.loss_input_dict.items():
+                    if isinstance(key, str):
+                        snapshot_names[value] = key
+                    else:
+                        snapshot_names[value] = value.identifier
 
             training_pipe += gp.Snapshot(
                 dataset_names=snapshot_names,
                 output_filename="{iteration}.zarr",
                 every=self.snapshot_every,
             )  # add Snapshot node to save volumes
+
+        # if mode == 'test':
+        training_pipe += gp.PrintProfilingStats(self.save_every)
 
         return training_pipe
 

@@ -31,16 +31,6 @@ class BaseSystem:
             for key, value in read_config(config).items():
                 setattr(self, key, value)
 
-        if self.checkpoint is None:
-            try:
-                self.checkpoint, self.iteration = self._get_latest_checkpoint()
-            except:
-                print("Checkpoint not found. Starting from scratch.")
-                self.checkpoint = None
-
-        if self.random_seed is not None:
-            self.set_random_seed()
-
         if not hasattr(self, "checkpoint_basename"):
             try:
                 self.checkpoint_basename = os.path.join(
@@ -48,6 +38,16 @@ class BaseSystem:
                 )
             except:
                 self.checkpoint_basename = "./models/model"
+
+        if not hasattr(self, "checkpoint") or self.checkpoint is None:
+            try:
+                self.checkpoint, self.iteration = self._get_latest_checkpoint()
+            except:
+                print("Checkpoint not found. Starting from scratch.")
+                self.checkpoint = None
+
+        if hasattr(self, "random_seed") and self.random_seed is not None:
+            self.set_random_seed()
 
     def batch_show(self):
         """Implement in subclasses."""
@@ -281,21 +281,33 @@ class BaseSystem:
 
     def setup_trainer(self):
         trainer_base = getattr(train, self.trainer_base)
-        self.trainer = trainer_base(
-            self.datapipes,
-            self.make_request(mode="train"),
-            self.model,
-            self.loss,
-            self.optimizer,
-            self.tensorboard_path,
-            self.log_every,
-            self.checkpoint_basename,
-            self.save_every,
-            self.spawn_subprocess,
-            self.num_workers,
-            self.cache_size,
-            snapshot_every=self.snapshot_every,
-        )
+        if hasattr(self, "train_kwargs"):
+            self.trainer = trainer_base(
+                self.datapipes,
+                self.make_request(mode="train"),
+                self.model,
+                self.loss,
+                self.optimizer,
+                **self.train_kwargs,
+            )
+        else:  # backwards compatability: Remove in 0.3.0
+            self.trainer = trainer_base(
+                self.datapipes,
+                self.make_request(mode="train"),
+                self.model,
+                self.loss,
+                self.optimizer,
+                self.tensorboard_path,
+                self.log_every,
+                self.checkpoint_basename,
+                self.save_every,
+                self.spawn_subprocess,
+                self.num_workers,
+                self.cache_size,
+                snapshot_every=self.snapshot_every,
+            )
+        
+        self.arrays.update(self.trainer.arrays)
 
     def build_system(self):
         # define our network model for training
@@ -308,7 +320,10 @@ class BaseSystem:
     def train(self):
         if not hasattr(self, "trainer"):
             self.build_system()
-        self.trainer.train(self.num_epochs)
+        if hasattr(self, "train_kwargs"):
+            self.trainer.train(self.train_kwargs["num_epochs"])
+        else:  # backwards compatability -> TODO: remove in 0.3.0
+            self.trainer.train(self.num_epochs)
 
     def test(self, mode: str = "train"):  # set to 'train' or 'eval'
         if not hasattr(self, "trainer"):

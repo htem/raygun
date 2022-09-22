@@ -21,16 +21,17 @@ def cluster_train(config_path=None):
 
     if config_path is None:
         config_path = sys.argv[1]
-        wait = True
-    else:
-        wait = False
+    config_path = os.path.realpath(config_path)
+    #     wait = True
+    # else:
+    #     wait = False
 
     config = read_config(config_path)
     os.chdir(os.path.dirname(config_path))
 
     command = config["job_command"] + [
         f"-J {'.'.join(os.path.dirname(config_path).split('/')[-3:])}",
-        f"-oo {os.path.dirname(config_path)}/train.out",
+        f"-o {os.path.dirname(config_path)}/train.out",
         "raygun-train",
         config_path,
         "&",
@@ -44,8 +45,8 @@ def cluster_train(config_path=None):
     except OSError as e:
         print("Execution failed:", e, file=sys.stderr)
 
-    if wait:
-        call("wait")
+    # if wait:
+    #     call("wait")
 
 
 def train(config_path=None):
@@ -57,6 +58,7 @@ def train(config_path=None):
 
     if config_path is None:
         config_path = sys.argv[1]
+    config_path = os.path.realpath(config_path)
 
     config = read_config(config_path)
     System = getattr(

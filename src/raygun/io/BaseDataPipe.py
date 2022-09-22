@@ -7,6 +7,25 @@ class BaseDataPipe(object):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+    def get_source(self, path, src_names, src_specs=None):
+        if path.endswith(".zarr") or path.endswith(".n5"):
+            source = gp.ZarrSource(  # add the data source
+                path,
+                src_names,  # which dataset to associate to the array key
+                src_specs,  # meta-information
+            )
+        elif path.endswith(".h5") or path.endswith(".hdf"):
+            source = gp.Hdf5Source(  # add the data source
+                path,
+                src_names,  # which dataset to associate to the array key
+                src_specs,  # meta-information
+            )
+        else:
+            raise NotImplemented(
+                f"Datasource type of {path} not implemented yet. Feel free to contribute its implementation!"
+            )
+        return source
+
     def prenet_pipe(self, mode: str = "train"):
         # Make pre-net datapipe
         prenet_pipe = self.source + gp.RandomLocation()

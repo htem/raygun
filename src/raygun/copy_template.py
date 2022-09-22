@@ -28,7 +28,10 @@ def include_patterns(inc_patterns, ig_patterns):
     return _ignore_patterns
 
 
-def copy_template(source, destination):
+def copy_template(source=None, destination=None):
+    if source is None or destination is None:
+        source, destination = sys.argv[1:]
+
     copytree(
         source,
         destination,

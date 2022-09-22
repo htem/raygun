@@ -10,6 +10,7 @@
 *checkpoint*
 *.zarr
 *.n5
+*.png
 *.pytest*
 *daisy_logs*
 *snapshots*

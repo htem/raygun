@@ -1,0 +1,95 @@
+{
+    "include_config": "../train_conf.json",
+    "loss_type": "link",
+    "gnet_kwargs": {
+        "input_nc": 1,
+        "output_nc": 1,
+        // "norm_layer": "#torch.nn.Identity#",
+        "padding_type": "same",
+        // "activation": "#torch.nn.SELU#",//torch.nn.Tanh, //torch.nn.SiLU,//
+        // "add_noise": true,
+        "ngf": 24,
+        "constant_upsample": true, // unet specific
+        "fmap_inc_factor": 4, // unet specific
+        "kernel_size_down": [
+            [
+                [
+                    7,
+                    7
+                ],
+                [
+                    7,
+                    7
+                ],
+                [
+                    7,
+                    7
+                ]
+            ],
+            [
+                [
+                    5,
+                    5
+                ],
+                [
+                    5,
+                    5
+                ],
+                [
+                    5,
+                    5
+                ]
+            ],
+            [
+                [
+                    3,
+                    3
+                ],
+                [
+                    3,
+                    3
+                ],
+                [
+                    3,
+                    3
+                ]
+            ]
+            // [[3, 3, 3], [3, 3, 3], [3, 3, 3]]
+        ], // unet specific
+        "kernel_size_up": [
+            [
+                [
+                    7,
+                    7
+                ],
+                [
+                    7,
+                    7
+                ],
+                [
+                    7,
+                    7
+                ]
+            ],
+            [
+                [
+                    5,
+                    5
+                ],
+                [
+                    5,
+                    5
+                ],
+                [
+                    5,
+                    5
+                ]
+            ]
+            // [[3, 3, 3], [3, 3, 3], [3, 3, 3]]
+        ], // unet specific
+        "num_downs": 3
+        // "residual": True, // unet specific
+        // "n_blocks": 9 // resnet specific
+        // "n_downsampling": 0
+    }
+}

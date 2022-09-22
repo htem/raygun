@@ -68,5 +68,5 @@ class BaseCompetentLoss(torch.nn.Module):
                 img = (img * 0.5) + 0.5
             writer.add_image(name, img, global_step=step, dataformats="HW")
 
-    def update_status(self, step):
-        pass
+    # def update_status(self, step):
+    #     pass
