@@ -184,6 +184,9 @@ class MTLSDDataPipe(BaseDataPipe):
             if self.reject_kwargs is not None:
                 source += gp.Reject(mask=self.cell_mask, **self.reject_kwargs)
 
+            if hasattr(self, "grow_boundary") and self.grow_boundary:
+                source += gp.GrowBoundary(self.labels)
+
             self.sources.append(source)
         self.sources = tuple(self.sources)
 

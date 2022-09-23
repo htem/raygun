@@ -23,8 +23,8 @@ def worker(render_config_path):
     config_path = render_config["config_path"]
     source_path = render_config["source_path"]
     source_dataset = render_config["source_dataset"]
-    net_name = render_config["net_name"]
     checkpoint = render_config["checkpoint"]
+    net_name = render_config["net_name"]
     crop = render_config["crop"]
 
     system = load_system(config_path)
@@ -45,7 +45,7 @@ def worker(render_config_path):
     net = getattr(system.model, net_name)
     net.eval()
     if torch.cuda.is_available():
-        net.to("cuda")  # TODO pick best option
+        net.to("cuda")  # TODO pick best GPU
 
     del system
 

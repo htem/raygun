@@ -74,6 +74,7 @@ class MTLSD(BaseSystem):
             "pad",
             "random_location_kwargs",
             "reject_kwargs",
+            "grow_boundary",
         ]
 
         dp_kwargs = {"srcs": self.sources}

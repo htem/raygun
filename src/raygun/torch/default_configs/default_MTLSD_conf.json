@@ -127,7 +127,7 @@
         ]
     ],
     "n_diagonals": 8,
-    "erosion": false,
+    "grow_boundary": false,
     "input_shape": [
         196,
         196,

@@ -34,6 +34,7 @@ class MTLSDModel(torch.nn.Module):
         )
 
         self.output_arrays = ["pred_affs", "pred_lsds"]  # TODO: Make work without LSD
+        self.data_dict = {}
 
     def add_log(self, writer, step):
         # add loss input image examples
@@ -54,7 +55,7 @@ class MTLSDModel(torch.nn.Module):
             writer.add_image(name, img, global_step=step, dataformats="HW")
 
     def forward(self, raw):
-        self.data_dict = {"raw": raw.detach()}
+        self.data_dict.update({"raw": raw.detach()})
         z = self.unet(raw)
         affs = self.aff_head(z)
         lsds = self.lsd_head(z)  # TODO: Make work without LSD

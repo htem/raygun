@@ -4,6 +4,7 @@ import torch
 class WeightedMSELoss_MTLSD(torch.nn.MSELoss):
     def __init__(self):
         super().__init__()
+        self.data_dict = {}
 
     def _calc_loss(self, pred, target, weights):
 
@@ -63,14 +64,14 @@ class WeightedMSELoss_MTLSD(torch.nn.MSELoss):
         gt_affs=None,
         affs_weights=None,
     ):
-        self.data_dict = {
+        self.data_dict.update({
             "pred_lsds": pred_lsds.detach(),
             "gt_lsds": gt_lsds.detach(),
             "lsds_weights": lsds_weights.detach(),
             "pred_affs": pred_affs.detach(),
             "gt_affs": gt_affs.detach(),
             "affs_weights": affs_weights.detach(),
-        }
+        })
 
         lsd_loss = self._calc_loss(pred_lsds, gt_lsds, lsds_weights)
         aff_loss = self._calc_loss(pred_affs, gt_affs, affs_weights)

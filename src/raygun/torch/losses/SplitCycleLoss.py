@@ -39,6 +39,7 @@ class SplitCycleLoss(BaseCompetentLoss):
         **kwargs,
     ):
         super().__init__(**passing_locals(locals()))
+        self.data_dict = {}
 
     def backward_D(self, side, dnet, data_dict):
         """Calculate losses for a discriminator"""
@@ -150,14 +151,16 @@ class SplitCycleLoss(BaseCompetentLoss):
         return loss_G1, loss_G2
 
     def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
-        self.data_dict = {
-            "real_A": real_A,
-            "fake_A": fake_A,
-            "cycled_A": cycled_A,
-            "real_B": real_B,
-            "fake_B": fake_B,
-            "cycled_B": cycled_B,
-        }
+        self.data_dict.update(
+            {
+                "real_A": real_A,
+                "fake_A": fake_A,
+                "cycled_A": cycled_A,
+                "real_B": real_B,
+                "fake_B": fake_B,
+                "cycled_B": cycled_B,
+            }
+        )
 
         # crop if necessary
         if real_A.size()[-self.dims :] != fake_B.size()[-self.dims :]:
