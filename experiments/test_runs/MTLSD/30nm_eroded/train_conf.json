@@ -10,7 +10,7 @@
     "sources": [
         {
             "path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5",
-            "raw": "volumes/interpolated_90nm_aligned",
+            "raw": "volumes/raw_30nm",
             "labels": "volumes/GT_labels",
             "labels_mask": "volumes/trainingMask_center400",
             "cell_mask": "volumes/unlabeled_mask"
@@ -19,9 +19,9 @@
     "ndims": 3,
     "train_kwargs": {
         "log_dir": "./tensorboard/",
-        "log_every": 20,
+        "log_every": 50,
         "checkpoint_basename": "./models/model",
-        "num_epochs": 20000,
+        "num_epochs": 100000,
         "save_every": 2000,
         "cache_size": 50,
         "num_workers": 10,
@@ -126,7 +126,7 @@
         ]
     ],
     "n_diagonals": 8,
-    "erosion": false,
+    "erosion": true,
     "input_shape": [
         196,
         196,
@@ -187,6 +187,6 @@
     "pad": false,
     "optim_type": "Adam",
     "optim_kwargs": {
-        "lr": 0.000005
+        "lr": 0.00005
     }
 }

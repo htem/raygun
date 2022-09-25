@@ -16,7 +16,7 @@ class MTLSDModel(torch.nn.Module):
             "input_nc": 1,
             "ngf": 12,
             "fmap_inc_factor": 6,
-            "downsample_factors": [[2], [2], [2]],
+            "downsample_factors": [(2, 2, 2), (2, 2, 2), (2, 2, 2)],
             "constant_upsample": True,
         },
         num_affs=3,

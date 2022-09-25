@@ -26,6 +26,7 @@ def worker(render_config_path):
     checkpoint = render_config["checkpoint"]
     net_name = render_config["net_name"]
     crop = render_config["crop"]
+    ndims = render_config["ndims"]
 
     system = load_system(config_path)
 
@@ -66,9 +67,12 @@ def worker(render_config_path):
                 this_write = block.write_roi
                 data = source.to_ndarray(block.read_roi)
                 if torch.cuda.is_available():
-                    data = torch.cuda.FloatTensor(data).unsqueeze(0).unsqueeze(0)
+                    data = torch.cuda.FloatTensor(data).unsqueeze(0)
                 else:
-                    data = torch.FloatTensor(data).unsqueeze(0).unsqueeze(0)
+                    data = torch.FloatTensor(data).unsqueeze(0)
+
+                if ndims == 3:
+                    data = data.unsqueeze(0)
 
                 data -= np.iinfo(source.dtype).min
                 data /= np.iinfo(source.dtype).max
@@ -76,7 +80,12 @@ def worker(render_config_path):
                 del data
 
                 if crop:
-                    out = out[crop:-crop, crop:-crop, crop:-crop]
+                    if ndims == 2:
+                        out = out[crop:-crop, crop:-crop]
+                    elif ndims == 3:
+                        out = out[crop:-crop, crop:-crop, crop:-crop]
+                    else:
+                        raise NotImplementedError()
 
                 out *= np.iinfo(destination.dtype).max
                 out = torch.clamp(
@@ -89,6 +98,9 @@ def worker(render_config_path):
                     out = out.cpu().numpy().astype(destination.dtype)
                 else:
                     out = out.numpy().astype(destination.dtype)
+
+                if ndims == 2:
+                    out = out[None, ...]
 
                 destination[this_write] = out
                 del out

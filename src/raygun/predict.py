@@ -30,8 +30,12 @@ def predict(render_config_path=None):
     # compressor = render_config['compressor']
     read_size = render_config["read_size"]
     crop = render_config["crop"]
+    ndims = render_config["ndims"]
     num_workers = render_config["num_workers"]
     max_retries = render_config["max_retries"]
+
+    read_size = daisy.Coordinate((1,) * (3 - ndims) + (read_size,) * (ndims))
+    crop = daisy.Coordinate((0,) * (3 - ndims) + (crop,) * (ndims))
 
     dest_path = os.path.join(
         os.path.dirname(config_path), os.path.basename(source_path)
@@ -54,66 +58,68 @@ def predict(render_config_path=None):
         # compressor=compressor,
     )
 
-    # with tempfile.TemporaryDirectory() as temp_dir:
-    #     cur_dir = os.getcwd()
-    #     os.chdir(temp_dir)
-    #     print(f'Executing in {os.getcwd()}')
+    with tempfile.TemporaryDirectory() as temp_dir:
+        cur_dir = os.getcwd()
+        os.chdir(temp_dir)
+        print(f"Executing in {os.getcwd()}")
 
-    if "launch_command" in render_config.keys():
-        process_function = lambda: Popen(
-            [
-                *render_config["launch_command"].split(" "),
-                "python",
-                import_module(
-                    ".".join(["raygun", train_config["framework"], "predict", "worker"])
-                ).__file__,
-                render_config_path,
-            ]
-        )
-
-    else:
-        worker = getattr(
-            import_module(
-                ".".join(["raygun", train_config["framework"], "predict", "worker"])
-            ),
-            "worker",
-        )
-        process_function = lambda: worker(render_config_path)
-
-    task = daisy.Task(
-        os.path.basename(render_config_path).rstrip(".json"),
-        total_roi=source.data_roi,
-        read_roi=read_roi,
-        write_roi=write_roi,
-        read_write_conflict=True,
-        fit="shrink",
-        num_workers=num_workers,
-        max_retries=max_retries,
-        process_function=process_function,
-    )
-
-    logger.info("Running blockwise prediction...")
-    daisy.run_blockwise([task])
-
-    logger.info("Saving viewer script...")
-    view_script = os.path.join(
-        os.path.dirname(config_path),
-        f"view_{os.path.basename(source_path).rstrip('.n5').rstrip('.zarr')}.ng",
-    )
-
-    if not os.path.exists(view_script):
-        with open(view_script, "w") as f:
-            f.write(
-                f"neuroglancer -f {source_path} -d {source_dataset} -f {dest_path} -d {dest_dataset} "
+        if "launch_command" in render_config.keys():
+            process_function = lambda: Popen(
+                [
+                    *render_config["launch_command"].split(" "),
+                    "python",
+                    import_module(
+                        ".".join(
+                            ["raygun", train_config["framework"], "predict", "worker"]
+                        )
+                    ).__file__,
+                    render_config_path,
+                ]
             )
 
-    else:
-        with open(view_script, "a") as f:
-            f.write(f"{dest_dataset} ")
+        else:
+            worker = getattr(
+                import_module(
+                    ".".join(["raygun", train_config["framework"], "predict", "worker"])
+                ),
+                "worker",
+            )
+            process_function = lambda: worker(render_config_path)
 
-    logger.info("Done.")
+        task = daisy.Task(
+            os.path.basename(render_config_path).rstrip(".json"),
+            total_roi=source.data_roi,
+            read_roi=read_roi,
+            write_roi=write_roi,
+            read_write_conflict=True,
+            fit="shrink",
+            num_workers=num_workers,
+            max_retries=max_retries,
+            process_function=process_function,
+        )
 
-    # os.chdir(cur_dir)
+        logger.info("Running blockwise prediction...")
+        daisy.run_blockwise([task])
+
+        logger.info("Saving viewer script...")
+        view_script = os.path.join(
+            os.path.dirname(config_path),
+            f"view_{os.path.basename(source_path).rstrip('.n5').rstrip('.zarr')}.ng",
+        )
+
+        if not os.path.exists(view_script):
+            with open(view_script, "w") as f:
+                f.write(
+                    f"neuroglancer -f {source_path} -d {source_dataset} -f {dest_path} -d {dest_dataset} "
+                )
+
+        else:
+            with open(view_script, "a") as f:
+                f.write(f"{dest_dataset} ")
+
+        logger.info("Done.")
+
+    os.chdir(cur_dir)
 
 
 # %%
