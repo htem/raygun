@@ -65,8 +65,10 @@ def worker(render_config_path):
         model = getattr(system.model, net_name)
     else:
         model = system.model
+
     model.eval()
     if torch.cuda.is_available():
+        logger.info("Moving model to CUDA...")
         model.to("cuda")  # TODO pick best GPU
 
     del system
@@ -93,7 +95,6 @@ def worker(render_config_path):
                 break
 
             else:
-                this_write = block.write_roi
                 data = source.to_ndarray(block.read_roi)
                 if torch.cuda.is_available():
                     data = torch.cuda.FloatTensor(data).unsqueeze(0)
@@ -110,14 +111,16 @@ def worker(render_config_path):
                     data /= scaleShift_input[0]
                     data += scaleShift_input[1]
 
-                outs = model(data).detach().squeeze()
+                outs = model(data)
                 del data
+
                 if not isinstance(outs, tuple):
-                    outs = tuple(outs)
+                    outs = tuple([outs])
 
                 for out, dest_dataset in zip(outs, output_ds):
                     destination = destinations[dest_dataset]
-                    if crop:
+                    out = out.detach().squeeze()
+                    if crop and crop != 0:
                         if ndims == 2:
                             out = out[crop:-crop, crop:-crop]
                         elif ndims == 3:
@@ -125,23 +128,33 @@ def worker(render_config_path):
                         else:
                             raise NotImplementedError()
 
-                    out *= np.iinfo(destination.dtype).max
-                    out = torch.clamp(
-                        out,
-                        np.iinfo(destination.dtype).min,
-                        np.iinfo(destination.dtype).max,
-                    )
+                    try:
+                        out *= np.iinfo(destination.dtype).max
+                        out = torch.clamp(
+                            out,
+                            np.iinfo(destination.dtype).min,
+                            np.iinfo(destination.dtype).max,
+                        )
+                    except:
+                        logger.info(
+                            f"Assuming output data for {dest_dataset} is float between 0 and 1..."
+                        )
+                        out = torch.clamp(out, 0, 1)
 
                     if torch.cuda.is_available():
                         out = out.cpu().numpy().astype(destination.dtype)
                     else:
                         out = out.numpy().astype(destination.dtype)
 
-                    if ndims == 2:
+                    if ndims == 2:  # Add Z dimension if necessary
                         out = out[None, ...]
 
-                    destination[this_write] = out
-                del out
+                    if len(out.shape) < 4:  # Add channel dimension if necessary
+                        out = out[None, ...]
+
+                    destination[block.write_roi] = out
+                    logger.info(f"Wrote chunk {block.block_id} to {dest_dataset}...")
+                    del out
 
 
 if __name__ == "__main__":

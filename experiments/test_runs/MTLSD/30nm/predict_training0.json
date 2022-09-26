@@ -7,7 +7,7 @@
         "pred_lsds"
     ],
     "checkpoint": 100000,
-    "launch_command": "bsub -n 16 -gpu \"num=1\" -q gpu_a100 -o predict.log",
+    "launch_command": "bsub -n 10 -gpu \"num=1\" -q gpu_tesla -o predict.log",
     "scaleShift_input": [
         2,
         -1

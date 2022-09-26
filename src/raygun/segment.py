@@ -200,7 +200,10 @@ def mutex_segment(config_path):
     f["mutex"].attrs["resolution"] = f[aff_ds].attrs["resolution"]
 
 
-def segment(config_path):
+def segment(config_path=None):
+    if config_path is None:
+        config_path = sys.argv[1]
+
     seg_config = {
         "aff_ds": "pred_affs",
         "thresholds": [t for t in np.arange(0.1, 0.9, 0.1)],

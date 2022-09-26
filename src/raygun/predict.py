@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 from raygun import load_system, read_config
 
 #%%
-def predict(render_config_path=None):
+def predict(render_config_path=None):  # Use absolute path
     if render_config_path is None:
         render_config_path = sys.argv[1]
 
@@ -69,11 +69,18 @@ def predict(render_config_path=None):
             output_shape = train_config["output_shape"]
 
         if not isinstance(input_shape, list):
-            input_shape = daisy.Coordinate((input_shape,) * ndims)
-            output_shape = daisy.Coordinate((output_shape,) * ndims)
-        voxel_size = source.voxel_size
-        read_size = input_shape * voxel_size
-        write_size = output_shape * voxel_size
+            input_shape = daisy.Coordinate(
+                (1,) * (3 - ndims) + (input_shape,) * (ndims)
+            )
+            output_shape = daisy.Coordinate(
+                (1,) * (3 - ndims) + (output_shape,) * (ndims)
+            )
+        else:
+            input_shape = daisy.Coordinate(input_shape)
+            output_shape = daisy.Coordinate(output_shape)
+
+        read_size = input_shape * source.voxel_size
+        write_size = output_shape * source.voxel_size
         context = (read_size - write_size) // 2
         read_roi = daisy.Roi((0, 0, 0), read_size)
         write_roi = daisy.Roi(context, write_size)
@@ -96,7 +103,7 @@ def predict(render_config_path=None):
             "filename": dest_path,
             "ds_name": dest_dataset,
             "total_roi": source.data_roi,
-            "voxel_size": voxel_size,
+            "voxel_size": source.voxel_size,
             "dtype": source.dtype,
             "write_size": write_roi.get_shape(),
             "num_channels": 1,
@@ -114,18 +121,16 @@ def predict(render_config_path=None):
         print(f"Executing in {os.getcwd()}")
 
         if "launch_command" in render_config.keys():
-            process_function = lambda: Popen(
-                [
-                    *render_config["launch_command"].split(" "),
-                    "python",
-                    import_module(
-                        ".".join(
-                            ["raygun", train_config["framework"], "predict", "worker"]
-                        )
-                    ).__file__,
-                    render_config_path,
-                ]
-            )
+            launch_command = [
+                *render_config["launch_command"].split(" "),
+                "python",
+                import_module(
+                    ".".join(["raygun", train_config["framework"], "predict", "worker"])
+                ).__file__,
+                render_config_path,
+            ]
+            process_function = lambda: Popen(launch_command)
+            logger.info(f"Launch command: {' '.join(launch_command)}")
 
         else:
             worker = getattr(
@@ -142,14 +147,17 @@ def predict(render_config_path=None):
             read_roi=read_roi,
             write_roi=write_roi,
             read_write_conflict=True,
-            fit="shrink",
+            # fit="shrink",
             num_workers=num_workers,
             max_retries=max_retries,
             process_function=process_function,
         )
 
         logger.info("Running blockwise prediction...")
-        daisy.run_blockwise([task])
+        if daisy.run_blockwise([task]):
+            logger.info("Daisy done.")
+        else:
+            raise ValueError("Daisy failed.")
 
         logger.info("Saving viewer script...")
         view_script = os.path.join(
