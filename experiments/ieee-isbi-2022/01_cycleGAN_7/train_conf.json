@@ -92,7 +92,7 @@
     "gnet_kwargs": {
         "input_nc": 1,
         "output_nc": 1,
-        "padding_type": "same",
+        "padding_type": "valid",
         "ngf": 24,
         "constant_upsample": true, // unet specific
         "fmap_inc_factor": 4,
