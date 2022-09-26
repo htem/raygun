@@ -1,7 +1,8 @@
+from raygun.torch.losses import BaseCompetentLoss
 import torch
 
 
-class WeightedMSELoss(torch.nn.MSELoss):
+class WeightedMSELoss(BaseCompetentLoss):
     def __init__(self):
         super().__init__()
 

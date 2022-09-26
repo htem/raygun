@@ -18,15 +18,33 @@ def worker(render_config_path):
     logger.info(f"Launching {worker_id}...")
 
     # Setup rendering pipeline
-    render_config = read_config(render_config_path)
+    render_config = {  # Defaults
+        "crop": 0,
+        "read_size": None,
+        "max_retries": 2,
+        "num_workers": 16,
+        "ndims": None,
+        "net_name": None,
+        "scaleShift_input": None,
+        "output_ds": None,
+        "out_specs": None,
+    }
+
+    temp = read_config(render_config_path)
+    render_config.update(temp)
 
     config_path = render_config["config_path"]
+    train_config = read_config(config_path)
     source_path = render_config["source_path"]
     source_dataset = render_config["source_dataset"]
-    checkpoint = render_config["checkpoint"]
     net_name = render_config["net_name"]
+    checkpoint = render_config["checkpoint"]
+    output_ds = render_config["output_ds"]
+    scaleShift_input = render_config["scaleShift_input"]
     crop = render_config["crop"]
     ndims = render_config["ndims"]
+    if ndims is None:
+        ndims = train_config["ndims"]
 
     system = load_system(config_path)
 
@@ -43,20 +61,31 @@ def worker(render_config_path):
         checkpoint_path = None
 
     system.load_saved_model(checkpoint_path)
-    net = getattr(system.model, net_name)
-    net.eval()
+    if net_name is not None:
+        model = getattr(system.model, net_name)
+    else:
+        model = system.model
+    model.eval()
     if torch.cuda.is_available():
-        net.to("cuda")  # TODO pick best GPU
+        model.to("cuda")  # TODO pick best GPU
 
     del system
 
     source = daisy.open_ds(source_path, source_dataset)
 
+    # Load output datsets
     dest_path = os.path.join(
         os.path.dirname(config_path), os.path.basename(source_path)
     )
-    dest_dataset = f"{source_dataset}_{net_name}_{checkpoint}"
-    destination = daisy.open_ds(dest_path, dest_dataset, "a")
+
+    if output_ds is None:
+        if net_name is not None:
+            output_ds = [f"{source_dataset}_{net_name}_{checkpoint}"]
+        else:
+            output_ds = [f"{source_dataset}_{checkpoint}"]
+    destinations = {}
+    for dest_dataset in output_ds:
+        destinations[dest_dataset] = daisy.open_ds(dest_path, dest_dataset, "a")
 
     while True:
         with client.acquire_block() as block:
@@ -76,33 +105,42 @@ def worker(render_config_path):
 
                 data -= np.iinfo(source.dtype).min
                 data /= np.iinfo(source.dtype).max
-                out = net(data).detach().squeeze()
+
+                if scaleShift_input is not None:
+                    data /= scaleShift_input[0]
+                    data += scaleShift_input[1]
+
+                outs = model(data).detach().squeeze()
                 del data
+                if not isinstance(outs, tuple):
+                    outs = tuple(outs)
 
-                if crop:
-                    if ndims == 2:
-                        out = out[crop:-crop, crop:-crop]
-                    elif ndims == 3:
-                        out = out[crop:-crop, crop:-crop, crop:-crop]
+                for out, dest_dataset in zip(outs, output_ds):
+                    destination = destinations[dest_dataset]
+                    if crop:
+                        if ndims == 2:
+                            out = out[crop:-crop, crop:-crop]
+                        elif ndims == 3:
+                            out = out[crop:-crop, crop:-crop, crop:-crop]
+                        else:
+                            raise NotImplementedError()
+
+                    out *= np.iinfo(destination.dtype).max
+                    out = torch.clamp(
+                        out,
+                        np.iinfo(destination.dtype).min,
+                        np.iinfo(destination.dtype).max,
+                    )
+
+                    if torch.cuda.is_available():
+                        out = out.cpu().numpy().astype(destination.dtype)
                     else:
-                        raise NotImplementedError()
+                        out = out.numpy().astype(destination.dtype)
 
-                out *= np.iinfo(destination.dtype).max
-                out = torch.clamp(
-                    out,
-                    np.iinfo(destination.dtype).min,
-                    np.iinfo(destination.dtype).max,
-                )
+                    if ndims == 2:
+                        out = out[None, ...]
 
-                if torch.cuda.is_available():
-                    out = out.cpu().numpy().astype(destination.dtype)
-                else:
-                    out = out.numpy().astype(destination.dtype)
-
-                if ndims == 2:
-                    out = out[None, ...]
-
-                destination[this_write] = out
+                    destination[this_write] = out
                 del out
 
 

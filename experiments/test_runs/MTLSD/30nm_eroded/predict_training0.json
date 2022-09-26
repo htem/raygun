@@ -1,0 +1,27 @@
+{
+    "config_path": "/nrs/funke/rhoadesj/raygun/experiments/test_runs/MTLSD/30nm_eroded/train_conf.json",
+    "source_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5",
+    "source_dataset": "volumes/raw_30nm",
+    "output_ds": [
+        "pred_affs",
+        "pred_lsds"
+    ],
+    "checkpoint": 100000,
+    "launch_command": "bsub -n 16 -gpu \"num=1\" -q gpu_a100 -o predict.log",
+    "scaleShift_input": [
+        2,
+        -1
+    ],
+    "out_specs": {
+        "pred_affs": {
+            "dtype": "#np.float32#",
+            "num_channels": 20
+        },
+        "pred_lsds": {
+            "dtype": "#np.float32#",
+            "num_channels": 10
+        }
+    },
+    "input_shape": 132,
+    "output_shape": 40
+}
