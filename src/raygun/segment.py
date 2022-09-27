@@ -176,7 +176,7 @@ def mutex_segment(config_path):
 
     f = zarr.open(file, "a")
 
-    # crop a few sections off for context
+    print("Loading affinity predictions...")
     affs = f[aff_ds][:]  # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0
 
     # use average affs to mask
@@ -187,13 +187,29 @@ def mutex_segment(config_path):
     affs[:sep] = affs[:sep] * -1
     affs[:sep] = affs[:sep] + 1
 
+    print("Getting segmentations...")
     seg = compute_mws_segmentation(
         affs, neighborhood, sep, strides=[10, 10, 10], mask=mask
     )
 
-    f["mutex"] = seg
-    f["mutex"].attrs["offset"] = f[aff_ds].attrs["offset"]
-    f["mutex"].attrs["resolution"] = f[aff_ds].attrs["resolution"]
+    print("Writing segmentations...")
+    dest_dataset = "mutex"  # TODO: should probably add to config
+    f[dest_dataset] = seg
+    f[dest_dataset].attrs["offset"] = f[aff_ds].attrs["offset"]
+    f[dest_dataset].attrs["resolution"] = f[aff_ds].attrs["resolution"]
+
+    view_script = os.path.join(
+        os.path.dirname(config_path),
+        f"view_{os.path.basename(file).rstrip('.n5').rstrip('.zarr')}.ng",
+    )
+
+    if not os.path.exists(view_script):
+        with open(view_script, "w") as f:
+            f.write(f"neuroglancer -f {file} -d {dest_dataset} ")
+
+    else:
+        with open(view_script, "a") as f:
+            f.write(f"{dest_dataset} ")
 
 
 def segment(config_path=None):
@@ -228,9 +244,11 @@ def segment(config_path=None):
 
         if not done:
             # load predicted affinities
+            print("Loading affinity predictions...")
             prediction = f[aff_ds][:].astype(
                 np.float32
             )  # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0
+            print("Getting segmentations...")
             pred_segs = get_segmentation(
                 prediction,
                 thresholds=thresholds,
@@ -239,23 +257,24 @@ def segment(config_path=None):
             )
 
             # save segmentation
-            # seg_dict = {}
+            view_script = os.path.join(
+                os.path.dirname(config_path),
+                f"view_{os.path.basename(file).rstrip('.n5').rstrip('.zarr')}.ng",
+            )
+            print("Writing segmentations...")
             for thresh, pred_seg in zip(thresholds, pred_segs):
-                # seg_dict[thresh] = pred_seg
-                f[f'pred_seg_{"{:.2f}".format(thresh)}'] = pred_seg
-                f[f'pred_seg_{"{:.2f}".format(thresh)}'].attrs["offset"] = f[
-                    aff_ds
-                ].attrs["offset"]
-                f[f'pred_seg_{"{:.2f}".format(thresh)}'].attrs["resolution"] = f[
-                    aff_ds
-                ].attrs["resolution"]
+                dest_dataset = f'pred_seg_{"{:.2f}".format(thresh)}'
+                f[dest_dataset] = pred_seg
+                f[dest_dataset].attrs["offset"] = f[aff_ds].attrs["offset"]
+                f[dest_dataset].attrs["resolution"] = f[aff_ds].attrs["resolution"]
 
-        # else:
-        #     seg_dict = {}
-        #     for thresh in thresholds:
-        #         seg_dict[thresh] = f[f'pred_seg_{"{:.2f}".format(thresh)}']
+                if not os.path.exists(view_script):
+                    with open(view_script, "w") as f:
+                        f.write(f"neuroglancer -f {file} -d {dest_dataset} ")
 
-        # return seg_dict
+                else:
+                    with open(view_script, "a") as f:
+                        f.write(f"{dest_dataset} ")
 
 
 # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0
