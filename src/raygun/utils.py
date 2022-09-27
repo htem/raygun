@@ -1,3 +1,4 @@
+import json
 import os
 import numpy as np
 import gunpowder as gp
@@ -49,3 +50,23 @@ def calc_max_padding(
     ).snap_to_grid(voxel_size, mode=mode)
 
     return max_padding.get_begin()
+
+
+def serialize(obj):
+    if isinstance(obj, dict):
+        out = {}
+        for key, value in obj.items():
+            out[key] = serialize(value)
+        return out
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.int64):
+        return int(obj)
+    else:
+        return obj
+
+
+def to_json(obj, file):
+    out = serialize(obj)
+    with open(file, "w") as f:
+        json.dump(out, f)

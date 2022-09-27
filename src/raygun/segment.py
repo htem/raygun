@@ -269,12 +269,12 @@ def segment(config_path=None):
                 f[dest_dataset].attrs["resolution"] = f[aff_ds].attrs["resolution"]
 
                 if not os.path.exists(view_script):
-                    with open(view_script, "w") as f:
-                        f.write(f"neuroglancer -f {file} -d {dest_dataset} ")
+                    with open(view_script, "w") as v:
+                        v.write(f"neuroglancer -f {file} -d {dest_dataset} ")
 
                 else:
-                    with open(view_script, "a") as f:
-                        f.write(f"{dest_dataset} ")
+                    with open(view_script, "a") as v:
+                        v.write(f"{dest_dataset} ")
 
 
 # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0

@@ -1,1 +1,0 @@
-/nrs/funke/rhoadesj/raygun/src/raygun/copy_template.py
