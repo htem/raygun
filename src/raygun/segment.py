@@ -135,7 +135,6 @@ def get_segmentation(affinities, thresholds, labels_mask=None, max_affinity_valu
 def mutex_segment(config_path):
     seg_config = {
         "aff_ds": "pred_affs",
-        "prefix": "volumes",
         "max_affinity_value": 1.0,
         "sep": 3,
         "neighborhood": [
@@ -160,7 +159,6 @@ def mutex_segment(config_path):
 
     file = seg_config["file"]
     aff_ds = seg_config["aff_ds"]
-    prefix = seg_config["prefix"]
     max_affinity_value = seg_config["max_affinity_value"]
     sep = seg_config["sep"]
     n_diagonals = seg_config["n_diagonals"]
@@ -176,12 +174,10 @@ def mutex_segment(config_path):
         stacked_diag = np.stack([0 * pos_diag, pos_diag, neg_diag], axis=-1)
         neighborhood = np.concatenate([neighborhood, stacked_diag]).astype(np.int8)
 
-    f = zarr.open(file, "a")[prefix]
+    f = zarr.open(file, "a")
 
     # crop a few sections off for context
-    affs = f[
-        aff_ds
-    ]  # [:, crop:-crop, :, :]  # TODO: Ask Arlo about crop # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0
+    affs = f[aff_ds][:]  # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0
 
     # use average affs to mask
     mask = np.mean(affs, axis=0) > 0.5 * max_affinity_value
@@ -207,7 +203,6 @@ def segment(config_path=None):
     seg_config = {
         "aff_ds": "pred_affs",
         "thresholds": [t for t in np.arange(0.1, 0.9, 0.1)],
-        "prefix": "volumes",
         "mutex": False,
         "max_affinity_value": 1.0,
         "labels_mask": None,
@@ -222,17 +217,14 @@ def segment(config_path=None):
         file = seg_config["file"]
         thresholds = seg_config["thresholds"]
         aff_ds = seg_config["aff_ds"]
-        prefix = seg_config["prefix"]
         max_affinity_value = seg_config["max_affinity_value"]
         labels_mask = seg_config["labels_mask"]
 
         done = True
         for thresh in thresholds:
-            done = done and os.path.exists(
-                os.path.join(file, prefix, "pred_seg_%.2f" % thresh)
-            )
+            done = done and os.path.exists(os.path.join(file, "pred_seg_%.2f" % thresh))
 
-        f = zarr.open(file)[prefix]
+        f = zarr.open(file)
 
         if not done:
             # load predicted affinities

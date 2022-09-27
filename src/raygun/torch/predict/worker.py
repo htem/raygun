@@ -1,6 +1,5 @@
 import os
 import sys
-import tempfile
 import daisy
 import torch
 import numpy as np
@@ -104,11 +103,11 @@ def worker(render_config_path):
                 if ndims == 3:
                     data = data.unsqueeze(0)
 
-                data -= np.iinfo(source.dtype).min
+                data -= np.iinfo(source.dtype).min  # TODO: Assumes integer inputs
                 data /= np.iinfo(source.dtype).max
 
                 if scaleShift_input is not None:
-                    data /= scaleShift_input[0]
+                    data *= scaleShift_input[0]
                     data += scaleShift_input[1]
 
                 outs = model(data)
