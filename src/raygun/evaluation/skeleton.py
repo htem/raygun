@@ -1,4 +1,5 @@
 import collections
+from glob import glob
 from raygun.utils import load_json_file, merge_dicts
 
 import copy
@@ -7,8 +8,10 @@ import os
 
 from daisy import Coordinate
 
+from raygun.webknossos_utils.wkw_seg_to_zarr import download_wk_skeleton
 
-def aggregate_configs(configs):
+
+def aggregateConfigs(configs):
 
     input_config = configs["Input"]
     global_config = configs.get("GlobalConfig", {})
@@ -319,7 +322,7 @@ def load_skeleton_config(args, aggregate_configs=True):
             global_configs[k] = hierarchy_configs[k]
 
     if aggregate_configs:
-        aggregate_configs(global_configs)
+        aggregateConfigs(global_configs)
 
     return global_configs
 
@@ -406,3 +409,21 @@ def interpolate_points(p0, p1, max_steps):
         res.append(tuple([int(p0[k] + (i + 1) * delta[k]) for k in range(3)]))
     res = list(set(res))
     return res
+
+
+def get_updated_skeleton(default_config_fn="segment_test.json"):
+    segment_config = load_json_file(default_config_fn)
+
+    if not os.path.exists(segment_config["SkeletonConfig"]["file"]):
+        files = glob("./skeletons/*")
+        if len(files) == 0 or segment_config["SkeletonConfig"]["file"] == "update":
+            skel_file = download_wk_skeleton(
+                segment_config["SkeletonConfig"]["url"].split("/")[-1],
+                f"{os.getcwd()}/skeletons/",
+                overwrite=True,
+            )
+        else:
+            skel_file = max(files, key=os.path.getctime)
+    skel_file = os.path.abspath(skel_file)
+
+    return skel_file

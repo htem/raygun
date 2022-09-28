@@ -1,0 +1,23 @@
+{
+    // CATMAID project ID to pull skeleton from
+    // "skeleton_project_id": 18,
+    "skeleton_config": {
+        "file": "update",
+        "url": "http://catmaid2.hms.harvard.edu:9000/annotations/62c50847010000b000fe61f4",
+        "coord_in_pix": true,
+        "coord_in_zyx": true,
+        "voxel_size_xyz": [
+            30,
+            30,
+            30
+        ],
+        "interpolation": true,
+        "interpolation_steps": 10
+    },
+    "eval_sources": {
+        "test": {
+            "file": "path/to/zarr",
+            "ds": "ds_name"
+        }
+    }
+}
