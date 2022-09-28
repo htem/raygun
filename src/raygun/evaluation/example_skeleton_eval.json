@@ -3,7 +3,7 @@
     // "skeleton_project_id": 18,
     "skeleton_config": {
         "file": "update",
-        "url": "http://catmaid2.hms.harvard.edu:9000/annotations/62c50847010000b000fe61f4",
+        "url": "http://catmaid2.hms.harvard.edu:9000/annotations/62e941050100008800fe64bf", // eval1
         "coord_in_pix": true,
         "coord_in_zyx": true,
         "voxel_size_xyz": [

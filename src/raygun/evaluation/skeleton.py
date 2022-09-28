@@ -1,4 +1,5 @@
 from glob import glob
+import sys
 from raygun.read_config import read_config
 
 import os
@@ -92,15 +93,22 @@ def interpolate_points(p0, p1, max_steps):
     return res
 
 
-def get_updated_skeleton(default_config_fn="segment_test.json"):
+def get_updated_skeleton(default_config_fn=None):
+    if default_config_fn is None:
+        try:
+            default_config_fn = sys.argv[1]
+        except:
+            default_config_fn = "skeleton.json"
+    path = os.path.dirname(os.path.realpath(default_config_fn))
+    print(f"Path: {path}")
     segment_config = read_config(default_config_fn)
 
     if not os.path.exists(segment_config["skeleton_config"]["file"]):
-        files = glob("./skeletons/*")
+        files = glob(os.path.join(path, "/skeletons/*"))
         if len(files) == 0 or segment_config["skeleton_config"]["file"] == "update":
             skel_file = download_wk_skeleton(
                 segment_config["skeleton_config"]["url"].split("/")[-1],
-                f"{os.getcwd()}/skeletons/",
+                os.path.join(path, "skeletons/"),
                 overwrite=True,
             )
         else:

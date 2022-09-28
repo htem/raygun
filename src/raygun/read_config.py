@@ -8,6 +8,7 @@ import numpy as np
 import gunpowder as gp
 import daisy
 import sys
+from raygun.utils import load_json_file
 
 import logging
 
@@ -22,12 +23,6 @@ try:
     import jax
 except:
     logger.warning("JAX unavailable.")
-
-
-def loadJsonFile(fin):
-    with open(fin, "r") as f:
-        config = json.load(StringIO(jsmin(f.read())))
-    return config
 
 
 def _eval_args(arg):
@@ -70,7 +65,7 @@ def read_config(file):
         return file
 
     configs = []
-    configs.append(loadJsonFile(file))
+    configs.append(load_json_file(file))
     last_file = file
     while "include_config" in configs[-1].keys():
         include_file = configs[-1]["include_config"]
@@ -78,7 +73,7 @@ def read_config(file):
             include_file = include_file.replace(
                 "..", os.path.dirname(os.path.dirname(last_file))
             )
-        configs.append(loadJsonFile(include_file))
+        configs.append(load_json_file(include_file))
         last_file = include_file
 
     config = {}
