@@ -6,14 +6,12 @@ import daisy
 import sys
 import os
 import json
-sys.path.append('/n/groups/htem/Segmentation/shared-nondev/cbx_fn/segway2/gt_scripts')
-from skeleton import parse_skeleton
-sys.path.insert(0, '/n/groups/htem/Segmentation/shared-nondev')
-import gt_tools
+from .skeleton import parse_skeleton, load_skeleton_config
 import zarr
 import numpy as np
 from skimage.draw import line_nd
 from funlib import evaluate
+
 
 def nm2px(coord, voxel_size, offset):
     # removes offset and converts to px
@@ -21,7 +19,7 @@ def nm2px(coord, voxel_size, offset):
 
 def rasterize_and_evaluate(config, cube_size=1024, thresh_list='volumes/segmentation_*'):
     if isinstance(config, str):
-        config = gt_tools.load_config(config)
+        config = load_skeleton_config(config)
 
     # Skel=tree_id:[Node_id], nodes=Node_id:{x,y,z}
     skeletons, nodes = parse_skeleton(config['SkeletonConfig'])
@@ -94,7 +92,7 @@ if __name__=="__main__":
     METRIC_OUT_JSON = "./metrics/metrics.json"
     BEST_METRIC_JSON = "./metrics/best.iteration"
 
-    config = gt_tools.load_config(config_file)
+    config = load_skeleton_config(config_file)
     current_iteration = int(config["Network"]["iteration"])
     print(f'Evaluating {config_file} at iteration {current_iteration}...')
     evaluation = rasterize_and_evaluate(config, thresh_list=thresh_list)

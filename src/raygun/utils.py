@@ -1,3 +1,5 @@
+from io import StringIO
+from jsmin import jsmin
 import json
 import os
 import numpy as np
@@ -70,3 +72,23 @@ def to_json(obj, file):
     out = serialize(obj)
     with open(file, "w") as f:
         json.dump(out, f)
+
+
+def load_json_file(fin):
+    with open(fin, "r") as f:
+        config = json.load(StringIO(jsmin(f.read())))
+    return config
+
+
+def merge_dicts(from_dict, to_dict):
+
+    # merge first level
+    for k in from_dict:
+        if k not in to_dict:
+            to_dict[k] = from_dict[k]
+        else:
+            # overwrite merge second level
+            for kk in from_dict[k]:
+                to_dict[k][kk] = from_dict[k][kk]
+
+    return to_dict
