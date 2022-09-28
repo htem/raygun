@@ -1,4 +1,5 @@
 #%%
+from glob import glob
 from importlib import import_module
 import os
 from subprocess import Popen
@@ -13,6 +14,11 @@ from raygun import load_system, read_config
 
 #%%
 def predict(render_config_path=None):  # Use absolute path
+    """Predict system (available through CLI as raygun-predict)
+
+    Args:
+        config_path (str, optional): Path to json file for predicting configuration. Defaults to command line argument.
+    """
     if render_config_path is None:
         render_config_path = sys.argv[1]
 
@@ -180,6 +186,67 @@ def predict(render_config_path=None):  # Use absolute path
         logger.info("Done.")
 
     os.chdir(cur_dir)
+
+
+# TODO:
+def _batch_predict(folder):
+    os.chdir(folder)
+
+    subfolders = glob("*/")
+    if len(subfolders) > 0:
+        config_paths = []
+        for subfolder in subfolders:
+            config_paths += _batch_predict(subfolder)
+
+    else:
+        config_path = os.path.realpath("train_conf.json")
+        if os.path.exists(config_path):
+            predict(config_path)
+            config_paths = [config_path]
+
+        else:
+            config_paths = []
+
+    os.chdir("..")
+    return config_paths
+
+
+# TODO:
+def batch_predict(base_folder=None):
+    """Batch predict systems (available through CLI as raygun-predict-batch).
+
+    Args:
+        base_folder (str, optional): Path to folder containing base predicting configuration json file and nested folders for batch predicting. Defaults to command line argument.
+    """
+
+    if base_folder is None:
+        base_folder = sys.argv[1]
+
+    os.chdir(base_folder)
+    base_folder = os.getcwd()  # get absolute path
+
+    config_paths = _batch_predict(".")
+
+    os.makedirs(os.path.join(base_folder, "tensorboards"), exist_ok=True)
+    while len(config_paths) > 0:
+        sleep(5)
+        for config_path in config_paths:
+            config_name = get_config_name(config_path, base_folder)
+
+            if not os.path.islink(
+                os.path.join(base_folder, "tensorboards", config_name)
+            ):
+                try:
+                    os.symlink(
+                        os.path.join(os.path.dirname(config_path), "tensorboard"),
+                        os.path.join(base_folder, "tensorboards", config_name),
+                        target_is_directory=True,
+                    )
+                    config_paths.remove(config_path)
+                except:
+                    logger.info(f"Waiting for {config_name} log...")
+
+    call("wait")
 
 
 # %%

@@ -157,7 +157,7 @@ def show_best_steps(model_logs, types: list = ["link", "split"]):
             f'{model_name} \n\t best step: {model_logs[model_name]["best_step"]} \n\t with score {this_best_score}'
         )
 
-        type = get_model_type(model_name)
+        type = get_model_type(model_name, types)
         if type not in bests.keys() or bests[type]["score"] > this_best_score:
             bests[type] = {
                 "score": this_best_score,
@@ -178,6 +178,13 @@ def show_best_steps(model_logs, types: list = ["link", "split"]):
 
 def get_best_layer(model_name, step):
     return os.path.join(*model_name.split("_"), f"models/models_checkpoint_{step}")
+
+
+def inspect_logs(config_path=None):
+    if config_path is None:
+        config_path = sys.argv[1]
+    config = read_config(config_path)
+    return pick_checkpoints(**config)
 
 
 # %%
