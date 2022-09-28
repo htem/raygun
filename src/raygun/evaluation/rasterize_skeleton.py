@@ -6,11 +6,11 @@ import daisy
 import sys
 import os
 import json
-from .skeleton import parse_skeleton, load_skeleton_config
 import zarr
 import numpy as np
 from skimage.draw import line_nd
 from funlib import evaluate
+from raygun.evaluation.skeleton import parse_skeleton
 from raygun import read_config
 
 
@@ -23,7 +23,7 @@ def rasterize_and_evaluate(
     config, cube_size=1024, thresh_list="volumes/segmentation_*"
 ):
     if isinstance(config, str):
-        config = load_skeleton_config(config)
+        config = read_config(config)
 
     # Skel=tree_id:[Node_id], nodes=Node_id:{x,y,z}
     skeletons, nodes = parse_skeleton(config["skeleton_config"])
@@ -57,9 +57,9 @@ def rasterize_and_evaluate(
     #     f['skel_image/gt'].attrs['offset'] = tuple(config["Input"]["roi_offset"] - pad * daisy.Coordinate(config["SkeletonConfig"]["voxel_size_xyz"]))
 
     # load segmentation
-    segment_file = config["Input"]["output_file"]
+    segment_file = config["Input"]["file"]
     if thresh_list is False:
-        segment_datasets = [config["segment_ds"]]
+        segment_datasets = [config["ds"]]
     elif isinstance(thresh_list, str):
         segment_datasets = [
             os.path.join(*ds.strip("/").split("/")[-2:])
