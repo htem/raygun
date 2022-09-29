@@ -153,6 +153,7 @@ def mutex_segment(config_path):
             [0, 0, 8],
         ],
         "n_diagonals": 8,
+        "mask_thresh": 0.5,
     }
 
     temp = read_config(config_path)
@@ -164,6 +165,7 @@ def mutex_segment(config_path):
     sep = seg_config["sep"]
     n_diagonals = seg_config["n_diagonals"]
     neighborhood = np.array(seg_config["neighborhood"])
+    mask_thresh = seg_config["mask_thresh"]
 
     if n_diagonals > 0:
         pos_diag = np.round(
@@ -181,7 +183,7 @@ def mutex_segment(config_path):
     affs = f[aff_ds][:]  # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0
 
     # use average affs to mask
-    mask = np.mean(affs, axis=0) > 0.5 * max_affinity_value
+    mask = np.mean(affs, axis=0) > mask_thresh * max_affinity_value
 
     affs = 1 - affs
 
@@ -194,7 +196,7 @@ def mutex_segment(config_path):
     )
 
     print("Writing segmentations...")
-    dest_dataset = "mutex"  # TODO: should probably add to config
+    dest_dataset = f"mutex_{'{:.2f}'.format(mask_thresh)}"  # TODO: should probably add to config
     f[dest_dataset] = seg
     f[dest_dataset].attrs["offset"] = f[aff_ds].attrs["offset"]
     f[dest_dataset].attrs["resolution"] = f[aff_ds].attrs["resolution"]

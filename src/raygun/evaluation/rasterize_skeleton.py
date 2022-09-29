@@ -16,19 +16,15 @@ from raygun import read_config
 
 def nm2px(coord, voxel_size, offset):
     # removes offset and converts to px
-    return [int((a / b) - (c / b)) for a, b, c in zip(coord, voxel_size, offset)]
+    return [int((c / v) - o) for c, v, o in zip(coord, voxel_size, offset)]
 
 
-def rasterize_and_evaluate(
-    config, cube_size=1024, thresh_list="volumes/segmentation_*"
-):
-    if isinstance(config, str):
-        config = read_config(config)
+def rasterize_and_evaluate(config_path):
+    config = read_config(config_path)
 
     # Skel=tree_id:[Node_id], nodes=Node_id:{x,y,z}
-    skeletons, nodes = parse_skeleton(config["skeleton_config"])
+    skeletons, nodes = parse_skeleton(config_path)
 
-    # Cardiac arrest is served
     # {Tree_id:[[xyz]]}
     skel_zyx = {
         tree_id: [nodes[nid]["zyx"] for nid in node_id]
@@ -36,13 +32,13 @@ def rasterize_and_evaluate(
     }
 
     # Initialize rasterized skeleton image
-    # config['roi_shape'] + 2 * config['roi_offset']
-    image = np.zeros((cube_size,) * 3, dtype=np.uint)
+    dataset_shape = np.array(config["skeleton_config"]["dataset_shape"])
+    image = np.zeros(dataset_shape, dtype=np.uint)
 
     px = partial(
         nm2px,
         voxel_size=config["skeleton_config"]["voxel_size_xyz"],
-        offset=config["Input"]["roi_offset"],
+        offset=config["skeleton_config"]["dataset_offset"],
     )
     for id, tree in skel_zyx.items():
         # iterates through ever node and assigns id to {image}
@@ -53,26 +49,24 @@ def rasterize_and_evaluate(
     # #Save GT rasterization
     # with zarr.open('segment.zarr', 'w') as f:
     #     f['skel_image/gt'] = image
-    #     f['skel_image/gt'].attrs['resolution'] = config["SkeletonConfig"]["voxel_size_xyz"]
-    #     f['skel_image/gt'].attrs['offset'] = tuple(config["Input"]["roi_offset"] - pad * daisy.Coordinate(config["SkeletonConfig"]["voxel_size_xyz"]))
+    #     f['skel_image/gt'].attrs['resolution'] = config["skeleton_config"]["voxel_size_xyz"]
+    #     f['skel_image/gt'].attrs['offset'] = tuple(config["skeleton_config"]["datset_offset"] - pad * daisy.Coordinate(config["skeleton_config"]["voxel_size_xyz"]))
 
-    # load segmentation
-    segment_file = config["Input"]["file"]
-    if thresh_list is False:
-        segment_datasets = [config["ds"]]
-    elif isinstance(thresh_list, str):
-        segment_datasets = [
-            os.path.join(*ds.strip("/").split("/")[-2:])
-            for ds in glob(os.path.join(segment_file, thresh_list))
-        ]
-    else:
-        segment_datasets = thresh_list
+    # load segmentations
+    segment_file = config["eval_sources"]["file"]
+    segment_datasets = config["eval_sources"]["datasets"]
+    if isinstance(segment_datasets, str):
+        segment_datasets = []
+        for ds in glob(os.path.join(segment_file, segment_datasets.rstrip("*") + "*")):
+            ds_parts = ds.strip("/").split("/")
+            ind = len(ds_parts) - np.nonzero([".n5" in p for p in ds_parts])[0][0] - 1
+            segment_datasets.append(os.path.join(ds_parts[-ind:]))
 
     evaluation = {}
     for segment_dataset in segment_datasets:
         segment_ds = daisy.open_ds(segment_file, segment_dataset)
         segment_array = segment_ds[segment_ds.roi].to_ndarray()
-        pad = daisy.Coordinate(cube_size - np.array(segment_array.shape)) // 2
+        pad = daisy.Coordinate(dataset_shape - np.array(segment_array.shape)) // 2
         evaluation[segment_dataset] = evaluate.rand_voi(
             image[pad[0] : -pad[0], pad[1] : -pad[1], pad[2] : -pad[2]], segment_array
         )

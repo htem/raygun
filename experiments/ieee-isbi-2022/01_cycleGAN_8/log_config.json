@@ -5,8 +5,10 @@
     "final": 200000,
     "tags": [
         "l1_loss/cycled_A",
-        "l1_loss/cycled_B"
-    ], //, "gan_loss/fake_A", "gan_loss/fake_B"],
+        "l1_loss/cycled_B",
+        "gan_loss/fake_A",
+        "gan_loss/fake_B"
+    ],
     "smoothing": 0.999,
     "plot": true,
     "save": true

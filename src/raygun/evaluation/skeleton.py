@@ -1,11 +1,9 @@
+#%%
 from glob import glob
 import sys
-from raygun.read_config import read_config
-
 import os
-
 from daisy import Coordinate
-
+from raygun.read_config import read_config
 from raygun.webknossos_utils.wkw_seg_to_zarr import download_wk_skeleton
 
 
@@ -17,19 +15,24 @@ def mult_coord(coord, voxel_size_xyz):
     ]
 
 
-def parse_skeleton(config):
+def parse_skeleton(config_path):
+    config = read_config(config_path)["skeleton_config"]
     fin = config["file"]
-    if fin.endswith(".zip"):
-        return parse_skeleton_wk(
-            fin,
-            voxel_size_xyz=config["voxel_size_xyz"],
-            coord_in_zyx=config["coord_in_zyx"],
-            coord_in_pix=config["coord_in_pix"],
-            interpolation=config["interpolation"],
-            interpolation_steps=config["interpolation_steps"],
-        )
-    else:
-        assert False, "CATMAID NOT IMPLEMENTED"
+    if not fin.endswith(".zip"):
+        try:
+            fin = get_updated_skeleton(config_path)
+            assert fin.endswith(".zip"), "Skeleton zip file not found."
+        except:
+            assert False, "CATMAID NOT IMPLEMENTED"
+
+    return parse_skeleton_wk(
+        fin,
+        voxel_size_xyz=config["voxel_size_xyz"],
+        coord_in_zyx=config["coord_in_zyx"],
+        coord_in_pix=config["coord_in_pix"],
+        interpolation=config["interpolation"],
+        interpolation_steps=config["interpolation_steps"],
+    )
 
 
 def parse_skeleton_wk(
@@ -93,22 +96,29 @@ def interpolate_points(p0, p1, max_steps):
     return res
 
 
-def get_updated_skeleton(default_config_fn=None):
-    if default_config_fn is None:
+def get_updated_skeleton(config_path=None):
+    if config_path is None:
         try:
-            default_config_fn = sys.argv[1]
+            config_path = sys.argv[1]
         except:
-            default_config_fn = "skeleton.json"
-    path = os.path.dirname(os.path.realpath(default_config_fn))
+            config_path = "skeleton.json"
+    path = os.path.dirname(os.path.realpath(config_path))
     print(f"Path: {path}")
-    segment_config = read_config(default_config_fn)
+    config = read_config(config_path)
 
-    if not os.path.exists(segment_config["skeleton_config"]["file"]):
-        files = glob(os.path.join(path, "/skeletons/*"))
-        if len(files) == 0 or segment_config["skeleton_config"]["file"] == "update":
+    if not os.path.exists(config["skeleton_config"]["file"]):
+        if "search_path" in config["skeleton_config"].keys():
+            search_path = (
+                config["skeleton_config"]["search_path"].rstrip("/*") + "/*"
+            )
+        else:
+            search_path = os.path.join(path, "/skeletons/*")
+        print(f"Search path: {search_path}")
+        files = glob(search_path)
+        if len(files) == 0 or config["skeleton_config"]["file"] == "update":
             skel_file = download_wk_skeleton(
-                segment_config["skeleton_config"]["url"].split("/")[-1],
-                os.path.join(path, "skeletons/"),
+                config["skeleton_config"]["url"].split("/")[-1],
+                search_path.rstrip("*"),
                 overwrite=True,
             )
         else:
@@ -116,3 +126,6 @@ def get_updated_skeleton(default_config_fn=None):
     skel_file = os.path.abspath(skel_file)
 
     return skel_file
+
+
+# %%

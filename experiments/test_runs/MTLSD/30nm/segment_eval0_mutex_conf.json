@@ -1,0 +1,10 @@
+{
+    "include_config": "/nrs/funke/rhoadesj/raygun/experiments/test_runs/MTLSD/30nm/train_conf.json",
+    "file": "/nrs/funke/rhoadesj/raygun/experiments/test_runs/MTLSD/30nm/eval_0.n5",
+    "aff_ds": "pred_affs",
+    "prefix": "",
+    "mutex": true,
+    "max_affinity_value": 1.0,
+    "sep": 3,
+    "mask_thresh": 0.3
+}
