@@ -68,10 +68,10 @@ def serialize(obj):
         return obj
 
 
-def to_json(obj, file):
+def to_json(obj, file, indent=3):
     out = serialize(obj)
     with open(file, "w") as f:
-        json.dump(out, f)
+        json.dump(out, f, indent=3)
 
 
 def load_json_file(fin):

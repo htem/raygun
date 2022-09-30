@@ -1,8 +1,13 @@
 import inspect
 import os
+from raygun.read_config import read_config
 from tqdm import trange
 import gunpowder as gp
 import numpy as np
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 from raygun.utils import passing_locals
 
@@ -23,7 +28,7 @@ class BaseTrain(object):
         num_workers: int = 11,
         cache_size: int = 50,
         snapshot_every=None,
-        **kwargs
+        **kwargs,
     ):
         kwargs = passing_locals(locals())
         for key, value in kwargs.items():
@@ -159,11 +164,44 @@ class BaseTrain(object):
         print(stats)
 
     def update_validation_configs(self, config):
-        current_iter = self.n_iter
-        # update and save validate_config
-        # update and save predict_config
-        # update and save segment_config
-        ...
+        config["checkpoint"] = self.n_iter
+        config["predict_config"]["checkpoint"] = self.n_iter
+
+        train_config = read_config(config["predict_config"]["config_path"])
+        sources = train_config["sources"]
+        raw_src = sources[np.argmax(["raw" in src.keys() for src in sources])]
+        source_path = config["predict_config"]["source_path"].replace(
+            "$source_dirname", os.path.dirname(raw_src["path"])
+        )
+        config["predict_config"]["source_path"] = source_path
+        source_ds = config["predict_config"]["source_dataset"].replace(
+            "$source_dataset", raw_src["raw"]
+        )
+        config["predict_config"]["source_dataset"] = source_ds
+
+        config["segment_config"]["file"] = source_path
+
+        validation_config_path = config["validation_config_path"]
+        to_json(config, validation_config_path)
+        prediction_config_path = config["prediction_config_path"]
+        to_json(config["predict_config"], prediction_config_path)
+
+        return config
+
+    def run_validation(self, config):
+        config = self.update_validation_configs(config)
+        config_path = config["validation_config_path"]
+        # launch validation
+        try:
+            retcode = call(config["launch_command"], shell=True)
+            if retcode < 0:
+                logger.warning(
+                    "Child was terminated by signal", -retcode, file=sys.stderr
+                )
+            else:
+                logger.info("Child returned", retcode, file=sys.stderr)
+        except OSError as e:
+            logger.warning("Execution failed:", e, file=sys.stderr)
 
     def train(self, iter: int):
         self.model.train()
@@ -182,10 +220,7 @@ class BaseTrain(object):
                     i % self.save_every == 0
                     and "validation_config" in self.train_kwargs.keys()
                 ):
-                    validation_config_path = self.update_validation_configs(
-                        self.train_kwargs["validation_config"]
-                    )
-                    # launch validation command
+                    self.run_validation(self.train_kwargs["validation_config"])
 
     def test(self, mode: str = "train"):
         getattr(self.model, mode)()
