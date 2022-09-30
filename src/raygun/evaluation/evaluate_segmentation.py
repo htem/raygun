@@ -8,51 +8,42 @@ import os
 import json
 import zarr
 import numpy as np
-from skimage.draw import line_nd
-from funlib import evaluate
-from raygun.evaluation.skeleton import parse_skeleton
-from raygun import read_config
+from funlib.evaluate import rand_voi
+from raygun.evaluation.skeleton import rasterize_skeleton
+from raygun import predict, read_config, segment
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-def nm2px(coord, voxel_size, offset):
-    # removes offset and converts to px
-    return [int((c / v) - o) for c, v, o in zip(coord, voxel_size, offset)]
+def validate_affinities(config):
+    config = read_config(config)
+    # MAKE SURE TO UPDATE CHECKPOINT, "save" in segment config is false
+    logger.info("Predicting validation volume affinities...")
+    predict(config["predict_config"])
+    return validate_segmentation(config)
 
 
-def rasterize_and_evaluate(config_path):
+def validate_segmentation(config):
+    config = read_config(config)
+    seg = segment(config["segment_config"])
+    image = rasterize_skeleton(config["skeleton_config"])
+    pad = daisy.Coordinate(np.array(image.shape) - np.array(seg.shape)) // 2
+    if sum(pad) < 3:
+        image = image
+    else:
+        image = image[pad[0] : -pad[0], pad[1] : -pad[1], pad[2] : -pad[2]]
+    return rand_voi(image, seg)
+
+
+def evaluate_segmentations(config_path):
     config = read_config(config_path)
-
-    # Skel=tree_id:[Node_id], nodes=Node_id:{x,y,z}
-    skeletons, nodes = parse_skeleton(config_path)
-
-    # {Tree_id:[[xyz]]}
-    skel_zyx = {
-        tree_id: [nodes[nid]["zyx"] for nid in node_id]
-        for tree_id, node_id in skeletons.items()
-    }
-
     # Initialize rasterized skeleton image
-    dataset_shape = np.array(config["skeleton_config"]["dataset_shape"])
-    image = np.zeros(dataset_shape, dtype=np.uint)
-
-    px = partial(
-        nm2px,
-        voxel_size=config["skeleton_config"]["voxel_size_xyz"],
-        offset=config["skeleton_config"]["dataset_offset"],
-    )
-    for id, tree in skel_zyx.items():
-        # iterates through ever node and assigns id to {image}
-        for i in range(0, len(tree) - 1, 2):
-            line = line_nd(px(tree[i]), px(tree[i + 1]))
-            image[line] = id
-
-    # #Save GT rasterization
-    # with zarr.open('segment.zarr', 'w') as f:
-    #     f['skel_image/gt'] = image
-    #     f['skel_image/gt'].attrs['resolution'] = config["skeleton_config"]["voxel_size_xyz"]
-    #     f['skel_image/gt'].attrs['offset'] = tuple(config["skeleton_config"]["datset_offset"] - pad * daisy.Coordinate(config["skeleton_config"]["voxel_size_xyz"]))
+    image = rasterize_skeleton(config_path)
 
     # load segmentations
+    logger.info(f"Getting segmentation datasets...")
     segment_file = config["eval_sources"]["file"]
     segment_datasets = config["eval_sources"]["datasets"]
     if isinstance(segment_datasets, str):
@@ -62,14 +53,20 @@ def rasterize_and_evaluate(config_path):
             ind = len(ds_parts) - np.nonzero([".n5" in p for p in ds_parts])[0][0] - 1
             segment_datasets.append(os.path.join(ds_parts[-ind:]))
 
+    logger.info(f"Evaluating skeleton...")
     evaluation = {}
     for segment_dataset in segment_datasets:
         segment_ds = daisy.open_ds(segment_file, segment_dataset)
-        segment_array = segment_ds[segment_ds.roi].to_ndarray()
-        pad = daisy.Coordinate(dataset_shape - np.array(segment_array.shape)) // 2
-        evaluation[segment_dataset] = evaluate.rand_voi(
-            image[pad[0] : -pad[0], pad[1] : -pad[1], pad[2] : -pad[2]], segment_array
+        segment_array = segment_ds.to_ndarray(segment_ds.roi)
+        pad = (
+            daisy.Coordinate(np.array(image.shape) - np.array(segment_array.shape)) // 2
         )
+        if sum(pad) < 3:
+            this_image = image
+        else:
+            this_image = image[pad[0] : -pad[0], pad[1] : -pad[1], pad[2] : -pad[2]]
+
+        evaluation[segment_dataset] = rand_voi(this_image, segment_array)
 
     return evaluation
 
@@ -117,7 +114,7 @@ if __name__ == "__main__":
     config = read_config(config_file)
     current_iteration = int(config["Network"]["iteration"])
     print(f"Evaluating {config_file} at iteration {current_iteration}...")
-    evaluation = rasterize_and_evaluate(config, thresh_list=thresh_list)
+    evaluation = evaluate(config)
     best_eval = {}
     for thresh, metrics in evaluation.items():
         if len(best_eval) == 0 or get_score(best_eval) > get_score(metrics):

@@ -60,6 +60,14 @@ def eval_args(config, file):
 
 
 def read_config(file):
+    """Read configuration json files into dictionary format
+
+    Args:
+        file (str or dict): Path to configuration file or, for convenience, a dictionary of the config
+
+    Returns:
+        dict: Configuration dictionary
+    """
     # Check to make sure dictionary hasn't been passed directly
     if isinstance(file, dict):
         return file

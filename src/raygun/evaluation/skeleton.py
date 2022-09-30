@@ -1,10 +1,18 @@
 #%%
+from functools import partial
 from glob import glob
+import numpy as np
 import sys
 import os
+import webknossos
+from skimage.draw import line_nd
 from daisy import Coordinate
 from raygun.read_config import read_config
 from raygun.webknossos_utils.wkw_seg_to_zarr import download_wk_skeleton
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def mult_coord(coord, voxel_size_xyz):
@@ -16,7 +24,8 @@ def mult_coord(coord, voxel_size_xyz):
 
 
 def parse_skeleton(config_path):
-    config = read_config(config_path)["skeleton_config"]
+    logger.info(f"Parsing skeleton...")
+    config = read_config(config_path)
     fin = config["file"]
     if not fin.endswith(".zip"):
         try:
@@ -43,8 +52,7 @@ def parse_skeleton_wk(
     interpolation=True,
     interpolation_steps=10,
 ):
-
-    import webknossos
+    logger.info(f"Parsing {fin}")
 
     assert coord_in_zyx, "Unimplemented"
     assert coord_in_pix, "Unimplemented"
@@ -103,21 +111,19 @@ def get_updated_skeleton(config_path=None):
         except:
             config_path = "skeleton.json"
     path = os.path.dirname(os.path.realpath(config_path))
-    print(f"Path: {path}")
+    logger.info(f"Path: {path}")
     config = read_config(config_path)
 
-    if not os.path.exists(config["skeleton_config"]["file"]):
-        if "search_path" in config["skeleton_config"].keys():
-            search_path = (
-                config["skeleton_config"]["search_path"].rstrip("/*") + "/*"
-            )
+    if not os.path.exists(config["file"]):
+        if "search_path" in config.keys():
+            search_path = config["search_path"].rstrip("/*") + "/*"
         else:
             search_path = os.path.join(path, "/skeletons/*")
-        print(f"Search path: {search_path}")
+        logger.info(f"Search path: {search_path}")
         files = glob(search_path)
-        if len(files) == 0 or config["skeleton_config"]["file"] == "update":
+        if len(files) == 0 or config["file"] == "update":
             skel_file = download_wk_skeleton(
-                config["skeleton_config"]["url"].split("/")[-1],
+                config["url"].split("/")[-1],
                 search_path.rstrip("*"),
                 overwrite=True,
             )
@@ -126,6 +132,50 @@ def get_updated_skeleton(config_path=None):
     skel_file = os.path.abspath(skel_file)
 
     return skel_file
+
+
+def nm2px(coord, voxel_size, offset):
+    # removes offset and converts to px
+    return [int((c / v) - o) for c, v, o in zip(coord, voxel_size, offset)]
+
+
+def rasterize_skeleton(config_path):
+    logger.info(f"Rasterizing skeleton...")
+    config = read_config(config_path)
+
+    # Skel=tree_id:[Node_id], nodes=Node_id:{x,y,z}
+    skeletons, nodes = parse_skeleton(config_path)
+
+    # {Tree_id:[[xyz]]}
+    skel_zyx = {
+        tree_id: [nodes[nid]["zyx"] for nid in node_id]
+        for tree_id, node_id in skeletons.items()
+    }
+
+    # Initialize rasterized skeleton image
+    dataset_shape = np.array(config["dataset_shape"])
+    image = np.zeros(dataset_shape, dtype=np.uint)
+
+    px = partial(
+        nm2px,
+        voxel_size=config["voxel_size_xyz"],
+        offset=config["dataset_offset"],
+    )
+    for id, tree in skel_zyx.items():
+        # iterates through ever node and assigns id to {image}
+        for i in range(0, len(tree) - 1, 2):
+            line = line_nd(px(tree[i]), px(tree[i + 1]))
+            image[line] = id
+
+    if "save" in config.keys() and config["save"]:
+        logger.info("Saving rasterization...")
+        raise NotImplementedError()
+        # #Save GT rasterization
+        # with zarr.open('segment.zarr', 'w') as f:
+        #     f['skel_image/gt'] = image
+        #     f['skel_image/gt'].attrs['resolution'] = config["voxel_size_xyz"]
+        #     f['skel_image/gt'].attrs['offset'] = tuple(config["datset_offset"] - pad * daisy.Coordinate(config["voxel_size_xyz"]))
+    return image
 
 
 # %%

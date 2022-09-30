@@ -158,6 +158,13 @@ class BaseTrain(object):
 
         print(stats)
 
+    def update_validation_configs(self, config):
+        current_iter = self.n_iter
+        # update and save validate_config
+        # update and save predict_config
+        # update and save segment_config
+        ...
+
     def train(self, iter: int):
         self.model.train()
         training_pipeline = self.training_pipe()
@@ -170,6 +177,15 @@ class BaseTrain(object):
 
                 if i % self.log_every == 0:
                     self.train_node.summary_writer.flush()
+
+                if (
+                    i % self.save_every == 0
+                    and "validation_config" in self.train_kwargs.keys()
+                ):
+                    validation_config_path = self.update_validation_configs(
+                        self.train_kwargs["validation_config"]
+                    )
+                    # launch validation command
 
     def test(self, mode: str = "train"):
         getattr(self.model, mode)()

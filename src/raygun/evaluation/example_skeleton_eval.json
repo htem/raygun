@@ -2,7 +2,8 @@
     // CATMAID project ID to pull skeleton from
     // "skeleton_project_id": 18,
     "skeleton_config": {
-        "file": "update",
+        "file": "load",
+        "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
         "url": "http://catmaid2.hms.harvard.edu:9000/annotations/62e941050100008800fe64bf", // eval1
         "coord_in_pix": true,
         "coord_in_zyx": true,
@@ -12,12 +13,22 @@
             30
         ],
         "interpolation": true,
-        "interpolation_steps": 10
+        "interpolation_steps": 10,
+        "dataset_shape": [
+            1024,
+            1024,
+            1024
+        ],
+        "dataset_offset": [
+            1753,
+            1696,
+            1097
+        ]
     },
     "eval_sources": {
-        "test": {
-            "file": "path/to/zarr",
-            "ds": "ds_name"
-        }
+        "file": "/nrs/funke/rhoadesj/raygun/experiments/test_runs/MTLSD/30nm/eval_0.n5",
+        "datasets": [
+            "mutex_0.30"
+        ]
     }
 }

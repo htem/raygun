@@ -1,4 +1,5 @@
 from glob import glob
+from logging import getLogger
 import os
 import sys
 import numpy as np
@@ -8,6 +9,10 @@ import zarr
 from scipy.ndimage import label, maximum_filter, measurements, distance_transform_edt
 from skimage.segmentation import watershed
 from affogato.segmentation import compute_mws_segmentation
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def watershed_from_boundary_distance(
@@ -22,7 +27,7 @@ def watershed_from_boundary_distance(
     maxima = max_filtered == boundary_distances
     seeds, n = label(maxima)
 
-    print(f"Found {n} fragments")
+    logger.info(f"Found {n} fragments")
 
     if n == 0:
         return np.zeros(boundary_distances.shape, dtype=np.uint64), id_offset
@@ -179,7 +184,7 @@ def mutex_segment(config_path):
 
     f = zarr.open(file, "a")
 
-    print("Loading affinity predictions...")
+    logger.info("Loading affinity predictions...")
     affs = f[aff_ds][:]  # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0
 
     # use average affs to mask
@@ -190,13 +195,19 @@ def mutex_segment(config_path):
     affs[:sep] = affs[:sep] * -1
     affs[:sep] = affs[:sep] + 1
 
-    print("Getting segmentations...")
+    logger.info("Getting segmentations...")
     seg = compute_mws_segmentation(
         affs, neighborhood, sep, strides=[10, 10, 10], mask=mask
     )
 
-    print("Writing segmentations...")
-    dest_dataset = f"mutex_{'{:.2f}'.format(mask_thresh)}"  # TODO: should probably add to config
+    if "save" in seg_config.keys() and not seg_config["save"]:
+        return seg
+
+    logger.info("Writing segmentations...")
+    if "dest_dataset" not in seg_config.keys():
+        dest_dataset = f"mutex_{'{:.2f}'.format(mask_thresh)}"
+    else:
+        dest_dataset = seg_config["dest_dataset"]
     f[dest_dataset] = seg
     f[dest_dataset].attrs["offset"] = f[aff_ds].attrs["offset"]
     f[dest_dataset].attrs["resolution"] = f[aff_ds].attrs["resolution"]
@@ -215,7 +226,7 @@ def mutex_segment(config_path):
             f.write(f"{dest_dataset} ")
 
 
-def segment(config_path=None):
+def segment(config_path=None):  # TODO: Clean up
     if config_path is None:
         config_path = sys.argv[1]
 
@@ -247,11 +258,11 @@ def segment(config_path=None):
 
         if not done:
             # load predicted affinities
-            print("Loading affinity predictions...")
+            logger.info("Loading affinity predictions...")
             prediction = f[aff_ds][:].astype(
                 np.float32
             )  # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0
-            print("Getting segmentations...")
+            logger.info("Getting segmentations...")
             pred_segs = get_segmentation(
                 prediction,
                 thresholds=thresholds,
@@ -264,7 +275,7 @@ def segment(config_path=None):
                 os.path.dirname(config_path),
                 f"view_{os.path.basename(file).rstrip('.n5').rstrip('.zarr')}.ng",
             )
-            print("Writing segmentations...")
+            logger.info("Writing segmentations...")
             for thresh, pred_seg in zip(thresholds, pred_segs):
                 dest_dataset = f'pred_seg_{"{:.2f}".format(thresh)}'
                 f[dest_dataset] = pred_seg

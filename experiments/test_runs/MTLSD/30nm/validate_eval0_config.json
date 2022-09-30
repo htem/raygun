@@ -28,7 +28,8 @@
     "eval_sources": {
         "file": "/nrs/funke/rhoadesj/raygun/experiments/test_runs/MTLSD/30nm/eval_0.n5",
         "datasets": [
-            "mutex_0.30"
+            "mutex_0.30",
+            "mutex_0.50"
         ]
     }
 }
