@@ -161,7 +161,7 @@ class MTLSDDataPipe(BaseDataPipe):
 
         self.sources = tuple(self.sources)
         if len(self.sources) > 1:
-            self.source = self.sources + gp.MergeProviders()
+            self.source = self.sources + gp.MergeProvider()
         else:
             self.source = self.sources[0]
 

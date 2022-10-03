@@ -1,5 +1,7 @@
 import inspect
 import os
+from subprocess import call
+import sys
 from raygun.read_config import read_config
 from tqdm import trange
 import gunpowder as gp
@@ -9,7 +11,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from raygun.utils import passing_locals
+from raygun.utils import passing_locals, to_json
 
 
 class BaseTrain(object):
@@ -190,18 +192,15 @@ class BaseTrain(object):
 
     def run_validation(self, config):
         config = self.update_validation_configs(config)
-        config_path = config["validation_config_path"]
         # launch validation
         try:
             retcode = call(config["launch_command"], shell=True)
             if retcode < 0:
-                logger.warning(
-                    "Child was terminated by signal", -retcode, file=sys.stderr
-                )
+                logger.warning(f"Child was terminated by signal {-retcode}")
             else:
-                logger.info("Child returned", retcode, file=sys.stderr)
+                logger.info(f"Child returned {retcode}")
         except OSError as e:
-            logger.warning("Execution failed:", e, file=sys.stderr)
+            logger.warning(f"Execution failed: {e}")
 
     def train(self, iter: int):
         self.model.train()
@@ -213,14 +212,13 @@ class BaseTrain(object):
                 pbar.set_postfix({"loss": self.batch.loss})
                 self.n_iter = self.train_node.iteration
 
-                if i % self.log_every == 0:
+                if self.n_iter % self.log_every == 0:
                     self.train_node.summary_writer.flush()
 
-                if (
-                    i % self.save_every == 0
-                    and "validation_config" in self.train_kwargs.keys()
+                if self.n_iter % self.save_every == 0 and hasattr(
+                    self, "validation_config"
                 ):
-                    self.run_validation(self.train_kwargs["validation_config"])
+                    self.run_validation(self.validation_config)
 
     def test(self, mode: str = "train"):
         getattr(self.model, mode)()

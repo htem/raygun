@@ -145,11 +145,17 @@ def worker(render_config_path):
                     else:
                         out = out.numpy().astype(destination.dtype)
 
-                    if ndims == 2:  # Add Z dimension if necessary
+                    if (
+                        ndims == 2 and len(out.shape) < 3
+                    ):  # Add Z dimension if necessary
                         out = out[None, ...]
+                    elif (
+                        ndims == 2 and len(out.shape) == 3
+                    ):  # Add Z dimension if necessary
+                        out = out[:, None, ...]
 
-                    if len(out.shape) < 4:  # Add channel dimension if necessary
-                        out = out[None, ...]
+                    # if len(out.shape) < 4:  # Add channel dimension if necessary
+                    #     out = out[None, ...]
 
                     destination[block.write_roi] = out
                     logger.info(f"Wrote chunk {block.block_id} to {dest_dataset}...")

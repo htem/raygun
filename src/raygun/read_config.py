@@ -5,7 +5,9 @@ import json
 import os
 from jsmin import jsmin
 import numpy as np
+import numpy
 import gunpowder as gp
+import gunpowder
 import daisy
 import sys
 from raygun.utils import load_json_file

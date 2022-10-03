@@ -1,3 +1,4 @@
+import inspect
 from io import StringIO
 from jsmin import jsmin
 import json
@@ -64,8 +65,14 @@ def serialize(obj):
         return obj.tolist()
     elif isinstance(obj, np.int64):
         return int(obj)
+    elif inspect.isclass(obj):
+        return f"#{'.'.join([obj.__module__, obj.__name__])}#"
     else:
-        return obj
+        try:
+            json.dumps(obj)
+            return obj
+        except:
+            return f"#{repr(obj)}#"
 
 
 def to_json(obj, file, indent=3):

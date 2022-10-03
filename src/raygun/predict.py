@@ -92,9 +92,9 @@ def predict(render_config_path=None):  # Use absolute path
         write_roi = daisy.Roi(context, write_size)
 
     else:
-        read_size = render_config["read_size"]  # CHANGE TO input_shape
+        read_size = render_config["read_size"]  # TODO: CHANGE TO input_shape
         if read_size is None:
-            read_size = train_config["side_length"]  # CHANGE TO input_shape
+            read_size = train_config["side_length"]  # TODO: CHANGE TO input_shape
         crop = render_config["crop"]
         read_size = daisy.Coordinate((1,) * (3 - ndims) + (read_size,) * (ndims))
         crop = daisy.Coordinate((0,) * (3 - ndims) + (crop,) * (ndims))
@@ -112,7 +112,7 @@ def predict(render_config_path=None):  # Use absolute path
             "voxel_size": source.voxel_size,
             "dtype": source.dtype,
             "write_size": write_roi.get_shape(),
-            "num_channels": 1,
+            "num_channels": None,
             "delete": True,
         }
         if out_specs is not None and dest_dataset in out_specs.keys():

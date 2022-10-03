@@ -4,15 +4,24 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 from raygun import read_config
-import tensorflow as tf
 from glob import glob
 import os
 import sys
 
-from raygun.utils import to_json
+from raygun.utils import load_json_file, to_json
+
+
+def convert_voi_metrics(path: str):
+    old = load_json_file(path)
+    metrics = defaultdict(list)
+    steps = np.array([k for k in old.keys()])
+    metrics["step"] = steps
+    tags = [k for k in old[steps[0]].keys()]
 
 
 def parse_events_file(path: str, tags: list):
+    import tensorflow as tf  # put here to prevent loading tensorflow for every raygun operation
+
     metrics = defaultdict(list)
     for e in tf.compat.v1.train.summary_iterator(path):
         for v in e.summary.value:

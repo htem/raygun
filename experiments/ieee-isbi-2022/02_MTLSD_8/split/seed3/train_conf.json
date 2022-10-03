@@ -8,8 +8,8 @@
             "cell_mask": "volumes/unlabeled_mask"
         },
         {
-            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed13/training_0.n5",
-            "raw": "volumes/raw_30nm_netG2_46000"
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_8/split/seed3/training_0.n5",
+            "raw": "volumes/raw_30nm_netG2_66000"
         }
     ]
 }
