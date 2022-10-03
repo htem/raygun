@@ -31,7 +31,7 @@
             "validation_config_path": "$working_dir/validate_eval0_config.json",
             "prediction_config_path": "$working_dir/predict_eval0_config.json",
             "checkpoint": null, // fill in per iteration
-            "launch_command": "bsub -n 16 -gpu \"num=1\" -q gpu_tesla -o validate.log -J validate_eval0 raygun-validate-affinities $working_dir/validate_eval0_config.json &",
+            "launch_command": "bsub -n 32 -q cloud -o validate.log -J validate_eval0 raygun-validate-affinities $working_dir/validate_eval0_config.json &",
             // CATMAID project ID to pull skeleton from
             // "skeleton_project_id": 18,
             "skeleton_config": {

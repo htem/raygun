@@ -53,10 +53,6 @@ class MTLSDDataPipe(BaseDataPipe):
 
         # setup data sources
         self.get_sources()
-        if len(self.sources) > 1:
-            self.source = self.sources + gp.RandomProvider()
-        else:
-            self.source = self.sources[0]
 
         # add augmentations
         self.augment_axes = list(np.arange(3)[-ndims:])
@@ -142,53 +138,56 @@ class MTLSDDataPipe(BaseDataPipe):
         else:
             self.unsqueeze = None
 
-    def get_sources(self):
+    def get_sources(self, names=["raw", "labels", "labels_mask", "cell_mask"]):
         if not isinstance(self.srcs, list):
             self.srcs = [self.srcs]
+
+        src_specs = {
+            self.raw: gp.ArraySpec(interpolatable=True),
+            self.labels: gp.ArraySpec(interpolatable=False),
+            self.labels_mask: gp.ArraySpec(interpolatable=False),
+            self.cell_mask: gp.ArraySpec(interpolatable=False),
+        }
+
         self.sources = []
         for src in self.srcs:
+            src_names = {getattr(self, k): v for k, v in src.items() if k in names}
             source = self.get_source(
                 path=src["path"],
-                src_names={
-                    self.raw: src["raw"],
-                    self.labels: src["labels"],
-                    self.labels_mask: src["labels_mask"],
-                    self.cell_mask: src["cell_mask"],
-                },
-                src_specs={
-                    self.raw: gp.ArraySpec(interpolatable=True),
-                    self.labels: gp.ArraySpec(interpolatable=False),
-                    self.labels_mask: gp.ArraySpec(interpolatable=False),
-                    self.cell_mask: gp.ArraySpec(interpolatable=False),
-                },
+                src_names=src_names,
+                src_specs={k: src_specs[k] for k in src_names.keys()},
             )
-
-            source += gp.Normalize(self.raw)
-
-            if self.pad:
-                labels_padding = calc_max_padding(
-                    self.output_size, self.voxel_size, self.neighborhood, self.sigma
-                )
-                source += gp.Pad(self.raw, None)
-                source += gp.Pad(self.labels, labels_padding)
-                source += gp.Pad(self.labels_mask, labels_padding)
-
-            if self.random_location_kwargs is not None:
-                source += gp.RandomLocation(
-                    mask=self.cell_mask, **self.random_location_kwargs
-                )
-            else:
-                source += gp.RandomLocation()
-
-            # use a mask to ensure batches see enough cells
-            if self.reject_kwargs is not None:
-                source += gp.Reject(mask=self.cell_mask, **self.reject_kwargs)
-
-            if hasattr(self, "grow_boundary") and self.grow_boundary:
-                source += gp.GrowBoundary(self.labels)
-
             self.sources.append(source)
+
         self.sources = tuple(self.sources)
+        if len(self.sources) > 1:
+            self.source = self.sources + gp.MergeProviders()
+        else:
+            self.source = self.sources[0]
+
+        self.source += gp.Normalize(self.raw)
+
+        if self.pad:
+            labels_padding = calc_max_padding(
+                self.output_size, self.voxel_size, self.neighborhood, self.sigma
+            )
+            self.source += gp.Pad(self.raw, None)
+            self.source += gp.Pad(self.labels, labels_padding)
+            self.source += gp.Pad(self.labels_mask, labels_padding)
+
+        if self.random_location_kwargs is not None:
+            self.source += gp.RandomLocation(
+                mask=self.cell_mask, **self.random_location_kwargs
+            )
+        else:
+            self.source += gp.RandomLocation()
+
+        # use a mask to ensure batches see enough cells
+        if self.reject_kwargs is not None:
+            self.source += gp.Reject(mask=self.cell_mask, **self.reject_kwargs)
+
+        if hasattr(self, "grow_boundary") and self.grow_boundary:
+            self.source += gp.GrowBoundary(self.labels)
 
     def prenet_pipe(self, mode: str = "train"):
         # Make pre-net datapipe
