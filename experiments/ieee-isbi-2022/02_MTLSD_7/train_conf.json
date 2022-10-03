@@ -27,6 +27,7 @@
             "pred_affs"
         ],
         "validation_config": {
+            "validate_every": 5000,
             "metric_path": "$working_dir/validation_eval0_metrics.json",
             "validation_config_path": "$working_dir/validate_eval0_config.json",
             "prediction_config_path": "$working_dir/predict_eval0_config.json",

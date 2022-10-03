@@ -1,12 +1,3 @@
 {
-    "include_config": "../train_conf.json",
-    "sources": [
-        {
-            "path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5",
-            "labels": "volumes/GT_labels",
-            "labels_mask": "volumes/trainingMask_center600",
-            "cell_mask": "volumes/unlabeled_mask",
-            "raw": "volumes/raw_30nm"
-        }
-    ]
+    "include_config": "../train_conf.json"
 }

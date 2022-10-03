@@ -1,13 +1,8 @@
-rm */train.out
-rm -r */tensorboard
-rm -r */models
-rm -r */snapshots
-
 rm */*/train.out
-rm -r */*/tensorboard
-rm -r */*/models
-rm -r */*/snapshots
-rm -r tensorboards
+rm -rf */*/tensorboard
+rm -rf */*/models
+rm -rf */*/snapshots
+rm -rf tensorboards
 
 raygun-train-batch .
 

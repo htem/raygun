@@ -1,9 +1,9 @@
 {
-   "metric_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/validation_eval0_metrics.json",
-   "validation_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/validate_eval0_config.json",
-   "prediction_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/predict_eval0_config.json",
+   "metric_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed3/validation_eval0_metrics.json",
+   "validation_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed3/validate_eval0_config.json",
+   "prediction_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed3/predict_eval0_config.json",
    "checkpoint": 0,
-   "launch_command": "bsub -n 32 -q cloud -o validate.log -J validate_eval0 raygun-validate-affinities /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/validate_eval0_config.json &",
+   "launch_command": "bsub -n 16 -o validate.log -J validate_eval0 raygun-validate-affinities /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed3/validate_eval0_config.json &",
    "skeleton_config": {
       "file": "load",
       "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
@@ -29,10 +29,10 @@
       ]
    },
    "predict_config": {
-      "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/train_conf.json",
+      "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed3/train_conf.json",
       "num_workers": 32,
-      "source_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/eval_0.n5",
-      "source_dataset": "volumes/raw_30nm",
+      "source_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed3/eval_0.n5",
+      "source_dataset": "volumes/raw_30nm_netG2_56000",
       "output_ds": [
          "pred_affs",
          "pred_lsds"
@@ -57,8 +57,8 @@
       "output_shape": 40
    },
    "segment_config": {
-      "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/train_conf.json",
-      "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/eval_0.n5",
+      "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed3/train_conf.json",
+      "file": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed3/eval_0.n5",
       "aff_ds": "pred_affs",
       "prefix": "",
       "mutex": true,

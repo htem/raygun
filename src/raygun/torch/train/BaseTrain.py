@@ -212,11 +212,11 @@ class BaseTrain(object):
                 pbar.set_postfix({"loss": self.batch.loss})
                 self.n_iter = self.train_node.iteration
 
-                if self.n_iter % self.log_every == 0:
+                if i + 1 % self.log_every == 0:
                     self.train_node.summary_writer.flush()
 
-                if self.n_iter % self.save_every == 0 and hasattr(
-                    self, "validation_config"
+                if hasattr(self, "validation_config") and (
+                    i + 1 % self.validation_config["validate_every"] == 0
                 ):
                     self.run_validation(self.validation_config)
 

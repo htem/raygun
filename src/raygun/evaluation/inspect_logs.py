@@ -11,12 +11,22 @@ import sys
 from raygun.utils import load_json_file, to_json
 
 
-def convert_voi_metrics(path: str):
+def convert_json_log(path: str, tags=None):
     old = load_json_file(path)
     metrics = defaultdict(list)
     steps = np.array([k for k in old.keys()])
     metrics["step"] = steps
-    tags = [k for k in old[steps[0]].keys()]
+    if tags is None:
+        tags = [k for k in old[steps[0]].keys()]
+
+    for step in steps:
+        for tag in tags:
+            metrics[tag].append(old[step][tag])
+
+    for k, v in metrics.items():
+        metrics[k] = np.array(v)
+
+    return metrics
 
 
 def parse_events_file(path: str, tags: list):
@@ -34,25 +44,53 @@ def parse_events_file(path: str, tags: list):
     return metrics
 
 
-# %%
-def pick_checkpoints(
+def load_json_logs(path: str, tags=None):
+    files = glob(path)
+    base_path = os.path.commonpath(files)
+    base_name = (
+        os.path.commonprefix([file.split("/")[-1] for file in files]).replace(
+            ".json", ""
+        ),
+    )
+    file_basename = os.path.join(base_path, base_name)
+    model_logs = {}  # model_name: log_metrics
+    for file in files:
+        model_name = "_".join(
+            file.replace(base_path, "")
+            .rstrip("/" + base_name + ".json")
+            .lstrip("/")
+            .split("/")
+        )
+        model_logs[model_name] = convert_json_log(file, tags)
+
+    return model_logs, file_basename
+
+
+def load_tensorboards(
     meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
-    increment=2000,
     start=2000,  # TODO: ALLOW FOR UNBOUNDED
-    final=200000,
-    tags=["l1_loss/cycled_A", "l1_loss/cycled_B", "gan_loss/fake_A", "gan_loss/fake_B"],
-    smoothing=0.999,
-    plot=True,
-    save=False,
+    tags=None,
 ):
+    if tags is None:
+        tags = [
+            "l1_loss/cycled_A",
+            "l1_loss/cycled_B",
+            "gan_loss/fake_A",
+            "gan_loss/fake_B",
+        ]
     meta_log_dir = meta_log_dir.rstrip("/*") + "/*"
 
     folders = glob(meta_log_dir)
+    file_basename = os.path.join(
+        os.path.dirname(os.path.commonpath(folders)), "model_logs"
+    )
     model_logs = {}  # model_name: log_metrics
     for folder in folders:
         log_paths = glob(folder + "/*")
         log_path = max(log_paths, key=os.path.getctime)
-        model_name = folder.split("/")[-1]
+        model_name = "_".join(
+            folder.replace(os.path.commonpath(folders), "").lstrip("/").split("/")
+        )
         model_logs[model_name] = parse_events_file(log_path, tags)
         # check what we want is there:
         p = 0
@@ -60,13 +98,33 @@ def pick_checkpoints(
             model_logs[model_name] = parse_events_file(log_paths[p], tags)
             p += 1
 
+    return model_logs, file_basename
+
+
+# %%
+def pick_checkpoints(
+    meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
+    increment=2000,
+    start=2000,  # TODO: ALLOW FOR UNBOUNDED
+    final=200000,
+    tags=None,
+    smoothing=0.999,
+    plot=True,
+    save=False,
+    tensorboard=True,
+):
+    if tensorboard:  # TODO: Make cleaner, this is super hacky
+        model_logs, file_basename = load_tensorboards(meta_log_dir, start, tags)
+    else:
+        model_logs, file_basename = load_json_logs(meta_log_dir, tags)
+
+    for model_name in model_logs.keys():
         model_logs[model_name]["geo_mean"] = get_geo_mean(model_logs[model_name], tags)
         # model_logs[model_name]['smooth_geo_mean'] = smooth(model_logs[model_name]['geo_mean'], smoothing)
         model_logs[model_name]["smooth_geo_mean"] = get_geo_mean(
             model_logs[model_name], tags, smoothing=smoothing
         )
 
-    for model_name in model_logs.keys():
         inds = np.array(
             [
                 np.where(model_logs[model_name]["step"] == step)
@@ -90,9 +148,6 @@ def pick_checkpoints(
         plot_all(model_logs, tags + ["scores"])
 
     if save:
-        file_basename = os.path.join(
-            os.path.dirname(os.path.dirname(meta_log_dir)), "model_logs"
-        )
         to_json(model_logs, file_basename + ".json")
         to_json(bests, file_basename + "_bests.json")
 

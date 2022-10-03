@@ -14,3 +14,5 @@ from .load_system import load_system
 from .utils import *
 from .evaluation import *
 from .webknossos_utils import *
+from .predict import predict
+from .segment import segment
