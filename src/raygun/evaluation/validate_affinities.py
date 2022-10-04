@@ -39,7 +39,7 @@ def update_validation_configs(config, iter=None):
     )
     config["predict_config"]["source_dataset"] = source_ds
 
-    config["segment_config"]["file"] = source_path
+    # config["segment_config"]["file"] = source_path
 
     validation_config_path = config["validation_config_path"]
     to_json(config, validation_config_path)
@@ -69,7 +69,7 @@ def validate_affinities(config=None):
     config = read_config(config)
     # MAKE SURE TO UPDATE CHECKPOINT, "save" in segment config is false
     logger.info("Predicting validation volume affinities...")
-    try: #TODO: Figure out why this is necessary and fix
+    try:  # TODO: Figure out why this is necessary and fix
         predict(config["prediction_config_path"])
     except:
         predict.predict(config["prediction_config_path"])
@@ -81,7 +81,7 @@ def validate_segmentation(config=None):
         config = sys.argv[1]
 
     config = read_config(config)
-    try: #TODO: Figure out why this is necessary and fix
+    try:  # TODO: Figure out why this is necessary and fix
         seg = segment(config["segment_config"])
     except:
         seg = segment.segment(config["segment_config"])
