@@ -17,8 +17,8 @@
          "num_channels": 10
       }
    },
-   "checkpoint": 5000,
-   "launch_command": "bsub -n 16 -gpu \"num=1\" -q gpu_tesla -o predict.log",
+   "checkpoint": null,
+   "launch_command": "bsub -n 48 -gpu \"num=1\" -q gpu_t4 -o predict.log",
    "scaleShift_input": [
       2,
       -1

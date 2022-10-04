@@ -3,12 +3,12 @@
    "metric_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/validation_eval0_metrics.json",
    "validation_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/validate_eval0_config.json",
    "prediction_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/predict_eval0_config.json",
-   "checkpoint": 5000,
-   "launch_command": "bsub -n 16 -o validate.log -J validate_eval0 raygun-validate-affinities /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/validate_eval0_config.json &",
+   "checkpoint": null,
+   "launch_command": "bsub -n 24 -o validate.log -J validate_eval0 raygun-validate-affinities /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/validate_eval0_config.json &",
    "skeleton_config": {
       "file": "load",
       "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
-      "url": "http://catmaid2.hms.harvard.edu:9000/annotations/62e937d60100006a01fe64b1",
+      "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25c20100000d01afc69b",
       "coord_in_pix": true,
       "coord_in_zyx": true,
       "voxel_size_xyz": [
@@ -48,8 +48,8 @@
             "num_channels": 10
          }
       },
-      "checkpoint": 5000,
-      "launch_command": "bsub -n 16 -gpu \"num=1\" -q gpu_tesla -o predict.log",
+      "checkpoint": null,
+      "launch_command": "bsub -n 48 -gpu \"num=1\" -q gpu_t4 -o predict.log",
       "scaleShift_input": [
          2,
          -1
