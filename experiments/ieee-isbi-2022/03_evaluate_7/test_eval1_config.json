@@ -8,7 +8,7 @@
     "skeleton_config": {
         "file": "load",
         "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval1_extras/eval1/skeletons",
-        "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25c20100000d01afc69b", // eval1
+        "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25b50100009a00afc698", // eval1
         "coord_in_pix": true,
         "coord_in_zyx": true,
         "voxel_size_xyz": [
@@ -30,7 +30,7 @@
         ]
     },
     "predict_config": {
-        "config_path": "$working_dir/train_conf.json",
+        "config_path": "$working_dir/train_conf.json", ### DEPENDS ON FOLDER
         "num_workers": 32,
         "source_path": "$source_dirname/eval_1.n5", ### DEPENDS ON FOLDER
         "source_dataset": "$source_dataset", ### DEPENDS ON FOLDER

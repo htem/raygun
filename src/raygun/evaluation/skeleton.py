@@ -113,12 +113,14 @@ def get_updated_skeleton(config_path=None):
     path = os.path.dirname(os.path.realpath(config_path))
     logger.info(f"Path: {path}")
     config = read_config(config_path)
+    if "skeleton_config" in config.keys():
+        config = config["skeleton_config"]
 
     if not os.path.exists(config["file"]):
         if "search_path" in config.keys():
             search_path = config["search_path"].rstrip("/*") + "/*"
         else:
-            search_path = os.path.join(path, "/skeletons/*")
+            search_path = os.path.join(path, "skeletons/*")
         logger.info(f"Search path: {search_path}")
         files = glob(search_path)
         if len(files) == 0 or config["file"] == "update":

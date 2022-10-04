@@ -40,7 +40,7 @@
             "skeleton_config": {
                 "file": "load",
                 "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
-                "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25b50100009a00afc698", // eval0
+                "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25c20100000d01afc69b", // eval0
                 "coord_in_pix": true,
                 "coord_in_zyx": true,
                 "voxel_size_xyz": [
