@@ -1,0 +1,1 @@
+For MTLSD networks trained on real 30nm data, predicting on fake 30nm data produced by "split" CycleGAN networks.

@@ -61,7 +61,7 @@ class MTLSD(BaseSystem):
             params=self.model.parameters(), **self.optim_kwargs
         )
 
-        self.loss = WeightedMSELoss_MTLSD()
+        self.loss = WeightedMSELoss_MTLSD(**self.loss_kwargs)
 
     def setup_datapipes(self):
         kws = [

@@ -1,9 +1,11 @@
+from raygun.torch.losses.BaseCompetentLoss import BaseCompetentLoss
+from raygun.utils import passing_locals
 import torch
 
 
-class WeightedMSELoss_MTLSD(torch.nn.MSELoss):
-    def __init__(self):
-        super().__init__()
+class WeightedMSELoss_MTLSD(BaseCompetentLoss):
+    def __init__(self, **kwargs):
+        super().__init__(**passing_locals(locals()))
         self.data_dict = {}
 
     def _calc_loss(self, pred, target, weights):

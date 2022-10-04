@@ -38,6 +38,7 @@
         ]
     },
     "batch_size": 1,
+    "loss_kwargs": {},
     "model_kwargs": {
         "unet_kwargs": {
             "input_nc": 1,

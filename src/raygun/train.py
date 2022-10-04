@@ -81,7 +81,8 @@ def _batch_train(folder):
     if len(subfolders) > 0:
         config_paths = []
         for subfolder in subfolders:
-            config_paths += _batch_train(subfolder)
+            if not ".n5" in subfolder and not ".zarr" in subfolder:
+                config_paths += _batch_train(subfolder)
 
     else:
         config_path = os.path.realpath("train_conf.json")

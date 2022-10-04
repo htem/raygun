@@ -1,10 +1,14 @@
 {
+    "metric_path": "$working_dir/test_eval1_metrics.json",
+    "validation_config_path": "$working_dir/test_eval1_config.json",
+    "prediction_config_path": "$working_dir/predict_eval1_config.json",
+    "checkpoint": null, // fill in per iteration
+    "launch_command": "bsub -n 16 -o validate.log -J test_eval1 raygun-validate-affinities $working_dir/test_eval1_config.json &",
     // CATMAID project ID to pull skeleton from
-    // "skeleton_project_id": 18,
     "skeleton_config": {
         "file": "load",
-        "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
-        "url": "http://catmaid2.hms.harvard.edu:9000/annotations/62e937d60100006a01fe64b1", // eval0
+        "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval1_extras/eval1/skeletons",
+        "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25c20100000d01afc69b", // eval1
         "coord_in_pix": true,
         "coord_in_zyx": true,
         "voxel_size_xyz": [
@@ -20,16 +24,16 @@
             1024
         ],
         "dataset_offset": [
-            1753,
-            1696,
-            1097
+            1425,
+            288,
+            806
         ]
     },
     "predict_config": {
         "config_path": "$working_dir/train_conf.json",
         "num_workers": 32,
-        "source_path": null, //same directory as training source, but eval_0.n5
-        "source_dataset": null, //same ds name as training source
+        "source_path": "$source_dirname/eval_1.n5", ### DEPENDS ON FOLDER
+        "source_dataset": "$source_dataset", ### DEPENDS ON FOLDER
         "output_ds": [
             "pred_affs",
             "pred_lsds"
@@ -54,13 +58,14 @@
         "output_shape": 40
     },
     "segment_config": {
-        "include_config": "$working_dir/train_conf.json",
-        "file": null, //same directory as training source, but eval_0.n5
+        "include_config": "$working_dir/train_conf.json", ### NEEDS TO BE FROM 02_MTLSD directory
+        "file": "$working_dir/eval_1.n5",
         "aff_ds": "pred_affs",
         "prefix": "",
         "mutex": true,
         "max_affinity_value": 1.0,
         "sep": 3,
-        "mask_thresh": 0.5
+        "mask_thresh": 0.5,
+        "save": false
     }
 }

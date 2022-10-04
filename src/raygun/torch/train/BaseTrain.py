@@ -1,6 +1,5 @@
 import inspect
 import os
-from subprocess import call
 import sys
 from raygun.read_config import read_config
 from tqdm import trange
@@ -165,43 +164,6 @@ class BaseTrain(object):
 
         print(stats)
 
-    def update_validation_configs(self, config):
-        config["checkpoint"] = self.n_iter
-        config["predict_config"]["checkpoint"] = self.n_iter
-
-        train_config = read_config(config["predict_config"]["config_path"])
-        sources = train_config["sources"]
-        raw_src = sources[np.argmax(["raw" in src.keys() for src in sources])]
-        source_path = config["predict_config"]["source_path"].replace(
-            "$source_dirname", os.path.dirname(raw_src["path"])
-        )
-        config["predict_config"]["source_path"] = source_path
-        source_ds = config["predict_config"]["source_dataset"].replace(
-            "$source_dataset", raw_src["raw"]
-        )
-        config["predict_config"]["source_dataset"] = source_ds
-
-        config["segment_config"]["file"] = source_path
-
-        validation_config_path = config["validation_config_path"]
-        to_json(config, validation_config_path)
-        prediction_config_path = config["prediction_config_path"]
-        to_json(config["predict_config"], prediction_config_path)
-
-        return config
-
-    def run_validation(self, config):
-        config = self.update_validation_configs(config)
-        # launch validation
-        try:
-            retcode = call(config["launch_command"], shell=True)
-            if retcode < 0:
-                logger.warning(f"Child was terminated by signal {-retcode}")
-            else:
-                logger.info(f"Child returned {retcode}")
-        except OSError as e:
-            logger.warning(f"Execution failed: {e}")
-
     def train(self, iter: int):
         self.model.train()
         training_pipeline = self.training_pipe()
@@ -214,11 +176,6 @@ class BaseTrain(object):
 
                 if i + 1 % self.log_every == 0:
                     self.train_node.summary_writer.flush()
-
-                if hasattr(self, "validation_config") and (
-                    i + 1 % self.validation_config["validate_every"] == 0
-                ):
-                    self.run_validation(self.validation_config)
 
     def test(self, mode: str = "train"):
         getattr(self.model, mode)()

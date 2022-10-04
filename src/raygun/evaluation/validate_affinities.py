@@ -2,6 +2,7 @@
 from functools import partial
 from glob import glob
 import json
+from subprocess import call
 from wsgiref import validate
 import daisy
 import sys
@@ -19,6 +20,48 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def update_validation_configs(config, iter=None):
+    config = read_config(config)
+
+    if iter is not None:
+        config["checkpoint"] = iter
+        config["predict_config"]["checkpoint"] = iter
+
+    train_config = read_config(config["predict_config"]["config_path"])
+    sources = train_config["sources"]
+    raw_src = sources[np.argmax(["raw" in src.keys() for src in sources])]
+    source_path = config["predict_config"]["source_path"].replace(
+        "$source_dirname", os.path.dirname(raw_src["path"])
+    )
+    config["predict_config"]["source_path"] = source_path
+    source_ds = config["predict_config"]["source_dataset"].replace(
+        "$source_dataset", raw_src["raw"]
+    )
+    config["predict_config"]["source_dataset"] = source_ds
+
+    config["segment_config"]["file"] = source_path
+
+    validation_config_path = config["validation_config_path"]
+    to_json(config, validation_config_path)
+    prediction_config_path = config["prediction_config_path"]
+    to_json(config["predict_config"], prediction_config_path)
+
+    return config
+
+
+def run_validation(config, iter=None):
+    config = update_validation_configs(config, iter)
+    # launch validation
+    try:
+        retcode = call(config["launch_command"], shell=True)
+        if retcode < 0:
+            logger.warning(f"Child was terminated by signal {-retcode}")
+        else:
+            logger.info(f"Child returned {retcode}")
+    except OSError as e:
+        logger.warning(f"Execution failed: {e}")
+
+
 def validate_affinities(config=None):
     if config is None:
         config = sys.argv[1]
@@ -26,8 +69,11 @@ def validate_affinities(config=None):
     config = read_config(config)
     # MAKE SURE TO UPDATE CHECKPOINT, "save" in segment config is false
     logger.info("Predicting validation volume affinities...")
-    predict(config["prediction_config_path"])
-    return validate_segmentation(config)
+    try: #TODO: Figure out why this is necessary and fix
+        predict(config["prediction_config_path"])
+    except:
+        predict.predict(config["prediction_config_path"])
+    metics = validate_segmentation(config)
 
 
 def validate_segmentation(config=None):
@@ -35,7 +81,10 @@ def validate_segmentation(config=None):
         config = sys.argv[1]
 
     config = read_config(config)
-    seg = segment(config["segment_config"])
+    try: #TODO: Figure out why this is necessary and fix
+        seg = segment(config["segment_config"])
+    except:
+        seg = segment.segment(config["segment_config"])
     image = rasterize_skeleton(config["skeleton_config"])
     pad = daisy.Coordinate(np.array(image.shape) - np.array(seg.shape)) // 2
     if sum(pad) < 3:

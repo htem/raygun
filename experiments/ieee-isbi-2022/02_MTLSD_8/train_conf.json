@@ -12,7 +12,7 @@
         "log_dir": "./tensorboard/",
         "log_every": 50,
         "checkpoint_basename": "./models/model",
-        "num_epochs": 200000,
+        "num_epochs": 100000,
         "save_every": 5000,
         "cache_size": 50,
         "num_workers": 16,
@@ -25,7 +25,10 @@
             "gt_affs",
             "pred_lsds",
             "pred_affs"
-        ],
+        ]
+    },
+    "batch_size": 1,
+    "loss_kwargs": {
         "validation_config": {
             "validate_every": 5000,
             "metric_path": "$working_dir/validation_eval0_metrics.json",
@@ -34,11 +37,10 @@
             "checkpoint": null, // fill in per iteration
             "launch_command": "bsub -n 16 -o validate.log -J validate_eval0 raygun-validate-affinities $working_dir/validate_eval0_config.json &",
             // CATMAID project ID to pull skeleton from
-            // "skeleton_project_id": 18,
             "skeleton_config": {
                 "file": "load",
                 "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
-                "url": "http://catmaid2.hms.harvard.edu:9000/annotations/62e937d60100006a01fe64b1", // eval0
+                "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25b50100009a00afc698", // eval0
                 "coord_in_pix": true,
                 "coord_in_zyx": true,
                 "voxel_size_xyz": [
@@ -54,9 +56,9 @@
                     1024
                 ],
                 "dataset_offset": [
-                    1753,
-                    1696,
-                    1097
+                    1441,
+                    1384,
+                    785
                 ]
             },
             "predict_config": {
@@ -89,17 +91,17 @@
             },
             "segment_config": {
                 "include_config": "$working_dir/train_conf.json",
-                "file": null, //same directory as training source, but eval_0.n5
+                "file": "$working_dir/eval_0.n5",
                 "aff_ds": "pred_affs",
                 "prefix": "",
                 "mutex": true,
                 "max_affinity_value": 1.0,
                 "sep": 3,
-                "mask_thresh": 0.5
+                "mask_thresh": 0.5,
+                "save": false
             }
         }
     },
-    "batch_size": 1,
     "model_kwargs": {
         "unet_kwargs": {
             "input_nc": 1,

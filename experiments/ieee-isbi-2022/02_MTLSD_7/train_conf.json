@@ -25,7 +25,10 @@
             "gt_affs",
             "pred_lsds",
             "pred_affs"
-        ],
+        ]
+    },
+    "batch_size": 1,
+    "loss_kwargs": {
         "validation_config": {
             "validate_every": 5000,
             "metric_path": "$working_dir/validation_eval0_metrics.json",
@@ -54,9 +57,9 @@
                     1024
                 ],
                 "dataset_offset": [
-                    1753,
-                    1696,
-                    1097
+                    1441,
+                    1384,
+                    785
                 ]
             },
             "predict_config": {
@@ -89,17 +92,17 @@
             },
             "segment_config": {
                 "include_config": "$working_dir/train_conf.json",
-                "file": null, //same directory as training source, but eval_0.n5
+                "file": "$working_dir/eval_0.n5",
                 "aff_ds": "pred_affs",
                 "prefix": "",
                 "mutex": true,
                 "max_affinity_value": 1.0,
                 "sep": 3,
-                "mask_thresh": 0.5
+                "mask_thresh": 0.5,
+                "save": false
             }
         }
     },
-    "batch_size": 1,
     "model_kwargs": {
         "unet_kwargs": {
             "input_nc": 1,

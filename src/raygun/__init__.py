@@ -16,3 +16,4 @@ from .evaluation import *
 from .webknossos_utils import *
 from .predict import predict
 from .segment import segment
+from .evaluation.validate_affinities import validate_affinities
