@@ -3,9 +3,9 @@
     "system": "MTLSD",
     "job_command": [
         "bsub",
-        "-n 16",
+        "-n 12",
         "-gpu \"num=1\"",
-        "-q gpu_a100"
+        "-q gpu_tesla"
     ],
     "ndims": 3,
     "train_kwargs": {
@@ -15,7 +15,7 @@
         "num_epochs": 100000,
         "save_every": 5000,
         "cache_size": 50,
-        "num_workers": 16,
+        "num_workers": 24,
         "spawn_subprocess": true,
         "snapshot_every": 5000,
         "snapshot_arrays": [
@@ -35,7 +35,7 @@
             "validation_config_path": "$working_dir/validate_eval0_config.json",
             "prediction_config_path": "$working_dir/predict_eval0_config.json",
             "checkpoint": null, // fill in per iteration
-            "launch_command": "bsub -n 16 -o validate.log -J validate_eval0 raygun-validate-affinities $working_dir/validate_eval0_config.json &",
+            "launch_command": "bsub -n 24 -o validate.log -J validate_eval0 raygun-validate-affinities $working_dir/validate_eval0_config.json &",
             // CATMAID project ID to pull skeleton from
             "skeleton_config": {
                 "file": "load",
@@ -81,7 +81,7 @@
                     }
                 },
                 "checkpoint": null, //fill per iteration
-                "launch_command": "bsub -n 16 -gpu \"num=1\" -q gpu_tesla -o predict.log",
+                "launch_command": "bsub -n 48 -gpu \"num=1\" -q gpu_t4 -o predict.log",
                 "scaleShift_input": [
                     2,
                     -1

@@ -78,11 +78,19 @@ def _batch_train(folder):
     os.chdir(folder)
 
     subfolders = glob("*/")
-    if len(subfolders) > 0:
+    num_exclude = (
+        sum([".n5" in subfolder for subfolder in subfolders])
+        + sum([".zarr" in subfolder for subfolder in subfolders])
+        + sum(["tensorboard" in subfolder for subfolder in subfolders])
+        + sum(["models" in subfolder for subfolder in subfolders])
+        + sum(["snapshots" in subfolder for subfolder in subfolders])
+        + sum(["metrics" in subfolder for subfolder in subfolders])
+        + sum(["logs" in subfolder for subfolder in subfolders])
+    )
+    if len(subfolders) > num_exclude:
         config_paths = []
         for subfolder in subfolders:
-            if not ".n5" in subfolder and not ".zarr" in subfolder:
-                config_paths += _batch_train(subfolder)
+            config_paths += _batch_train(subfolder)
 
     else:
         config_path = os.path.realpath("train_conf.json")
