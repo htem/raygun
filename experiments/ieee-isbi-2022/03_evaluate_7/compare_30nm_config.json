@@ -1,0 +1,23 @@
+{
+    "target_source": {
+        "path": "",
+        "ds": "" // "scaleShift": [1,0]
+    },
+    "test_sources": {
+        "model_name": {
+            "path": "",
+            "ds": "" // "scaleShift": [1,0]
+        },
+        "model_name2": {
+            "path": "",
+            "ds": "" // "scaleShift": [1,0]
+        }
+    },
+    "metrics": [
+        "normalized_root_mse",
+        "peak_signal_noise_ratio",
+        "structural_similarity"
+        // 'normalized_mutual_information'
+    ],
+    "metrics_path": "$working_dir/compare_30nm_metrics.json"
+}

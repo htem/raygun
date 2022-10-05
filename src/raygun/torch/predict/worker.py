@@ -111,7 +111,7 @@ def worker(render_config_path):
                     data += scaleShift_input[1]
 
                 outs = model(data)
-                del data
+                # del data
 
                 if not isinstance(outs, tuple):
                     outs = tuple([outs])
@@ -159,7 +159,7 @@ def worker(render_config_path):
 
                     destination[block.write_roi] = out
                     logger.info(f"Wrote chunk {block.block_id} to {dest_dataset}...")
-                    del out
+                    # del out
 
 
 if __name__ == "__main__":

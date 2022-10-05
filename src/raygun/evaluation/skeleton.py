@@ -110,8 +110,6 @@ def get_updated_skeleton(config_path=None):
             config_path = sys.argv[1]
         except:
             config_path = "skeleton.json"
-    path = os.path.dirname(os.path.realpath(config_path))
-    logger.info(f"Path: {path}")
     config = read_config(config_path)
     if "skeleton_config" in config.keys():
         config = config["skeleton_config"]
@@ -120,6 +118,8 @@ def get_updated_skeleton(config_path=None):
         if "search_path" in config.keys():
             search_path = config["search_path"].rstrip("/*") + "/*"
         else:
+            path = os.path.dirname(os.path.realpath(config_path))
+            logger.info(f"Path: {path}")
             search_path = os.path.join(path, "skeletons/*")
         logger.info(f"Search path: {search_path}")
         files = glob(search_path)

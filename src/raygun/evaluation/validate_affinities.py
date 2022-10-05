@@ -20,6 +20,20 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def find_source_path(path_template, try_path, n_search=3):
+    try_path = try_path.rstrip("/")
+    n = -1
+    while len(glob(path_template.replace("$source_dirname", try_path + "/*" * n))) == 0:
+        if n - 1 > n_search:
+            raise ValueError(
+                f"Source not found at {path_template.replace('$source_dirname/', try_path + '/*' * n)}"
+            )
+        try_path = os.path.dirname(try_path)
+        n += 1
+    source_path = glob(path_template.replace("$source_dirname", try_path + "/*" * n))[0]
+    return source_path
+
+
 def update_validation_configs(config, iter=None):
     config = read_config(config)
 
@@ -30,16 +44,16 @@ def update_validation_configs(config, iter=None):
     train_config = read_config(config["predict_config"]["config_path"])
     sources = train_config["sources"]
     raw_src = sources[np.argmax(["raw" in src.keys() for src in sources])]
-    source_path = config["predict_config"]["source_path"].replace(
-        "$source_dirname", os.path.dirname(raw_src["path"])
+
+    source_path = find_source_path(
+        config["predict_config"]["source_path"], raw_src["path"]
     )
     config["predict_config"]["source_path"] = source_path
+
     source_ds = config["predict_config"]["source_dataset"].replace(
         "$source_dataset", raw_src["raw"]
     )
     config["predict_config"]["source_dataset"] = source_ds
-
-    # config["segment_config"]["file"] = source_path
 
     validation_config_path = config["validation_config_path"]
     to_json(config, validation_config_path)
@@ -49,17 +63,21 @@ def update_validation_configs(config, iter=None):
     return config
 
 
-def run_validation(config, iter=None):
-    config = update_validation_configs(config, iter)
-    # launch validation
+def launch(launch_command):
     try:
-        retcode = call(config["launch_command"], shell=True)
+        retcode = call(launch_command, shell=True)
         if retcode < 0:
             logger.warning(f"Child was terminated by signal {-retcode}")
         else:
             logger.info(f"Child returned {retcode}")
     except OSError as e:
         logger.warning(f"Execution failed: {e}")
+
+
+def run_validation(config, iter=None):
+    config = update_validation_configs(config, iter)
+    # launch validation
+    launch(config["launch_command"])
 
 
 def validate_affinities(config=None):
@@ -73,7 +91,13 @@ def validate_affinities(config=None):
         predict(config["prediction_config_path"])
     except:
         predict.predict(config["prediction_config_path"])
-    metics = validate_segmentation(config)
+
+    if (
+        "launch_command" in config["segment_config"].keys()
+    ):  # TODO: make this general use in 0.3.0
+        launch(config["segment_config"]["launch_command"])
+    else:
+        validate_segmentation(config)
 
 
 def validate_segmentation(config=None):
@@ -103,10 +127,8 @@ def validate_segmentation(config=None):
         metrics[current_iteration] = evaluation
     to_json(metrics, metric_path)
 
-    return metrics
 
-
-def evaluate_segmentations(config_path=None):
+def evaluate_segmentations(config_path=None):  # TODO: Determine if this is depracated
     if config_path is None:
         config_path = sys.argv[1]
 

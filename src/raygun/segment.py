@@ -1,5 +1,3 @@
-from glob import glob
-from logging import getLogger
 import os
 import sys
 import numpy as np
@@ -199,6 +197,7 @@ def mutex_segment(config_path):
     seg = compute_mws_segmentation(
         affs, neighborhood, sep, strides=[10, 10, 10], mask=mask
     )
+    logger.info("Segmented.")
 
     if "save" in seg_config.keys() and not seg_config["save"]:
         return seg

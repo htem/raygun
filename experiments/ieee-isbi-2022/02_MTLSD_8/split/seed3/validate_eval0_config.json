@@ -3,7 +3,7 @@
    "metric_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/validation_eval0_metrics.json",
    "validation_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/validate_eval0_config.json",
    "prediction_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/predict_eval0_config.json",
-   "checkpoint": null,
+   "checkpoint": 5000,
    "launch_command": "bsub -n 24 -o validate.log -J validate_eval0 raygun-validate-affinities /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/validate_eval0_config.json &",
    "skeleton_config": {
       "file": "load",
@@ -31,7 +31,7 @@
    },
    "predict_config": {
       "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/train_conf.json",
-      "num_workers": 32,
+      "num_workers": 96,
       "source_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_8/split/seed3/eval_0.n5",
       "source_dataset": "volumes/raw_30nm_netG2_66000",
       "output_ds": [
@@ -48,7 +48,7 @@
             "num_channels": 10
          }
       },
-      "checkpoint": null,
+      "checkpoint": 5000,
       "launch_command": "bsub -n 48 -gpu \"num=1\" -q gpu_t4 -o predict.log",
       "scaleShift_input": [
          2,
@@ -59,7 +59,7 @@
    },
    "segment_config": {
       "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/train_conf.json",
-      "file": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_8/split/seed3/eval_0.n5",
+      "file": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_8/split/seed3/eval_0.n5",
       "aff_ds": "pred_affs",
       "prefix": "",
       "mutex": true,

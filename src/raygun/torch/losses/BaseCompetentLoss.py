@@ -70,9 +70,7 @@ class BaseCompetentLoss(torch.nn.Module):
             writer.add_image(name, img, global_step=step, dataformats="HW")
 
     def update_status(self, step):
-        if (
-            hasattr(self, "validation_config")
-            and (step % self.validation_config["validate_every"] == 0)
-            and (step > 0)
+        if hasattr(self, "validation_config") and (
+            step % self.validation_config["validate_every"] == 0
         ):
             run_validation(self.validation_config, step)
