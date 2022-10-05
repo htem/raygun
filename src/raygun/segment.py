@@ -211,18 +211,21 @@ def mutex_segment(config_path):
     f[dest_dataset].attrs["offset"] = f[aff_ds].attrs["offset"]
     f[dest_dataset].attrs["resolution"] = f[aff_ds].attrs["resolution"]
 
-    view_script = os.path.join(
-        os.path.dirname(config_path),
-        f"view_{os.path.basename(file).rstrip('.n5').rstrip('.zarr')}.ng",
-    )
+    try:
+        view_script = os.path.join(
+            os.path.dirname(config_path),
+            f"view_{os.path.basename(file).rstrip('.n5').rstrip('.zarr')}.ng",
+        )
 
-    if not os.path.exists(view_script):
-        with open(view_script, "w") as f:
-            f.write(f"neuroglancer -f {file} -d {dest_dataset} ")
+        if not os.path.exists(view_script):
+            with open(view_script, "w") as f:
+                f.write(f"neuroglancer -f {file} -d {dest_dataset} ")
 
-    else:
-        with open(view_script, "a") as f:
-            f.write(f"{dest_dataset} ")
+        else:
+            with open(view_script, "a") as f:
+                f.write(f"{dest_dataset} ")
+    except:
+        logger.warning("Viewing script not writting/updated.")
 
 
 def segment(config_path=None):  # TODO: Clean up

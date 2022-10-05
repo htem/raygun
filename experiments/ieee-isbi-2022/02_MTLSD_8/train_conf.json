@@ -12,7 +12,7 @@
         "log_dir": "./tensorboard/",
         "log_every": 50,
         "checkpoint_basename": "./models/model",
-        "num_epochs": 3,
+        "num_epochs": 100000,
         "save_every": 5000,
         "cache_size": 50,
         "num_workers": 24,
@@ -30,7 +30,7 @@
     "batch_size": 1,
     "loss_kwargs": {
         "validation_config": {
-            "validate_every": 2,
+            "validate_every": 5000,
             "metric_path": "$working_dir/validation_eval0_metrics.json",
             "validation_config_path": "$working_dir/validate_eval0_config.json",
             "prediction_config_path": "$working_dir/predict_eval0_config.json",
@@ -56,12 +56,9 @@
                     1024
                 ],
                 "dataset_offset": [
-                    // 1441,
-                    // 1384,
-                    // 785
-                    0,
-                    0,
-                    0
+                    1441,
+                    1384,
+                    785
                 ]
             },
             "predict_config": {
@@ -95,6 +92,7 @@
             "segment_config": {
                 "include_config": "$working_dir/train_conf.json",
                 "launch_command": "bsub -n 32 -We 3:59 -o segment.log -J segment_eval0 raygun-validate-segmentation $working_dir/validate_eval0_config.json &",
+                // "launch_command": "bsub -n 14 -gpu \"num=1\" -q gpu_tesla -o segment.log -J segment_eval0 raygun-validate-segmentation $working_dir/validate_eval0_config.json &",
                 "file": "$working_dir/eval_0.n5",
                 "aff_ds": "pred_affs",
                 "prefix": "",

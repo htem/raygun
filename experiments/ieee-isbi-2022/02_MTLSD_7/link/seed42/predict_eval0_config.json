@@ -1,6 +1,6 @@
 {
    "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/train_conf.json",
-   "num_workers": 32,
+   "num_workers": 12,
    "source_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed42/eval_0.n5",
    "source_dataset": "volumes/raw_30nm_netG2_62000",
    "output_ds": [
@@ -17,12 +17,12 @@
          "num_channels": 10
       }
    },
-   "checkpoint": 0,
-   "launch_command": "bsub -n 16 -gpu \"num=1\" -q gpu_tesla -o predict.log",
+   "checkpoint": "100000",
+   "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla -o predict.log",
    "scaleShift_input": [
       2,
       -1
    ],
-   "input_shape": 132,
-   "output_shape": 40
+   "input_shape": 196,
+   "output_shape": 104
 }

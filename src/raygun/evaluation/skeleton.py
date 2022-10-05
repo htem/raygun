@@ -6,7 +6,7 @@ import sys
 import os
 import webknossos
 from skimage.draw import line_nd
-from daisy import Coordinate
+import daisy
 from raygun.read_config import read_config
 from raygun.webknossos_utils.wkw_seg_to_zarr import download_wk_skeleton
 
@@ -136,14 +136,33 @@ def get_updated_skeleton(config_path=None):
     return skel_file
 
 
-def nm2px(coord, voxel_size, offset):
+def nm2px(coord, voxel_size, offset, max_shape=None):
     # removes offset and converts to px
-    return [int((c / v) - o) for c, v, o in zip(coord, voxel_size, offset)]
+    if max_shape is None:
+        return [int((c / v) - o) for c, v, o in zip(coord, voxel_size, offset)]
+    else:
+        return [
+            min(s - 2, int((c / v) - o))
+            for c, v, o, s in zip(coord, voxel_size, offset, max_shape)
+        ]
 
 
-def rasterize_skeleton(config_path):
-    logger.info(f"Rasterizing skeleton...")
+def rasterize_skeleton(config_path=None):
+    if config_path is None:
+        config_path = sys.argv[1]
+
     config = read_config(config_path)
+
+    if "dataset_name" in config.keys() and "." in config["file"]:
+        # Load pre-rasterized
+        try:
+            logger.info(f"Trying to load skeleton...")
+            image = daisy.open_ds(config["file"], config["dataset_name"])
+            return image.to_ndarray(image.roi)
+        except:
+            pass
+
+    logger.info(f"Rasterizing skeleton...")
 
     # Skel=tree_id:[Node_id], nodes=Node_id:{x,y,z}
     skeletons, nodes = parse_skeleton(config_path)
@@ -156,27 +175,38 @@ def rasterize_skeleton(config_path):
 
     # Initialize rasterized skeleton image
     dataset_shape = np.array(config["dataset_shape"])
+    voxel_size = config["voxel_size_xyz"]
+    offset = config["dataset_offset"]
     image = np.zeros(dataset_shape, dtype=np.uint)
 
-    px = partial(
-        nm2px,
-        voxel_size=config["voxel_size_xyz"],
-        offset=config["dataset_offset"],
-    )
+    px = partial(nm2px, voxel_size=voxel_size, offset=offset, max_shape=dataset_shape)
     for id, tree in skel_zyx.items():
         # iterates through ever node and assigns id to {image}
         for i in range(0, len(tree) - 1, 2):
             line = line_nd(px(tree[i]), px(tree[i + 1]))
             image[line] = id
 
-    if "save" in config.keys() and config["save"]:
+    if "save_path" in config.keys() and "save_ds" in config.keys():
         logger.info("Saving rasterization...")
-        raise NotImplementedError()
-        # #Save GT rasterization
-        # with zarr.open('segment.zarr', 'w') as f:
-        #     f['skel_image/gt'] = image
-        #     f['skel_image/gt'].attrs['resolution'] = config["voxel_size_xyz"]
-        #     f['skel_image/gt'].attrs['offset'] = tuple(config["datset_offset"] - pad * daisy.Coordinate(config["voxel_size_xyz"]))
+        # Save GT rasterization #TODO: implement daisy blockwise option
+        total_roi = daisy.Roi(
+            daisy.Coordinate(offset) * daisy.Coordinate(voxel_size),
+            daisy.Coordinate(dataset_shape) * daisy.Coordinate(voxel_size),
+        )
+        write_size = daisy.Coordinate((64, 64, 64)) * daisy.Coordinate(
+            voxel_size
+        )  # TODO: unhardcode
+        out_ds = daisy.prepare_ds(
+            config["save_path"],
+            config["save_ds"],
+            total_roi,
+            voxel_size,
+            image.dtype,
+            delete=True,
+            write_size=write_size,
+        )
+        out_ds[out_ds.roi] = image
+
     return image
 
 

@@ -1,5 +1,6 @@
 #%%
 from functools import partial
+from reloading import reloading
 from glob import glob
 import json
 from subprocess import call
@@ -74,7 +75,14 @@ def launch(launch_command):
         logger.warning(f"Execution failed: {e}")
 
 
-def run_validation(config, iter=None):
+# @reloading
+def run_validation(config=None, iter=None):
+    if config is None: # assume used as CLI
+        config = sys.argv[1]
+        try:
+            iter = sys.argv[2]
+        except:
+            pass
     config = update_validation_configs(config, iter)
     # launch validation
     launch(config["launch_command"])
