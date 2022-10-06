@@ -138,7 +138,7 @@ def worker(render_config_path):
                         logger.info(
                             f"Assuming output data for {dest_dataset} is float between 0 and 1..."
                         )
-                        out = torch.clamp(out, 0, 1)
+                        # out = torch.clamp(out, 0, 1) #TODO
 
                     if torch.cuda.is_available():
                         out = out.cpu().numpy().astype(destination.dtype)
@@ -153,9 +153,6 @@ def worker(render_config_path):
                         ndims == 2 and len(out.shape) == 3
                     ):  # Add Z dimension if necessary
                         out = out[:, None, ...]
-
-                    # if len(out.shape) < 4:  # Add channel dimension if necessary
-                    #     out = out[None, ...]
 
                     destination[block.write_roi] = out
                     logger.info(f"Wrote chunk {block.block_id} to {dest_dataset}...")

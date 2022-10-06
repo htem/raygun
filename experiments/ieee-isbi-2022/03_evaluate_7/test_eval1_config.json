@@ -2,13 +2,12 @@
     "metric_path": "$working_dir/test_eval1_metrics.json",
     "validation_config_path": "$working_dir/test_eval1_config.json",
     "prediction_config_path": "$working_dir/predict_eval1_config.json",
-    "checkpoint": null, // fill in per iteration
-    "launch_command": "bsub -n 16 -o validate.log -J test_eval1 raygun-validate-affinities $working_dir/test_eval1_config.json &",
-    // CATMAID project ID to pull skeleton from
+    "launch_command": "bsub -n 2 -We 3:59 -o $working_dir/test.log -J test_eval1 raygun-validate-affinities $working_dir/test_eval1_config.json &",
     "skeleton_config": {
-        "file": "load",
+        "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5",
+        "dataset_name": "volumes/rasterized_skeleton",
         "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval1_extras/eval1/skeletons",
-        "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25b50100009a00afc698", // eval1
+        "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25c20100000d01afc69b",
         "coord_in_pix": true,
         "coord_in_zyx": true,
         "voxel_size_xyz": [
@@ -17,7 +16,7 @@
             30
         ],
         "interpolation": true,
-        "interpolation_steps": 10,
+        "interpolation_steps": 100,
         "dataset_shape": [
             1024,
             1024,
@@ -27,45 +26,8 @@
             1425,
             288,
             806
-        ]
-    },
-    "predict_config": {
-        "config_path": "$working_dir/train_conf.json", ### DEPENDS ON FOLDER
-        "num_workers": 32,
-        "source_path": "$source_dirname/eval_1.n5", ### DEPENDS ON FOLDER
-        "source_dataset": "$source_dataset", ### DEPENDS ON FOLDER
-        "output_ds": [
-            "pred_affs",
-            "pred_lsds"
         ],
-        "out_specs": {
-            "pred_affs": {
-                "dtype": "#np.float32#",
-                "num_channels": 20
-            },
-            "pred_lsds": {
-                "dtype": "#np.float32#",
-                "num_channels": 10
-            }
-        },
-        "checkpoint": null, //fill per iteration
-        "launch_command": "bsub -n 16 -gpu \"num=1\" -q gpu_tesla -o predict.log",
-        "scaleShift_input": [
-            2,
-            -1
-        ],
-        "input_shape": 132,
-        "output_shape": 40
-    },
-    "segment_config": {
-        "include_config": "$working_dir/train_conf.json", ### NEEDS TO BE FROM 02_MTLSD directory
-        "file": "$working_dir/eval_1.n5",
-        "aff_ds": "pred_affs",
-        "prefix": "",
-        "mutex": true,
-        "max_affinity_value": 1.0,
-        "sep": 3,
-        "mask_thresh": 0.5,
-        "save": false
+        "save_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5",
+        "save_ds": "volumes/rasterized_skeleton"
     }
 }

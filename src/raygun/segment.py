@@ -225,7 +225,9 @@ def mutex_segment(config_path):
             with open(view_script, "a") as f:
                 f.write(f"{dest_dataset} ")
     except:
-        logger.warning("Viewing script not writting/updated.")
+        logger.warning("Viewing script not written/updated.")
+
+    return seg
 
 
 def segment(config_path=None):  # TODO: Clean up
@@ -243,7 +245,7 @@ def segment(config_path=None):  # TODO: Clean up
     temp = read_config(config_path)
     seg_config.update(temp)
     if seg_config["mutex"]:
-        mutex_segment(config_path)
+        return mutex_segment(config_path)
 
     else:
         file = seg_config["file"]
@@ -265,7 +267,7 @@ def segment(config_path=None):  # TODO: Clean up
                 np.float32
             )  # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0
             logger.info("Getting segmentations...")
-            pred_segs = get_segmentation(
+            segs = get_segmentation(
                 prediction,
                 thresholds=thresholds,
                 labels_mask=labels_mask,
@@ -278,9 +280,9 @@ def segment(config_path=None):  # TODO: Clean up
                 f"view_{os.path.basename(file).rstrip('.n5').rstrip('.zarr')}.ng",
             )
             logger.info("Writing segmentations...")
-            for thresh, pred_seg in zip(thresholds, pred_segs):
+            for thresh, seg in zip(thresholds, segs):
                 dest_dataset = f'pred_seg_{"{:.2f}".format(thresh)}'
-                f[dest_dataset] = pred_seg
+                f[dest_dataset] = seg
                 f[dest_dataset].attrs["offset"] = f[aff_ds].attrs["offset"]
                 f[dest_dataset].attrs["resolution"] = f[aff_ds].attrs["resolution"]
 
@@ -291,6 +293,7 @@ def segment(config_path=None):  # TODO: Clean up
                 else:
                     with open(view_script, "a") as v:
                         v.write(f"{dest_dataset} ")
+        return segs
 
 
 # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0

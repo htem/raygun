@@ -156,9 +156,11 @@ def rasterize_skeleton(config_path=None):
     if "dataset_name" in config.keys() and "." in config["file"]:
         # Load pre-rasterized
         try:
-            logger.info(f"Trying to load skeleton...")
-            image = daisy.open_ds(config["file"], config["dataset_name"])
-            return image.to_ndarray(image.roi)
+            logger.info("Trying to load skeleton...")
+            ds = daisy.open_ds(config["file"], config["dataset_name"])
+            image = ds.to_ndarray(ds.roi)
+            return image
+
         except:
             pass
 

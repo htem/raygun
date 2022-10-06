@@ -4,7 +4,7 @@
     "validation_config_path": "$working_dir/validate_eval0_config.json",
     "prediction_config_path": "$working_dir/predict_eval0_config.json",
     "checkpoint": null, // fill in per iteration
-    "launch_command": "bsub -n 2 -We 3:59 -o validate.log -J validate_eval0 raygun-validate-affinities $working_dir/validate_eval0_config.json &",
+    "launch_command": "bsub -n 2 -We 3:59 -o $working_dir/validate.log -J validate_eval0 raygun-validate-affinities $working_dir/validate_eval0_config.json &",
     // CATMAID project ID to pull skeleton from
     "skeleton_config": {
         "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
@@ -53,7 +53,7 @@
             }
         },
         "checkpoint": null, //fill per iteration
-        "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla -o predict.log",
+        "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla",
         "scaleShift_input": [
             2,
             -1
@@ -63,7 +63,7 @@
     },
     "segment_config": {
         "include_config": "$working_dir/train_conf.json",
-        "launch_command": "bsub -n 32 -We 3:59 -o segment.log -J segment_eval0 raygun-validate-segmentation $working_dir/validate_eval0_config.json &",
+        "launch_command": "bsub -n 32 -We 3:59 -o $working_dir/segment.log -J segment_eval0 raygun-validate-segmentation $working_dir/validate_eval0_config.json &",
         // "launch_command": "bsub -n 14 -gpu \"num=1\" -q gpu_tesla -o segment.log -J segment_eval0 raygun-validate-segmentation $working_dir/validate_eval0_config.json &",
         "file": "$working_dir/eval_0.n5",
         "aff_ds": "pred_affs",
@@ -72,6 +72,6 @@
         "max_affinity_value": 1.0,
         "sep": 3,
         "mask_thresh": 0.5,
-        "save": false
+        "dest_dataset": "segment"
     }
 }

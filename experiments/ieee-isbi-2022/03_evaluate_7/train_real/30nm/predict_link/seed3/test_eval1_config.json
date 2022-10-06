@@ -1,0 +1,43 @@
+{
+   "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/test_eval1_config.json",
+   "predict_config": {
+      "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/train_conf.json",
+      "num_workers": 12,
+      "source_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed3/eval_1.n5",
+      "source_dataset": "volumes/interpolated_90nm_aligned_netG1_56000",
+      "output_ds": [
+         "pred_affs",
+         "pred_lsds"
+      ],
+      "out_specs": {
+         "pred_affs": {
+            "dtype": "#numpy.float32#",
+            "num_channels": 20
+         },
+         "pred_lsds": {
+            "dtype": "#numpy.float32#",
+            "num_channels": 10
+         }
+      },
+      "checkpoint": "90000",
+      "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla",
+      "scaleShift_input": [
+         2,
+         -1
+      ],
+      "input_shape": 196,
+      "output_shape": 104
+   },
+   "segment_config": {
+      "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/train_conf.json",
+      "launch_command": "bsub -n 32 -We 3:59 -o $working_dir/segment.log -J segment_eval1 raygun-validate-segmentation $working_dir/test_eval1_config.json &",
+      "file": "$working_dir/eval_1.n5",
+      "aff_ds": "pred_affs",
+      "prefix": "",
+      "mutex": true,
+      "max_affinity_value": 1.0,
+      "sep": 3,
+      "mask_thresh": 0.5,
+      "dest_dataset": "segment"
+   }
+}

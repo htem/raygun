@@ -77,7 +77,7 @@ def launch(launch_command):
 
 # @reloading
 def run_validation(config=None, iter=None):
-    if config is None: # assume used as CLI
+    if config is None:  # assume used as CLI
         config = sys.argv[1]
         try:
             iter = sys.argv[2]
@@ -118,12 +118,7 @@ def validate_segmentation(config=None):
     except:
         seg = segment.segment(config["segment_config"])
     image = rasterize_skeleton(config["skeleton_config"])
-    pad = daisy.Coordinate(np.array(image.shape) - np.array(seg.shape)) // 2
-    if sum(pad) < 3:
-        image = image
-    else:
-        image = image[pad[0] : -pad[0], pad[1] : -pad[1], pad[2] : -pad[2]]
-    evaluation = rand_voi(image, seg)
+    evaluation = pad_eval(seg, image)
 
     # save metrics
     current_iteration = config["checkpoint"]
@@ -136,6 +131,16 @@ def validate_segmentation(config=None):
     to_json(metrics, metric_path)
 
 
+def pad_eval(segment_array, image):
+    pad = daisy.Coordinate(np.array(image.shape) - np.array(segment_array.shape)) // 2
+    if sum(pad) < 3:
+        image = image
+    else:
+        image = image[pad[0] : -pad[0], pad[1] : -pad[1], pad[2] : -pad[2]]
+
+    return rand_voi(image, segment_array)
+
+
 def evaluate_segmentations(config_path=None):  # TODO: Determine if this is depracated
     if config_path is None:
         config_path = sys.argv[1]
@@ -146,29 +151,47 @@ def evaluate_segmentations(config_path=None):  # TODO: Determine if this is depr
 
     # load segmentations
     logger.info(f"Getting segmentation datasets...")
-    segment_file = config["eval_sources"]["file"]
-    segment_datasets = config["eval_sources"]["datasets"]
-    if isinstance(segment_datasets, str):
-        segment_datasets = []
-        for ds in glob(os.path.join(segment_file, segment_datasets.rstrip("*") + "*")):
-            ds_parts = ds.strip("/").split("/")
-            ind = len(ds_parts) - np.nonzero([".n5" in p for p in ds_parts])[0][0] - 1
-            segment_datasets.append(os.path.join(ds_parts[-ind:]))
-
-    logger.info(f"Evaluating skeleton...")
     evaluation = {}
-    for segment_dataset in segment_datasets:
-        segment_ds = daisy.open_ds(segment_file, segment_dataset)
-        segment_array = segment_ds.to_ndarray(segment_ds.roi)
-        pad = (
-            daisy.Coordinate(np.array(image.shape) - np.array(segment_array.shape)) // 2
-        )
-        if sum(pad) < 3:
-            this_image = image
-        else:
-            this_image = image[pad[0] : -pad[0], pad[1] : -pad[1], pad[2] : -pad[2]]
+    if "file" in config["eval_sources"].keys():
+        segment_file = config["eval_sources"]["file"]
+        segment_datasets = config["eval_sources"]["datasets"]
+        if isinstance(segment_datasets, str):
+            segment_datasets = []
+            for ds in glob(
+                os.path.join(segment_file, segment_datasets.rstrip("*") + "*")
+            ):
+                ds_parts = ds.strip("/").split("/")
+                ind = (
+                    len(ds_parts) - np.nonzero([".n5" in p for p in ds_parts])[0][0] - 1
+                )
+                segment_datasets.append(os.path.join(ds_parts[-ind:]))
 
-        evaluation[segment_dataset] = rand_voi(this_image, segment_array)
+        logger.info(f"Evaluating skeleton...")
+        for segment_dataset in segment_datasets:
+            segment_ds = daisy.open_ds(segment_file, segment_dataset)
+            segment_array = segment_ds.to_ndarray(segment_ds.roi)
+
+            evaluation[segment_dataset] = pad_eval(segment_array, image)
+
+    else:
+        for name, dataset in config["eval_sources"]:
+            segment_file = dataset["file"]
+
+            logger.info(f"Evaluating {name}...")
+            if isinstance(dataset["datasets"], str):
+                segment_ds = daisy.open_ds(segment_file, dataset["datasets"])
+                segment_array = segment_ds.to_ndarray(segment_ds.roi)
+
+                evaluation[name] = pad_eval(segment_array, image)
+
+            else:
+                for segment_dataset in dataset["datasets"]:
+                    segment_ds = daisy.open_ds(segment_file, segment_dataset)
+                    segment_array = segment_ds.to_ndarray(segment_ds.roi)
+
+                    evaluation[f"{name}_{segment_dataset}"] = pad_eval(
+                        segment_array, image
+                    )
 
     return evaluation
 
