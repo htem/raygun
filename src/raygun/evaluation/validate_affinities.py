@@ -118,7 +118,9 @@ def validate_segmentation(config=None):
     except:
         seg = segment.segment(config["segment_config"])
     image = rasterize_skeleton(config["skeleton_config"])
+    logger.info("Evaluating...")
     evaluation = pad_eval(seg, image)
+    logger.info("Done... saving...")
 
     # save metrics
     current_iteration = config["checkpoint"]
@@ -129,6 +131,7 @@ def validate_segmentation(config=None):
         metrics = load_json_file(metric_path)
         metrics[current_iteration] = evaluation
     to_json(metrics, metric_path)
+    logger.info("Done.")
 
 
 def pad_eval(segment_array, image):

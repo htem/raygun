@@ -159,10 +159,11 @@ def rasterize_skeleton(config_path=None):
             logger.info("Trying to load skeleton...")
             ds = daisy.open_ds(config["file"], config["dataset_name"])
             image = ds.to_ndarray(ds.roi)
+            logger.info("Loaded skeleton...")
             return image
 
         except:
-            pass
+            logger.warn("Failed to load skeleton...")
 
     logger.info(f"Rasterizing skeleton...")
 
