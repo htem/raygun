@@ -8,15 +8,11 @@
         "dataset_name": "volumes/rasterized_skeleton",
         "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval1_extras/eval1/skeletons",
         "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25c20100000d01afc69b",
-        "coord_in_pix": true,
-        "coord_in_zyx": true,
         "voxel_size_xyz": [
             30,
             30,
             30
         ],
-        "interpolation": true,
-        "interpolation_steps": 100,
         "dataset_shape": [
             1024,
             1024,

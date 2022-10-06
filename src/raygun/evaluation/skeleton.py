@@ -15,14 +15,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def mult_coord(coord, voxel_size_xyz):
-    return [
-        coord[0] * voxel_size_xyz[2],
-        coord[1] * voxel_size_xyz[1],
-        coord[2] * voxel_size_xyz[0],
-    ]
-
-
 def parse_skeleton(config_path):
     logger.info(f"Parsing skeleton...")
     config = read_config(config_path)
@@ -34,74 +26,18 @@ def parse_skeleton(config_path):
         except:
             assert False, "CATMAID NOT IMPLEMENTED"
 
-    return parse_skeleton_wk(
-        fin,
-        voxel_size_xyz=config["voxel_size_xyz"],
-        coord_in_zyx=config["coord_in_zyx"],
-        coord_in_pix=config["coord_in_pix"],
-        interpolation=config["interpolation"],
-        interpolation_steps=config["interpolation_steps"],
-    )
-
-
-def parse_skeleton_wk(
-    fin,
-    voxel_size_xyz,
-    coord_in_zyx,
-    coord_in_pix,
-    interpolation=True,
-    interpolation_steps=10,
-):
-    logger.info(f"Parsing {fin}")
-
-    assert coord_in_zyx, "Unimplemented"
-    assert coord_in_pix, "Unimplemented"
-    skeletons = {}
-    nodes = {}
-
     wk_skels = webknossos.skeleton.Skeleton.load(fin)
+    # return wk_skels
 
+    skel_coor = {}
     for tree in wk_skels.trees:
+        skel_coor[tree.id] = []
+        for start, end in tree.edges.keys():
+            start_pos = start.position.to_np()
+            end_pos = end.position.to_np()
+            skel_coor[tree.id].append([start_pos, end_pos])
 
-        skeleton = []
-
-        def add_node(pos):
-            node_ = {"zyx": mult_coord(pos, voxel_size_xyz)}
-            node_id = len(nodes)
-            nodes[node_id] = node_
-            skeleton.append(node_id)
-
-        # add nodes
-        for node in tree.nodes():
-            add_node(node.position)
-
-        # add interpolated nodes
-        if interpolation:
-            for edge in tree.edges():
-                pos0 = edge[0].position
-                pos1 = edge[1].position
-                points = interpolate_points(pos0, pos1, max_steps=interpolation_steps)
-                for p in points:
-                    add_node(p)
-
-        if len(skeleton) == 1:
-            # skip single node skeletons (likely to be synapses annotation)
-            continue
-
-        skeletons[tree.id] = skeleton
-
-    return skeletons, nodes
-
-
-def interpolate_points(p0, p1, max_steps):
-    delta = []
-    for i in range(3):
-        delta.append((float(p1[i]) - p0[i]) / max_steps)
-    res = []
-    for i in range(max_steps - 1):
-        res.append(tuple([int(p0[k] + (i + 1) * delta[k]) for k in range(3)]))
-    res = list(set(res))
-    return res
+    return skel_coor
 
 
 def get_updated_skeleton(config_path=None):
@@ -136,17 +72,6 @@ def get_updated_skeleton(config_path=None):
     return skel_file
 
 
-def nm2px(coord, voxel_size, offset, max_shape=None):
-    # removes offset and converts to px
-    if max_shape is None:
-        return [int((c / v) - o) for c, v, o in zip(coord, voxel_size, offset)]
-    else:
-        return [
-            min(s - 2, int((c / v) - o))
-            for c, v, o, s in zip(coord, voxel_size, offset, max_shape)
-        ]
-
-
 def rasterize_skeleton(config_path=None):
     if config_path is None:
         config_path = sys.argv[1]
@@ -168,25 +93,21 @@ def rasterize_skeleton(config_path=None):
     logger.info(f"Rasterizing skeleton...")
 
     # Skel=tree_id:[Node_id], nodes=Node_id:{x,y,z}
-    skeletons, nodes = parse_skeleton(config_path)
-
-    # {Tree_id:[[xyz]]}
-    skel_zyx = {
-        tree_id: [nodes[nid]["zyx"] for nid in node_id]
-        for tree_id, node_id in skeletons.items()
-    }
+    skel_coor = parse_skeleton(config_path)
 
     # Initialize rasterized skeleton image
     dataset_shape = np.array(config["dataset_shape"])
     voxel_size = config["voxel_size_xyz"]
-    offset = config["dataset_offset"]
+    offset = np.array(config["dataset_offset"])
     image = np.zeros(dataset_shape, dtype=np.uint)
 
-    px = partial(nm2px, voxel_size=voxel_size, offset=offset, max_shape=dataset_shape)
-    for id, tree in skel_zyx.items():
+    def adjust(coor):
+        return np.min([coor - offset, dataset_shape - 1], 0)
+
+    for id, tree in skel_coor.items():
         # iterates through ever node and assigns id to {image}
-        for i in range(0, len(tree) - 1, 2):
-            line = line_nd(px(tree[i]), px(tree[i + 1]))
+        for start, end in tree:
+            line = line_nd(adjust(start), adjust(end))
             image[line] = id
 
     if "save_path" in config.keys() and "save_ds" in config.keys():

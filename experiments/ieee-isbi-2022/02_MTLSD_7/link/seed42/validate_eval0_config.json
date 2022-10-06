@@ -1,5 +1,4 @@
 {
-   "validate_every": 5000,
    "metric_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/validation_eval0_metrics.json",
    "validation_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/validate_eval0_config.json",
    "prediction_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/predict_eval0_config.json",
@@ -9,16 +8,11 @@
       "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
       "dataset_name": "volumes/rasterized_skeleton",
       "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
-      "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25c20100000d01afc69b",
-      "coord_in_pix": true,
-      "coord_in_zyx": true,
       "voxel_size_xyz": [
          30,
          30,
          30
       ],
-      "interpolation": true,
-      "interpolation_steps": 100,
       "dataset_shape": [
          1024,
          1024,
@@ -52,7 +46,7 @@
          }
       },
       "checkpoint": "95000",
-      "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla",
+      "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla -o temp.out",
       "scaleShift_input": [
          2,
          -1

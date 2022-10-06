@@ -4,7 +4,7 @@
       "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/train_conf.json",
       "num_workers": 12,
       "source_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed13/eval_1.n5",
-      "source_dataset": "volumes/interpolated_90nm_aligned_netG1_56000",
+      "source_dataset": "volumes/interpolated_90nm_aligned_netG1_46000",
       "output_ds": [
          "pred_affs",
          "pred_lsds"
@@ -20,7 +20,7 @@
          }
       },
       "checkpoint": "90000",
-      "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla",
+      "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla -o temp.out",
       "scaleShift_input": [
          2,
          -1

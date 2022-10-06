@@ -20,7 +20,7 @@
          }
       },
       "checkpoint": "90000",
-      "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla",
+      "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla -o temp.out",
       "scaleShift_input": [
          2,
          -1
