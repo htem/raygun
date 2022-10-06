@@ -13,8 +13,15 @@ def image_compare(
     test,
     target,
     metrics=["normalized_root_mse", "peak_signal_noise_ratio", "structural_similarity"],
+    roi=None,
+    crop=None,
 ):
-    roi = test.roi.intersect(target.roi)
+    if roi is None:
+        roi = test.roi.intersect(target.roi)
+
+    if crop is not None:
+        roi = roi.grow(target.voxel_size * -crop, target.voxel_size * -crop)
+
     test = test.to_ndarray(roi)
     target = target.to_ndarray(roi)
 
@@ -35,12 +42,17 @@ def images_compare(config=None):
     target = daisy.open_ds(
         config["target_source"]["path"], config["target_source"]["ds"]
     )
+    if "crop" in config.keys():
+        crop = config["crop"]
+    else:
+        crop = None
+
     results = {}
     for name, dataset in config["test_sources"].items():
         try:
             logger.info(f"Comparing {name} to target...")
             test = daisy.open_ds(dataset["path"], dataset["ds"])
-            results[name] = image_compare(test, target)
+            results[name] = image_compare(test, target, crop=crop)
             del test
         except:
             logger.info(f"Failed to compare {name} to target.")
