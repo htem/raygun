@@ -97,19 +97,19 @@ same_link["90nm"] = {
 }
 same_link["30nm"] = {
     "link_seed3": {
-        "normalized_root_mse": 0.5019334129360046,
-        "peak_signal_noise_ratio": 11.131591834615522,
-        "structural_similarity": 0.23699391351667545,
+        "normalized_root_mse": 0.2789423973608573,
+        "peak_signal_noise_ratio": 16.308164283401595,
+        "structural_similarity": 0.2935607817282296,
     },
     "link_seed13": {
-        "normalized_root_mse": 0.49552985872677335,
-        "peak_signal_noise_ratio": 11.243117403272421,
-        "structural_similarity": 0.24349817431155177,
+        "normalized_root_mse": 0.26747664038096475,
+        "peak_signal_noise_ratio": 16.672737672819792,
+        "structural_similarity": 0.3008643849641317,
     },
     "link_seed42": {
-        "normalized_root_mse": 0.4967844224457209,
-        "peak_signal_noise_ratio": 11.221154587621376,
-        "structural_similarity": 0.23774150447718825,
+        "normalized_root_mse": 0.26504644577321995,
+        "peak_signal_noise_ratio": 16.752015169878103,
+        "structural_similarity": 0.294300605382028,
     },
 }
 
@@ -134,19 +134,19 @@ same_split["90nm"] = {
 }
 same_split["30nm"] = {
     "split_seed3": {
-        "normalized_root_mse": 0.49535700353243384,
-        "peak_signal_noise_ratio": 11.24614782221088,
-        "structural_similarity": 0.1931191268088784,
+        "normalized_root_mse": 0.2676652808153625,
+        "peak_signal_noise_ratio": 16.666614025998555,
+        "structural_similarity": 0.2379345849750498,
     },
     "split_seed13": {
-        "normalized_root_mse": 0.49195590511019016,
-        "peak_signal_noise_ratio": 11.30599041545432,
-        "structural_similarity": 0.20146458955024635,
+        "normalized_root_mse": 0.2732598271061206,
+        "peak_signal_noise_ratio": 16.486939081292586,
+        "structural_similarity": 0.24673593360724605,
     },
     "split_seed42": {
-        "normalized_root_mse": 0.4858738047270455,
-        "peak_signal_noise_ratio": 11.414044268722723,
-        "structural_similarity": 0.21298072642300428,
+        "normalized_root_mse": 0.2800309315813704,
+        "peak_signal_noise_ratio": 16.27433476213818,
+        "structural_similarity": 0.25903535001208233,
     },
 }
 

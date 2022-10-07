@@ -1,6 +1,5 @@
 #%%
 from collections import defaultdict
-import json
 import matplotlib.pyplot as plt
 import numpy as np
 from raygun import read_config
@@ -15,18 +14,25 @@ def convert_json_log(path: str, tags=None):
     old = load_json_file(path)
     metrics = defaultdict(list)
     steps = np.array([k for k in old.keys()])
-    metrics["step"] = steps
+    metrics["step"] = steps.astype(int)
     if tags is None:
         tags = [k for k in old[steps[0]].keys()]
 
     for step in steps:
         for tag in tags:
-            metrics[tag].append(old[step][tag])
+            val = old[step][tag]
+            if type(val) is not dict:  # TODO: hacky
+                metrics[tag].append(val)
+            else:
+                tags.remove(tag)
 
     for k, v in metrics.items():
         metrics[k] = np.array(v)
 
-    return metrics
+    return metrics, tags
+
+
+#%%
 
 
 def parse_events_file(path: str, tags: list):
@@ -47,26 +53,26 @@ def parse_events_file(path: str, tags: list):
 def load_json_logs(path: str, tags=None):
     files = glob(path)
     base_path = os.path.commonpath(files)
-    base_name = (
-        os.path.commonprefix([file.split("/")[-1] for file in files]).replace(
-            ".json", ""
-        ),
+    base_name = os.path.commonprefix([file.split("/")[-1] for file in files]).replace(
+        ".json", ""
     )
     file_basename = os.path.join(base_path, base_name)
     model_logs = {}  # model_name: log_metrics
     for file in files:
         model_name = "_".join(
             file.replace(base_path, "")
-            .rstrip("/" + base_name + ".json")
             .lstrip("/")
+            .rstrip(".json")
+            .rstrip(base_name)
+            .rstrip("/")
             .split("/")
         )
-        model_logs[model_name] = convert_json_log(file, tags)
+        model_logs[model_name], tags = convert_json_log(file, tags)
 
-    return model_logs, file_basename
+    return model_logs, file_basename, tags
 
 
-def load_tensorboards(
+def load_tensorboards(  # TODO: Cleanup
     meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
     start=2000,  # TODO: ALLOW FOR UNBOUNDED
     tags=None,
@@ -98,7 +104,7 @@ def load_tensorboards(
             model_logs[model_name] = parse_events_file(log_paths[p], tags)
             p += 1
 
-    return model_logs, file_basename
+    return model_logs, file_basename, tags
 
 
 # %%
@@ -114,9 +120,9 @@ def pick_checkpoints(
     tensorboard=True,
 ):
     if tensorboard:  # TODO: Make cleaner, this is super hacky
-        model_logs, file_basename = load_tensorboards(meta_log_dir, start, tags)
+        model_logs, file_basename, tags = load_tensorboards(meta_log_dir, start, tags)
     else:
-        model_logs, file_basename = load_json_logs(meta_log_dir, tags)
+        model_logs, file_basename, tags = load_json_logs(meta_log_dir, tags)
 
     for model_name in model_logs.keys():
         model_logs[model_name]["geo_mean"] = get_geo_mean(model_logs[model_name], tags)
