@@ -54,9 +54,12 @@ def predict(render_config_path=None):  # Use absolute path
     if ndims is None:
         ndims = train_config["ndims"]
 
-    dest_path = os.path.join(
-        os.path.dirname(config_path), os.path.basename(source_path)
-    )
+    if "dest_path" in render_config.keys():
+        dest_path = render_config["dest_path"]
+    else:
+        dest_path = os.path.join(
+            os.path.dirname(config_path), os.path.basename(source_path)
+        )
     if output_ds is None:
         if net_name is not None:
             output_ds = [f"{source_dataset}_{net_name}_{checkpoint}"]

@@ -1,10 +1,38 @@
 {
+   "metric_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/train_split/seed13/predict_real90nm/test_eval1_metrics.json",
+   "validation_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/train_split/seed13/predict_real90nm/test_eval1_config.json",
+   "prediction_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/train_split/seed13/predict_real90nm/predict_eval1_config.json",
+   "launch_command": "bsub -n 2 -We 3:59 -o /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/train_split/seed13/predict_real90nm/test.log -J test_eval1 raygun-validate-affinities /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/train_split/seed13/predict_real90nm/test_eval1_config.json &",
+   "skeleton_config": {
+      "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5",
+      "dataset_name": "volumes/rasterized_skeleton",
+      "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval1_extras/eval1/skeletons",
+      "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25c20100000d01afc69b",
+      "voxel_size_xyz": [
+         30,
+         30,
+         30
+      ],
+      "dataset_shape": [
+         1024,
+         1024,
+         1024
+      ],
+      "dataset_offset": [
+         1425,
+         288,
+         806
+      ],
+      "save_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5",
+      "save_ds": "volumes/rasterized_skeleton"
+   },
    "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/test_eval1_config.json",
    "predict_config": {
       "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/split/seed13/train_conf.json",
       "num_workers": 12,
       "source_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5",
       "source_dataset": "volumes/interpolated_90nm_aligned",
+      "dest_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/train_split/seed13/predict_real90nm/eval_1.n5",
       "output_ds": [
          "pred_affs",
          "pred_lsds"
