@@ -118,6 +118,7 @@ def pick_checkpoints(
     plot=True,
     save=False,
     tensorboard=True,
+    types: list = ["link", "split", "real_90nm", "real_30nm"],
 ):
     if tensorboard:  # TODO: Make cleaner, this is super hacky
         model_logs, file_basename, tags = load_tensorboards(meta_log_dir, start, tags)
@@ -133,13 +134,15 @@ def pick_checkpoints(
 
         inds = np.array(
             [
-                np.where(model_logs[model_name]["step"] == step)
+                np.argmax(model_logs[model_name]["step"] == step)
                 for step in np.arange(start, final + increment, increment)
+                if step in model_logs[model_name]["step"]
             ]
         ).flatten()
+
         model_logs[model_name]["score_steps"] = np.arange(
             start, final + increment, increment
-        )
+        )[: len(inds)]
         model_logs[model_name]["scores"] = model_logs[model_name]["smooth_geo_mean"][
             inds
         ]
@@ -149,7 +152,7 @@ def pick_checkpoints(
         for tag in tags + ["geo_mean"]:
             model_logs[model_name][tag] = model_logs[model_name][tag][inds]
 
-    bests = show_best_steps(model_logs)
+    bests = show_best_steps(model_logs, types)
     if plot:
         plot_all(model_logs, tags + ["scores"])
 
@@ -163,7 +166,9 @@ def pick_checkpoints(
     return model_logs, bests
 
 
-def get_model_type(model_name: str, types: list = ["link", "split"]) -> str:
+def get_model_type(
+    model_name: str, types: list = ["link", "split", "real_90nm", "real_30nm"]
+) -> str:
     for type in types:
         if type in model_name.lower():
             return type
@@ -217,7 +222,9 @@ def plot_all(model_logs, tags, size=7):
         plot_scores(model_logs, tag)
 
 
-def show_best_steps(model_logs, types: list = ["link", "split"]):
+def show_best_steps(
+    model_logs, types: list = ["link", "split", "real_90nm", "real_30nm"]
+):
     bests = defaultdict(dict)
     for model_name in model_logs.keys():
         this_best_score = model_logs[model_name]["scores"][
@@ -238,7 +245,7 @@ def show_best_steps(model_logs, types: list = ["link", "split"]):
                 ),
             }
 
-    for type in types:
+    for type in bests.keys():
         print(
             f'Best {type}: \n\t model_name: {bests[type]["model_name"]} \n\t layer_name: {bests[type]["layer_name"]} \n\t score: {bests[type]["score"]}'
         )
