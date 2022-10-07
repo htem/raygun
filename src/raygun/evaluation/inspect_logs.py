@@ -107,7 +107,6 @@ def load_tensorboards(  # TODO: Cleanup
     return model_logs, file_basename, tags
 
 
-# %%
 def pick_checkpoints(
     meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
     increment=2000,

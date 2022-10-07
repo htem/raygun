@@ -7,6 +7,6 @@
     "tags": [
         "voi_merge",
         "voi_split"
-    ]
-    // "save": true
+    ],
+    "save": true
 }
