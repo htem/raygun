@@ -1,9 +1,36 @@
 {
+   "metric_path": "train_real/90nm/predict_real90nm/test_eval1_metrics.json",
+   "validation_config_path": "train_real/90nm/predict_real90nm/test_eval1_config.json",
+   "prediction_config_path": "train_real/90nm/predict_real90nm/predict_eval1_config.json",
+   "launch_command": "bsub -n 2 -We 3:59 -o train_real/90nm/predict_real90nm/test.log -J test_eval1 raygun-validate-affinities train_real/90nm/predict_real90nm/test_eval1_config.json &",
+   "skeleton_config": {
+      "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5",
+      "dataset_name": "volumes/rasterized_skeleton",
+      "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval1_extras/eval1/skeletons",
+      "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25c20100000d01afc69b",
+      "voxel_size_xyz": [
+         30,
+         30,
+         30
+      ],
+      "dataset_shape": [
+         1024,
+         1024,
+         1024
+      ],
+      "dataset_offset": [
+         1425,
+         288,
+         806
+      ],
+      "save_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5",
+      "save_ds": "volumes/rasterized_skeleton"
+   },
    "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/test_eval1_config.json",
    "segment_config": {
       "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/90nm/train_conf.json",
-      "launch_command": "bsub -n 32 -We 3:59 -o $working_dir/segment.log -J segment_eval1 raygun-validate-segmentation $working_dir/test_eval1_config.json &",
-      "file": "$working_dir/eval_1.n5",
+      "launch_command": "bsub -n 32 -We 3:59 -o train_real/90nm/predict_real90nm/segment.log -J segment_eval1 raygun-validate-segmentation train_real/90nm/predict_real90nm/test_eval1_config.json &",
+      "file": "train_real/90nm/predict_real90nm/eval_1.n5",
       "aff_ds": "pred_affs",
       "prefix": "",
       "mutex": true,
@@ -39,5 +66,6 @@
       ],
       "input_shape": 196,
       "output_shape": 104
-   }
+   },
+   "checkpoint": "90000"
 }
