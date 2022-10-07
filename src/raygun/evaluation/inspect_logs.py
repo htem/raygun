@@ -50,8 +50,14 @@ def parse_events_file(path: str, tags: list):
     return metrics
 
 
-def load_json_logs(path: str, tags=None):
-    files = glob(path)
+def load_json_logs(paths, tags=None):
+    if isinstance(paths, str):
+        paths = [paths]
+    
+    files = []
+    for path in paths:
+        files += glob(path)
+
     base_path = os.path.commonpath(files)
     base_name = os.path.commonprefix([file.split("/")[-1] for file in files]).replace(
         ".json", ""

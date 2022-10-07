@@ -1,0 +1,13 @@
+{
+   "95000": {
+      "rand_split": 1.0,
+      "rand_merge": 0.01664067880880689,
+      "voi_split": 0.0,
+      "voi_merge": 6.232564581449931,
+      "nvi_split": 0.0,
+      "nvi_merge": 1.0,
+      "nid": 1.0,
+      "voi_split_i": {},
+      "voi_merge_j": {}
+   }
+}
