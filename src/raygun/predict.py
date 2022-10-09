@@ -171,7 +171,7 @@ def predict(render_config_path=None):  # Use absolute path
 
         logger.info("Saving viewer script...")
         view_script = os.path.join(
-            os.path.dirname(config_path),
+            dest_path,
             f"view_{os.path.basename(source_path).rstrip('.n5').rstrip('.zarr')}.ng",
         )
 

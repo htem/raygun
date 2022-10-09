@@ -79,79 +79,24 @@ def load_json_logs(paths, tags=None):
     return model_logs, file_basename, tags
 
 
-def load_tensorboards(  # TODO: Cleanup
-    meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
-    start=2000,  # TODO: ALLOW FOR UNBOUNDED
-    tags=None,
-):
-    if tags is None:
-        tags = [
-            "l1_loss/cycled_A",
-            "l1_loss/cycled_B",
-            "gan_loss/fake_A",
-            "gan_loss/fake_B",
-        ]
-    meta_log_dir = meta_log_dir.rstrip("/*") + "/*"
-
-    folders = glob(meta_log_dir)
-    file_basename = os.path.join(
-        os.path.dirname(os.path.commonpath(folders)), "model_logs"
-    )
-    model_logs = {}  # model_name: log_metrics
-    for folder in folders:
-        log_paths = glob(folder + "/*")
-        log_path = max(log_paths, key=os.path.getctime)
-        model_name = "_".join(
-            folder.replace(os.path.commonpath(folders), "").lstrip("/").split("/")
-        )
-        model_logs[model_name] = parse_events_file(log_path, tags)
-        # check what we want is there:
-        p = 0
-        while start not in model_logs[model_name]["step"] and p < len(log_paths):
-            model_logs[model_name] = parse_events_file(log_paths[p], tags)
-            p += 1
-
-    return model_logs, file_basename, tags
-
-
 def pick_checkpoints(
-    meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
-    increment=2000,
-    start=2000,  # TODO: ALLOW FOR UNBOUNDED
-    final=200000,
+    meta_log_dir,
     tags=None,
     smoothing=0.999,
     plot=True,
     save=False,
-    tensorboard=True,
     types: list = ["link", "split", "real_90nm", "real_30nm"],
 ):
-    if tensorboard:  # TODO: Make cleaner, this is super hacky
-        model_logs, file_basename, tags = load_tensorboards(meta_log_dir, start, tags)
-    else:
-        model_logs, file_basename, tags = load_json_logs(meta_log_dir, tags)
+    model_logs, file_basename, tags = load_json_logs(meta_log_dir, tags)
 
     for model_name in model_logs.keys():
         model_logs[model_name]["geo_mean"] = get_geo_mean(model_logs[model_name], tags)
-        # model_logs[model_name]['smooth_geo_mean'] = smooth(model_logs[model_name]['geo_mean'], smoothing)
-        # model_logs[model_name]["smooth_geo_mean"] = get_geo_mean(
-        #     model_logs[model_name], tags, smoothing=smoothing
-        # )
+        model_logs[model_name]["smooth_geo_mean"] = get_geo_mean(
+            model_logs[model_name], tags, smoothing=smoothing
+        )
         model_logs[model_name]["smooth_sum"] = get_sum(
             model_logs[model_name], tags, smoothing=smoothing
         )
-
-        inds = np.array(
-            [
-                np.argmax(model_logs[model_name]["step"] == step)
-                for step in np.arange(start, final + increment, increment)
-                if step in model_logs[model_name]["step"]
-            ]
-        ).flatten()
-
-        model_logs[model_name]["score_steps"] = np.arange(
-            start, final + increment, increment
-        )[: len(inds)]
         # model_logs[model_name]["scores"] = model_logs[model_name]["smooth_geo_mean"][
         #     inds
         # ]
@@ -159,8 +104,6 @@ def pick_checkpoints(
         model_logs[model_name]["best_step"] = model_logs[model_name]["score_steps"][
             model_logs[model_name]["scores"].argmin()
         ]
-        for tag in tags + ["geo_mean"]:
-            model_logs[model_name][tag] = model_logs[model_name][tag][inds]
 
     bests = show_best_steps(model_logs, types)
     if plot:
@@ -277,7 +220,7 @@ def get_best_layer(model_name, step):
     return os.path.join(*model_name.split("_"), f"models/models_checkpoint_{step}")
 
 
-def inspect_logs(config_path=None):
+def inspect_evals(config_path=None):
     if config_path is None:
         config_path = sys.argv[1]
     config = read_config(config_path)
