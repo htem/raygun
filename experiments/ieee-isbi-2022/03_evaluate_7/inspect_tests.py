@@ -196,6 +196,120 @@ def inspect_tests(config_path=None):
     return show_data(**config)
 
 
+def get_type(name):
+    if "link" in name:
+        return "link"
+    elif "split" in name:
+        return "split"
+    elif "real_" in name:
+        return (
+            name.replace("real_", "real").replace("train_", "").replace("predict_", "")
+        )
+    else:
+        return name.replace("train_", "").replace("predict_", "")
+
+
+def make_data_dict(tests):
+    raw_dict = defaultdict(lambda: defaultdict(list))
+    for name, results in tests.items():
+        train, predict = name.split("_predict_")
+        train = get_type(train)
+        predict = get_type(predict)
+        metrics = [key for key in results.keys() if "_split" in key]
+        for metric in metrics:
+            raw_dict[metric.replace("_split", "")][train, predict].append(
+                [results[metric], results[metric.replace("_split", "_merge")]]
+            )
+
+    sums = defaultdict(defaultdict)
+    means = defaultdict(defaultdict)
+    mins = defaultdict(defaultdict)
+    maxs = defaultdict(defaultdict)
+    for metric, results in raw_dict.items():
+        for (train, predict), data in results.items():
+            sums[metric][train, predict] = np.sum(data, 1)
+            means[metric][train, predict] = np.mean(data, 0)
+            mins[metric][train, predict] = np.min(data, 0)
+            maxs[metric][train, predict] = np.max(data, 0)
+
+    return (
+        raw_dict,
+        sums,
+        means,
+        mins,
+        maxs,
+    )  # raw_dict[train_type, predict_type][metric] = [split, merge]
+
+
+def plot_metric_pairs_scatters(data):
+    metrics = list(data.keys())
+
+    # colors = list(TABLEAU_COLORS.values())
+    # color_dict = get_color_dict(all_metrics)
+
+    fig, axs = plt.subplots(len(data), 1, figsize=(10, 10 * len(data)))
+    try:
+        len(axs)
+    except:
+        axs = [axs]
+    for a, (met, results) in enumerate(data.items()):
+        for (train, predict), result in results.items():
+            # color=color_dict[train]
+            if "split" in train:
+                marker = "v"
+                color = "blue"  # colors[0]
+            elif "link" in train:
+                marker = "v"
+                color = "red"  # colors[1]
+            elif "split" in predict:
+                marker = "^"
+                color = "green"  # colors[2]
+            elif "link" in predict:
+                marker = "^"
+                color = "orange"  # colors[3]
+            elif "90nm" in train and "90nm" in predict:
+                marker = "o"
+                color = "magenta"
+            elif "30nm" in train and "90nm" in predict:
+                marker = "X"
+                color = "brown"
+            elif "30nm" in train and "30nm" in predict:
+                marker = "D"
+                color = "black"
+
+            # lim = max(result + [0])
+            # if (train, predict) in bests or len(bests) == 0:
+            kwargs = {"color": color, "s": 95}
+            label = f"{train}-train | {predict}-predict"
+            #     _, _, train_ac = get_category(train)
+            #     _, _, predict_ac = get_category(predict)
+            #     # label = f'train on {train_ac} > predict on {predict_ac} (best)'
+            #     label = f"{train_ac}-train | {predict_ac}-predict"
+            # else:
+            #     # label = f'train on {train_ac} > predict on {predict_ac}'
+            #     label = None
+            #     kwargs = {"facecolors": "none", "edgecolors": color, "s": 70}
+            result = np.array(result)
+            if len(result.shape) == 1:
+                axs[a].scatter(
+                    result[0], result[1], label=label, marker=marker, **kwargs
+                )
+            else:
+                axs[a].scatter(
+                    result[:, 0], result[:, 1], label=label, marker=marker, **kwargs
+                )
+
+        axs[a].set_xlabel("Split")
+        axs[a].set_ylabel("Merge")
+        axs[a].set_title(met)
+        # axs[a].set_xlim([0, lim])
+        # axs[a].set_ylim([0, lim])
+        # axs[a].legend(legend)
+        axs[a].legend()  # bbox_to_anchor=(2, 1))
+    plt.show()
+    return fig
+
+
 #%%
 paths = [
     "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/test_eval1_metrics.json",
@@ -214,32 +328,31 @@ print(
     ]
 )
 
-means = defaultdict(lambda: defaultdict(defaultdict))
-maxs = defaultdict(lambda: defaultdict(defaultdict))
-mins = defaultdict(lambda: defaultdict(defaultdict))
-fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-for r, res in enumerate(["split", "merge"]):
-    for c, metric in enumerate([tag for tag in tags if res in tag]):
-        axes[r, c].set_title(" ".join(metric.split("_")))
-        if c == 0:
-            axes[r, c].set_ylabel(res)
-        for x, (name, metrics) in enumerate(model_tests.items()):
-            vals = [v[metric] for v in metrics[res].values()]
-            means[metric][res][name] = np.mean(vals)
-            maxs[metric][res][name] = np.max(vals)
-            mins[metric][res][name] = np.min(vals)
-            axes[r, c].scatter(
-                np.ones_like(vals) * x,
-                vals,
-                label=f"{name} (mean={means[metric][res][name]:10.4f}, min={mins[metric][res][name]:10.4f}, max={maxs[metric][res][name]:10.4f}",
-            )
+raw_dict, sums, means, mins, maxs = make_data_dict(results)
 
-        axes[r, c].set_xticklabels(
-            [
-                f"{n}\nmean={means[metric][res][n]:3.4f}\nmin={mins[metric][res][n]:3.4f}\nmax={maxs[metric][res][n]:3.4f}"
-                for n in model_tests.keys()
-            ]
+#%%
+fig, axes = plt.subplots(1, len(sums), figsize=(20, 5))
+for c, (metric, results) in enumerate(sums.items()):
+    axes[c].set_title(metric)
+    if c == 0:
+        axes[c].set_ylabel("Sum of split and merge scores")
+    # x_labels = ["train\npredict\nmean=\nmin=\nmax="]
+    x_labels = ["Train on:\nPredict on:\nBest score = "]
+    for x, ((train, predict), result) in enumerate(results.items()):
+        means[metric][train, predict] = np.mean(result)
+        maxs[metric][train, predict] = np.max(result)
+        mins[metric][train, predict] = np.min(result)
+        axes[c].scatter(
+            np.ones_like(result) * x + 1,
+            result,
+            label=f"train-{train} | predict-{predict}",
         )
+        # x_labels.append(
+        #     f"{train}\n{predict}\n{means[metric][train, predict]:3.4f}\n{mins[metric][train, predict]:3.4f}\n{maxs[metric][train, predict]:3.4f}"
+        # )
+        x_labels.append(f"{train}\n{predict}\n{mins[metric][train, predict]:3.4f}")
+    axes[c].set_xticks(range(x + 2))
+    axes[c].set_xticklabels(x_labels)
 fig.tight_layout()
 
 # %%

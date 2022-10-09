@@ -1,5 +1,4 @@
 #%%
-
 from collections import defaultdict
 from glob import glob
 import json
@@ -48,7 +47,7 @@ def get_metric_dict(path="."):
                 metric_dict[train_name, predict_name] = stats
     return metric_dict
 
-
+#%%
 def compare_metrics(
     metric_dict=None,
     norm_base=["train_real_30nm", "predict_real_90nm"],
