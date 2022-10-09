@@ -331,11 +331,11 @@ print(
 raw_dict, sums, means, mins, maxs = make_data_dict(results)
 
 #%%
-fig, axes = plt.subplots(1, len(sums), figsize=(20, 5))
+fig, axes = plt.subplots(len(sums), 1, figsize=(7, 15))
 for c, (metric, results) in enumerate(sums.items()):
     axes[c].set_title(metric)
-    if c == 0:
-        axes[c].set_ylabel("Sum of split and merge scores")
+    # if c == 0:
+    axes[c].set_ylabel("Sum of split and merge scores")
     # x_labels = ["train\npredict\nmean=\nmin=\nmax="]
     x_labels = ["Train on:\nPredict on:\nBest score = "]
     for x, ((train, predict), result) in enumerate(results.items()):
