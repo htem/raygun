@@ -68,5 +68,9 @@
         "mask_thresh": 0.5,
         "dest_dataset": "segment"
     },
-    "crop": 128
+    "crop": [
+        128,
+        128,
+        128
+    ]
 }

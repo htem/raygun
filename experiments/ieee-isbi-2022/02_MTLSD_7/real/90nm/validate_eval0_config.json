@@ -66,5 +66,6 @@
       "mask_thresh": 0.5,
       "dest_dataset": "segment"
    },
+   "crop": 128,
    "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/validate_eval0_config.json"
 }

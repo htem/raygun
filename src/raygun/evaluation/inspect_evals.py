@@ -82,7 +82,7 @@ def load_json_evals(paths, tags=None):
 def pick_checkpoints(
     meta_eval_dir,
     tags=None,
-    smoothing=0.999,
+    smoothing=0,
     plot=True,
     save=False,
     types: list = ["link", "split", "real_90nm", "real_30nm"],

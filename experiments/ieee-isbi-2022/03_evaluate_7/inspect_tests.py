@@ -8,6 +8,26 @@ import os
 import sys
 
 from raygun.utils import load_json_file, to_json
+import matplotlib
+
+# switch to svg backend
+matplotlib.use("svg")
+# update latex preamble
+plt.rcParams.update(
+    {
+        "svg.fonttype": "path",
+        "font.family": "sans-serif",
+        "font.sans-serif": "AvenirNextLTPro",  # ["Avenir", "AvenirNextLTPro", "Avenir Next LT Pro", "AvenirNextLTPro-Regular", 'UniversLTStd-Light', 'Verdana', 'Helvetica']
+        "path.simplify": True,
+        # "text.usetex": True,
+        # "pgf.rcfonts": False,
+        # "pgf.texsystem": 'pdflatex', # default is xetex
+        # "pgf.preamble": [
+        #      r"\usepackage[T1]{fontenc}",
+        #      r"\usepackage{mathpazo}"
+        #      ]
+    }
+)
 
 
 def convert_json_test(path: str, tags=None):
@@ -25,9 +45,6 @@ def convert_json_test(path: str, tags=None):
             tags.remove(tag)
 
     return metrics, tags
-
-
-#%%
 
 
 def load_json_tests(paths, tags=None):
@@ -61,7 +78,7 @@ def load_json_tests(paths, tags=None):
 def show_data(
     meta_test_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
     tags=None,
-    smoothing=0.999,
+    smoothing=0,
     plot=True,
     save=False,
     types: list = ["link", "split", "real_90nm", "real_30nm"],
@@ -85,7 +102,7 @@ def show_data(
         to_json(bests, file_basename + "_bests.json")
 
         if plot:
-            plt.savefig(file_basename + ".png", bbox_inches="tight")
+            plt.savefig(file_basename + ".svg", bbox_inches="tight")
 
     return model_tests, bests
 
@@ -326,7 +343,7 @@ results, basename, tags = load_json_tests(paths)
 
 print(
     *[
-        f"{k}: \n\tnvi_merge={v['nvi_merge']} \t nvi_split={v['nvi_split']}\n\n\tVOI sum={v['voi_merge']+v['voi_split']}\n"
+        f"{k}: \n\tnvi_merge={v['nvi_merge']} \t nvi_split={v['nvi_split']}\n\tVOI sum={v['voi_merge']+v['voi_split']}\n\n"
         for k, v in results.items()
     ]
 )
