@@ -10,7 +10,7 @@ import sys
 from raygun.utils import load_json_file, to_json
 
 
-def convert_json_log(path: str, tags=None):
+def convert_json_eval(path: str, tags=None):
     old = load_json_file(path)
     metrics = defaultdict(list)
     steps = [k for k in old.keys()]
@@ -51,7 +51,7 @@ def parse_events_file(path: str, tags: list):
     return metrics
 
 
-def load_json_logs(paths, tags=None):
+def load_json_evals(paths, tags=None):
     if isinstance(paths, str):
         paths = [paths]
 
@@ -64,7 +64,7 @@ def load_json_logs(paths, tags=None):
         ".json", ""
     )
     file_basename = os.path.join(base_path, base_name)
-    model_logs = {}  # model_name: log_metrics
+    model_evals = {}  # model_name: eval_metrics
     for file in files:
         model_name = "_".join(
             file.replace(base_path, "")
@@ -74,49 +74,54 @@ def load_json_logs(paths, tags=None):
             .rstrip("/")
             .split("/")
         )
-        model_logs[model_name], tags = convert_json_log(file, tags)
+        model_evals[model_name], tags = convert_json_eval(file, tags)
 
-    return model_logs, file_basename, tags
+    return model_evals, file_basename, tags
 
 
 def pick_checkpoints(
-    meta_log_dir,
+    meta_eval_dir,
     tags=None,
     smoothing=0.999,
     plot=True,
     save=False,
     types: list = ["link", "split", "real_90nm", "real_30nm"],
 ):
-    model_logs, file_basename, tags = load_json_logs(meta_log_dir, tags)
+    model_evals, file_basename, tags = load_json_evals(meta_eval_dir, tags)
 
-    for model_name in model_logs.keys():
-        model_logs[model_name]["geo_mean"] = get_geo_mean(model_logs[model_name], tags)
-        model_logs[model_name]["smooth_geo_mean"] = get_geo_mean(
-            model_logs[model_name], tags, smoothing=smoothing
+    for model_name in model_evals.keys():
+        model_evals[model_name]["geo_mean"] = get_geo_mean(
+            model_evals[model_name], tags
         )
-        model_logs[model_name]["smooth_sum"] = get_sum(
-            model_logs[model_name], tags, smoothing=smoothing
+        model_evals[model_name]["smooth_geo_mean"] = get_geo_mean(
+            model_evals[model_name], tags, smoothing=smoothing
         )
-        # model_logs[model_name]["scores"] = model_logs[model_name]["smooth_geo_mean"][
+        model_evals[model_name]["smooth_sum"] = get_sum(
+            model_evals[model_name], tags, smoothing=smoothing
+        )
+        # model_evals[model_name]["score"] = model_evals[model_name]["smooth_geo_mean"][
         #     inds
         # ]
-        model_logs[model_name]["scores"] = model_logs[model_name]["smooth_sum"][inds]
-        model_logs[model_name]["best_step"] = model_logs[model_name]["score_steps"][
-            model_logs[model_name]["scores"].argmin()
+        model_evals[model_name]["score"] = model_evals[model_name]["smooth_sum"]
+        model_evals[model_name]["best_score"] = model_evals[model_name]["score"][
+            model_evals[model_name]["score"].argmin()
+        ]
+        model_evals[model_name]["best_step"] = model_evals[model_name]["step"][
+            model_evals[model_name]["score"].argmin()
         ]
 
-    bests = show_best_steps(model_logs, types)
+    bests = show_best_steps(model_evals, types)
     if plot:
-        plot_all(model_logs, tags + ["scores"])
+        plot_all(model_evals, tags + ["score"])
 
     if save:
-        to_json(model_logs, file_basename + ".json")
+        to_json(model_evals, file_basename + ".json")
         to_json(bests, file_basename + "_bests.json")
 
         if plot:
             plt.savefig(file_basename + ".png", bbox_inches="tight")
 
-    return model_logs, bests
+    return model_evals, bests
 
 
 def get_model_type(
@@ -158,43 +163,41 @@ def smooth(scalars, weight=0.99):  # Weight between 0 and 1
     return np.array(smoothed)
 
 
-def plot_geo_mean(model_logs):
-    for model_name in model_logs.keys():
+def plot_geo_mean(model_evals):
+    for model_name in model_evals.keys():
         plt.plot(
-            model_logs[model_name]["step"],
-            model_logs[model_name]["smooth_geo_mean"],
+            model_evals[model_name]["step"],
+            model_evals[model_name]["smooth_geo_mean"],
             label=model_name,
         )
     plt.legend()
 
 
-def plot_scores(model_logs, tag="scores"):
-    for model_name in model_logs.keys():
+def plot_scores(model_evals, tag="scores"):
+    for model_name in model_evals.keys():
         plt.plot(
-            model_logs[model_name]["score_steps"],
-            model_logs[model_name][tag],
-            label=f"{model_name} - best: {model_logs[model_name]['score_steps'][model_logs[model_name][tag].argmin()]}",
+            model_evals[model_name]["step"],
+            model_evals[model_name][tag],
+            label=f"{model_name} - best: {model_evals[model_name]['step'][model_evals[model_name][tag].argmin()]}",
         )
     plt.legend()
 
 
-def plot_all(model_logs, tags, size=7):
+def plot_all(model_evals, tags, size=7):
     plt.figure(figsize=(size, size * len(tags)))
     for i, tag in enumerate(tags):
         plt.subplot(len(tags), 1, i + 1, title=tag)
-        plot_scores(model_logs, tag)
+        plot_scores(model_evals, tag)
 
 
 def show_best_steps(
-    model_logs, types: list = ["link", "split", "real_90nm", "real_30nm"]
+    model_evals, types: list = ["link", "split", "real_90nm", "real_30nm"]
 ):
     bests = defaultdict(dict)
-    for model_name in model_logs.keys():
-        this_best_score = model_logs[model_name]["scores"][
-            model_logs[model_name]["score_steps"] == model_logs[model_name]["best_step"]
-        ][0]
+    for model_name in model_evals.keys():
+        this_best_score = model_evals[model_name]["best_score"]
         print(
-            f'{model_name} \n\t best step: {model_logs[model_name]["best_step"]} \n\t with score {this_best_score}'
+            f'{model_name} \n\t best step: {model_evals[model_name]["best_step"]} \n\t with score {this_best_score}'
         )
 
         type = get_model_type(model_name, types)
@@ -202,9 +205,9 @@ def show_best_steps(
             bests[type] = {
                 "score": this_best_score,
                 "model_name": model_name,
-                "step": model_logs[model_name]["best_step"],
+                "step": model_evals[model_name]["best_step"],
                 "layer_name": get_best_layer(
-                    model_name, model_logs[model_name]["best_step"]
+                    model_name, model_evals[model_name]["best_step"]
                 ),
             }
 
@@ -231,4 +234,4 @@ def inspect_evals(config_path=None):
 if __name__ == "__main__":
     config_path = sys.argv[1]
     config = read_config(config_path)
-    logs, bests = pick_checkpoints(**config)
+    evals, bests = pick_checkpoints(**config)

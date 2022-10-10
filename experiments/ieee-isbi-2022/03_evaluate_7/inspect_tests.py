@@ -72,20 +72,13 @@ def show_data(
         model_tests[model_name]["geo_mean"] = get_geo_mean(
             model_tests[model_name], tags
         )
-        # model_tests[model_name]['smooth_geo_mean'] = smooth(model_tests[model_name]['geo_mean'], smoothing)
-        model_tests[model_name]["scores"] = get_geo_mean(
+        model_tests[model_name]["score"] = get_sum(
             model_tests[model_name], tags, smoothing=smoothing
         )
 
-        model_tests[model_name]["best_step"] = model_tests[model_name]["score_steps"][
-            model_tests[model_name]["scores"].argmin()
-        ]
-        for tag in tags + ["geo_mean"]:
-            model_tests[model_name][tag] = model_tests[model_name][tag][inds]
-
     bests = show_best_steps(model_tests, types)
     if plot:
-        plot_all(model_tests, tags + ["scores"])
+        plot_all(model_tests, tags + ["score"])
 
     if save:
         to_json(model_tests, file_basename + ".json")
@@ -95,6 +88,16 @@ def show_data(
             plt.savefig(file_basename + ".png", bbox_inches="tight")
 
     return model_tests, bests
+
+
+def get_sum(data, tags, smoothing=None):
+    if smoothing is not None:
+        for tag in tags:
+            data[tag] = smooth(data[tag])
+    this_sum = np.zeros_like(data[tags[0]])
+    for tag in tags:
+        this_sum += data[tag]
+    return this_sum
 
 
 def get_model_type(
@@ -323,7 +326,7 @@ results, basename, tags = load_json_tests(paths)
 
 print(
     *[
-        f"{k}: \n\tnvi_merge={v['nvi_merge']} \t nvi_split={v['nvi_split']}\n"
+        f"{k}: \n\tnvi_merge={v['nvi_merge']} \t nvi_split={v['nvi_split']}\n\n\tVOI sum={v['voi_merge']+v['voi_split']}\n"
         for k, v in results.items()
     ]
 )
@@ -355,6 +358,48 @@ for c, (metric, results) in enumerate(sums.items()):
     axes[c].set_xticklabels(x_labels)
 fig.tight_layout()
 
+#%%
+trains = [
+    "real30nm",
+    "real90nm",
+    "link",
+    "split",
+]  # set([keys[0] for keys in list(sums.values())[0].keys()])
+predicts = [
+    "real30nm",
+    "link",
+    "split",
+    "real90nm",
+]  # set([keys[1] for keys in list(sums.values())[0].keys()])
+fig, axes = plt.subplots(len(sums), 1, figsize=(7, 15))
+for c, (metric, results) in enumerate(sums.items()):
+    axes[c].set_title(metric)
+    # if c == 0:
+    axes[c].set_ylabel("Sum of split and merge scores")
+    # x_labels = ["train\npredict\nmean=\nmin=\nmax="]
+    x_labels = ["Train on:\nPredict on:\nBest score = "]
+    x = 0
+    for train in trains:
+        for predict in predicts:
+            if (train, predict) not in results.keys():
+                continue
+            result = results[train, predict]
+            means[metric][train, predict] = np.mean(result)
+            maxs[metric][train, predict] = np.max(result)
+            mins[metric][train, predict] = np.min(result)
+            axes[c].scatter(
+                np.ones_like(result) * x + 1,
+                result,
+                label=f"train-{train} | predict-{predict}",
+            )
+            # x_labels.append(
+            #     f"{train}\n{predict}\n{means[metric][train, predict]:3.4f}\n{mins[metric][train, predict]:3.4f}\n{maxs[metric][train, predict]:3.4f}"
+            # )
+            x_labels.append(f"{train}\n{predict}\n{mins[metric][train, predict]:3.4f}")
+            x += 1
+    axes[c].set_xticks(range(x + 1))
+    axes[c].set_xticklabels(x_labels)
+fig.tight_layout()
 # %%
 if __name__ == "__main__":
     config_path = sys.argv[1]

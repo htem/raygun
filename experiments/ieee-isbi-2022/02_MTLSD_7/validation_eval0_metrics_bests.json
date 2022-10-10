@@ -2,25 +2,25 @@
    "link": {
       "score": 5.090911150276378,
       "model_name": "link_seed42",
-      "step": 65000,
-      "layer_name": "link/seed42/models/models_checkpoint_65000"
+      "step": 100000,
+      "layer_name": "link/seed42/models/models_checkpoint_100000"
    },
    "real_30nm": {
-      "score": 5.1337193395335845,
+      "score": 5.133769606823185,
       "model_name": "real_30nm",
       "step": 50000,
       "layer_name": "real/30nm/models/models_checkpoint_50000"
    },
    "real_90nm": {
-      "score": 5.205244682702449,
+      "score": 5.205489115533179,
       "model_name": "real_90nm",
-      "step": 55000,
-      "layer_name": "real/90nm/models/models_checkpoint_55000"
+      "step": 95000,
+      "layer_name": "real/90nm/models/models_checkpoint_95000"
    },
    "split": {
-      "score": 5.304064352248506,
+      "score": 5.3042529028822365,
       "model_name": "split_seed42",
-      "step": 50000,
-      "layer_name": "split/seed42/models/models_checkpoint_50000"
+      "step": 80000,
+      "layer_name": "split/seed42/models/models_checkpoint_80000"
    }
 }

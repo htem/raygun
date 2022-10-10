@@ -67,5 +67,6 @@
         "sep": 3,
         "mask_thresh": 0.5,
         "dest_dataset": "segment"
-    }
+    },
+    "crop": 128
 }

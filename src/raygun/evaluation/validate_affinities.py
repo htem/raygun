@@ -109,13 +109,18 @@ def validate_segmentation(config=None):
         config = sys.argv[1]
 
     config = read_config(config)
+    if "crop" in config.keys():
+        crop = config["crop"]
+    else:
+        crop = None
+
     try:  # TODO: Figure out why this is necessary and fix
         seg = segment(config["segment_config"])
     except:
         seg = segment.segment(config["segment_config"])
     image = rasterize_skeleton(config["skeleton_config"])
     logger.info("Evaluating...")
-    evaluation = pad_eval(seg, image)
+    evaluation = pad_eval(seg, image, crop=crop)
     logger.info("Done... saving...")
 
     # save metrics
@@ -130,8 +135,13 @@ def validate_segmentation(config=None):
     logger.info("Done.")
 
 
-def pad_eval(segment_array, image):
-    pad = daisy.Coordinate(np.array(image.shape) - np.array(segment_array.shape)) // 2
+def pad_eval(segment_array, image, crop=None):
+    if crop is not None:
+        segment_array = segment_array[crop[0] : -crop[0], crop[1] : -crop[1], crop[2] : -crop[2]]
+
+    pad = (
+            daisy.Coordinate(np.array(image.shape) - np.array(segment_array.shape)) // 2
+        )
     if sum(pad) < 3:
         image = image
     else:
