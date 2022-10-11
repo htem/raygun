@@ -18,7 +18,7 @@
          "num_channels": 10
       }
    },
-   "checkpoint": "90000",
+   "checkpoint": "100000",
    "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla -o temp.out",
    "scaleShift_input": [
       2,

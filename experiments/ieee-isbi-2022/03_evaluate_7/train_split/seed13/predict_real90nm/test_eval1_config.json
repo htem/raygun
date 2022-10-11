@@ -26,6 +26,11 @@
       "save_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5",
       "save_ds": "volumes/rasterized_skeleton"
    },
+   "crop": [
+      128,
+      128,
+      128
+   ],
    "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/test_eval1_config.json",
    "predict_config": {
       "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/split/seed13/train_conf.json",
@@ -47,7 +52,7 @@
             "num_channels": 10
          }
       },
-      "checkpoint": "100000",
+      "checkpoint": "95000",
       "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla -o temp.out",
       "scaleShift_input": [
          2,
@@ -68,5 +73,5 @@
       "mask_thresh": 0.5,
       "dest_dataset": "segment"
    },
-   "checkpoint": "100000"
+   "checkpoint": "95000"
 }

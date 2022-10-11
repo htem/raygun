@@ -12,8 +12,16 @@ matplotlib.use("svg")
 plt.rcParams.update(
     {
         "svg.fonttype": "path",
-        "font.family": "sans-serif",
-        "font.sans-serif": "AvenirNextLTPro",  # ["Avenir", "AvenirNextLTPro", "Avenir Next LT Pro", "AvenirNextLTPro-Regular", 'UniversLTStd-Light', 'Verdana', 'Helvetica']
+        # "font.family": "sans-serif",
+        # "font.sans-serif": [
+        #     "Avenir",
+        #     "AvenirNextLTPro",
+        #     "Avenir Next LT Pro",
+        #     "AvenirNextLTPro-Regular",
+        #     "UniversLTStd-Light",
+        #     "Verdana",
+        #     "Helvetica",
+        # ],
         "path.simplify": True,
         # "text.usetex": True,
         # "pgf.rcfonts": False,
@@ -62,9 +70,9 @@ def show_images(
     if num == 1:
         axs = [axs]
     for ax, (key, image) in zip(axs, images.items()):
-        name = key.copy()
-        for sep in ["\n", "(", ")", " ", ":"]:
-            name = name.replace(sep, "_")
+        # name = copy(key)
+        # for sep in ["\n", "(", ")", " ", ":"]:
+        #     name = name.replace(sep, "_")
         image = image.squeeze()
         if len(image.shape) >= 3 and image.shape[0] < image.shape[-1]:
             image = image.transpose((1, 2, 0))
@@ -73,13 +81,13 @@ def show_images(
 
         if "segment" in key or len(image.shape) >= 3:
             # if save:
-            #     plt.imsave(os.path.join(filepath, key, ".svg"), image, vmin=0, vmax=255)
+            #     plt.imsave(os.path.join(filepath, name, ".svg"), image, vmin=0, vmax=255)
             ax.imshow(image, vmin=0, vmax=255)
             ax.set_title(key)
         else:
             # if save:
             #     plt.imsave(
-            #         os.path.join(filepath, key, ".svg"),
+            #         os.path.join(filepath, name, ".svg"),
             #         image,
             #         vmin=0,
             #         vmax=255,
@@ -95,7 +103,6 @@ def show_images(
 #%% Training0
 num = 4
 fig, axes = plt.subplots(2, num, figsize=(5 * num, 10))
-
 
 roi = daisy.Roi(offset=(896, 1920, 312), shape=(512, 512, 1)) * 30
 dataset_dict = {
@@ -217,7 +224,7 @@ for r in range(rows):
     dataset_dict = dataset_dict_list[r]
     show_images(dataset_dict, roi, axs=axes[r])
 fig.set_tight_layout(True)
-
+fig
 # %%
 # Now in presentation layout
 cols = 7
@@ -227,5 +234,5 @@ for c in range(cols):
     dataset_dict = dataset_dict_list[c]
     show_images(dataset_dict, roi, axs=axes[:, c])
 fig.set_tight_layout(True)
-
+fig
 # %%

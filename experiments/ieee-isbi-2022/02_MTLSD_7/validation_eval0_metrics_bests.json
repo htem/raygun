@@ -1,0 +1,26 @@
+{
+   "link": {
+      "score": 4.522221873775921,
+      "model_name": "link_seed42",
+      "step": 100000,
+      "layer_name": "link/seed42/models/models_checkpoint_100000"
+   },
+   "real_30nm": {
+      "score": 4.458655974237615,
+      "model_name": "real_30nm",
+      "step": 100000,
+      "layer_name": "real/30nm/models/models_checkpoint_100000"
+   },
+   "real_90nm": {
+      "score": 4.608776980713982,
+      "model_name": "real_90nm",
+      "step": 90000,
+      "layer_name": "real/90nm/models/models_checkpoint_90000"
+   },
+   "split": {
+      "score": 4.75766871436352,
+      "model_name": "split_seed13",
+      "step": 95000,
+      "layer_name": "split/seed13/models/models_checkpoint_95000"
+   }
+}

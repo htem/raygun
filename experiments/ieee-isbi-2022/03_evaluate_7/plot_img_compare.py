@@ -169,22 +169,25 @@ real["30nm"] = {
 #%%
 tecs = {
     "real": real,
-    "valid link": valid_link,
-    "valid split": valid_split,
-    "same link": same_link,
-    "same split": same_split,
+    "link-fake": valid_link,
+    "split-fake": valid_split,
+    # "valid link": valid_link,
+    # "valid split": valid_split,
+    # "same link": same_link,
+    # "same split": same_split,
 }
+all_res = ["90nm", "30nm"]
 means = defaultdict(lambda: defaultdict(defaultdict))
 maxs = defaultdict(lambda: defaultdict(defaultdict))
 mins = defaultdict(lambda: defaultdict(defaultdict))
-fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+fig, axes = plt.subplots(2, 3, figsize=(4 * len(tecs), 6))
 for c, metric in enumerate(
     ["normalized_root_mse", "peak_signal_noise_ratio", "structural_similarity"]
 ):
-    for r, res in enumerate(["90nm", "30nm"]):
+    for r, res in enumerate(all_res):
         axes[r, c].set_title(" ".join(metric.split("_")))
         if c == 0:
-            axes[r, c].set_ylabel(res)
+            axes[r, c].set_ylabel(f"Compared to real {res}")
         # axes[r,c].set_xticklabels([n for n in tecs.keys()])
         axes[r, c].set_xticks(range(len(tecs)))
         for x, (name, tec) in enumerate(tecs.items()):
@@ -200,10 +203,12 @@ for c, metric in enumerate(
 
         axes[r, c].set_xticklabels(
             [
-                f"{n}\nmean={means[metric][res][n]:3.4f}\nmin={mins[metric][res][n]:3.4f}\nmax={maxs[metric][res][n]:3.4f}"
+                f"{n} {res}\nmean={means[metric][res][n]:3.3f}\nmin={mins[metric][res][n]:3.3f}\nmax={maxs[metric][res][n]:3.3f}"
+                if n != "real"
+                else f"real {all_res[np.argmax([r != res for r in all_res])]}\nmean={means[metric][res][n]:3.3f}\nmin={mins[metric][res][n]:3.3f}\nmax={maxs[metric][res][n]:3.3f}"
                 for n in tecs.keys()
             ]
         )
 fig.tight_layout()
-
+fig
 # %%

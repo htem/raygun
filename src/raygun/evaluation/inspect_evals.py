@@ -33,9 +33,6 @@ def convert_json_eval(path: str, tags=None):
     return metrics, tags
 
 
-#%%
-
-
 def parse_events_file(path: str, tags: list):
     import tensorflow as tf  # put here to prevent loading tensorflow for every raygun operation
 
@@ -133,9 +130,9 @@ def get_model_type(
 
 
 def get_sum(data, tags, smoothing=None):
-    if smoothing is not None:
+    if smoothing is not None and smoothing > 0:
         for tag in tags:
-            data[tag] = smooth(data[tag])
+            data[tag] = smooth(data[tag], smoothing)
     this_sum = np.zeros_like(data[tags[0]])
     for tag in tags:
         this_sum += data[tag]
@@ -143,9 +140,9 @@ def get_sum(data, tags, smoothing=None):
 
 
 def get_geo_mean(data, tags, smoothing=None):
-    if smoothing is not None:
+    if smoothing is not None and smoothing > 0:
         for tag in tags:
-            data[tag] = smooth(data[tag])
+            data[tag] = smooth(data[tag], smoothing)
     temp_prod = np.ones_like(data[tags[0]])
     for tag in tags:
         temp_prod *= data[tag]
@@ -175,9 +172,13 @@ def plot_geo_mean(model_evals):
 
 def plot_scores(model_evals, tag="scores"):
     for model_name in model_evals.keys():
+        steps = model_evals[model_name]["step"].copy()
+        steps.sort()
+        inds = [np.argmax(step == model_evals[model_name]["step"]) for step in steps]
+        data = model_evals[model_name][tag][inds]
         plt.plot(
-            model_evals[model_name]["step"],
-            model_evals[model_name][tag],
+            steps,
+            data,
             label=f"{model_name} - best: {model_evals[model_name]['step'][model_evals[model_name][tag].argmin()]}",
         )
     plt.legend()

@@ -25,5 +25,10 @@
         ],
         "save_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5",
         "save_ds": "volumes/rasterized_skeleton"
-    }
+    },
+    "crop": [
+        128,
+        128,
+        128
+    ]
 }

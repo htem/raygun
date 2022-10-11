@@ -7,10 +7,6 @@
         "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/*/*/*/test_eval1_metrics.json",
         "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/*/*/*/*/test_eval1_metrics.json"
     ],
-    "increment": 5000,
-    "start": 90000,
-    "final": 100000,
-    "tensorboard": false,
     // "tags": [
     //     "voi_merge",
     //     "voi_split"

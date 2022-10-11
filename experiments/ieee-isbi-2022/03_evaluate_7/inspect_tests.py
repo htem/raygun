@@ -16,8 +16,8 @@ matplotlib.use("svg")
 plt.rcParams.update(
     {
         "svg.fonttype": "path",
-        "font.family": "sans-serif",
-        "font.sans-serif": "AvenirNextLTPro",  # ["Avenir", "AvenirNextLTPro", "Avenir Next LT Pro", "AvenirNextLTPro-Regular", 'UniversLTStd-Light', 'Verdana', 'Helvetica']
+        # "font.family": "sans-serif",
+        # "font.sans-serif": "AvenirNextLTPro",  # ["Avenir", "AvenirNextLTPro", "Avenir Next LT Pro", "AvenirNextLTPro-Regular", 'UniversLTStd-Light', 'Verdana', 'Helvetica']
         "path.simplify": True,
         # "text.usetex": True,
         # "pgf.rcfonts": False,
@@ -78,7 +78,7 @@ def load_json_tests(paths, tags=None):
 def show_data(
     meta_test_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
     tags=None,
-    smoothing=0,
+    smoothing=None,
     plot=True,
     save=False,
     types: list = ["link", "split", "real_90nm", "real_30nm"],
@@ -108,9 +108,9 @@ def show_data(
 
 
 def get_sum(data, tags, smoothing=None):
-    if smoothing is not None:
+    if smoothing is not None and smoothing > 0:
         for tag in tags:
-            data[tag] = smooth(data[tag])
+            data[tag] = smooth(data[tag], smoothing)
     this_sum = np.zeros_like(data[tags[0]])
     for tag in tags:
         this_sum += data[tag]
@@ -126,9 +126,9 @@ def get_model_type(
 
 
 def get_geo_mean(data, tags, smoothing=None):
-    if smoothing is not None:
+    if smoothing is not None and smoothing > 0:
         for tag in tags:
-            data[tag] = smooth(data[tag])
+            data[tag] = smooth(data[tag], smoothing)
     temp_prod = np.ones_like(data[tags[0]])
     for tag in tags:
         temp_prod *= data[tag]
@@ -417,6 +417,7 @@ for c, (metric, results) in enumerate(sums.items()):
     axes[c].set_xticks(range(x + 1))
     axes[c].set_xticklabels(x_labels)
 fig.tight_layout()
+fig
 # %%
 if __name__ == "__main__":
     config_path = sys.argv[1]
