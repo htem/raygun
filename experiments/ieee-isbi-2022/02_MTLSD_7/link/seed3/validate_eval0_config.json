@@ -2,7 +2,7 @@
    "metric_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed3/validation_eval0_metrics.json",
    "validation_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed3/validate_eval0_config.json",
    "prediction_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed3/predict_eval0_config.json",
-   "checkpoint": "75000",
+   "checkpoint": "100000",
    "launch_command": "bsub -n 2 -We 3:59 -o /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed3/validate.log -J validate_eval0 raygun-validate-affinities /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed3/validate_eval0_config.json &",
    "skeleton_config": {
       "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
@@ -45,7 +45,7 @@
             "num_channels": 10
          }
       },
-      "checkpoint": "75000",
+      "checkpoint": "100000",
       "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla -o temp.out",
       "scaleShift_input": [
          2,
@@ -66,6 +66,10 @@
       "mask_thresh": 0.5,
       "dest_dataset": "segment"
    },
-   "crop": 128,
+   "crop": [
+      128,
+      128,
+      128
+   ],
    "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/validate_eval0_config.json"
 }

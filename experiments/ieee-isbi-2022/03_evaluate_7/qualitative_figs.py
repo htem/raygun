@@ -50,11 +50,11 @@ def get_images(dataset_dict, roi):
 
 
 def show_images(
-    dataset_dict, roi, save=False, axs=None, folder_name="qualitative_figures"
+    dataset_dict, roi, axs=None, save=False, folder_name="qualitative_figures"
 ):
-    if save:
-        filepath = os.path.join(os.getcwd(), folder_name)
-        os.makedirs(filepath, exist_ok=True)
+    # if save:
+    #     filepath = os.path.join(os.getcwd(), folder_name)
+    #     os.makedirs(filepath, exist_ok=True)
     images = get_images(dataset_dict, roi)
     num = len(images)
     if axs is None:
@@ -72,19 +72,19 @@ def show_images(
                 image = image[..., :3]
 
         if "segment" in key or len(image.shape) >= 3:
-            if save:
-                plt.imsave(os.path.join(filepath, key, ".svg"), image, vmin=0, vmax=255)
+            # if save:
+            #     plt.imsave(os.path.join(filepath, key, ".svg"), image, vmin=0, vmax=255)
             ax.imshow(image, vmin=0, vmax=255)
             ax.set_title(key)
         else:
-            if save:
-                plt.imsave(
-                    os.path.join(filepath, key, ".svg"),
-                    image,
-                    vmin=0,
-                    vmax=255,
-                    cmap="gray",
-                )
+            # if save:
+            #     plt.imsave(
+            #         os.path.join(filepath, key, ".svg"),
+            #         image,
+            #         vmin=0,
+            #         vmax=255,
+            #         cmap="gray",
+            #     )
             ax.imshow(image, vmin=0, vmax=255, cmap="gray")
             ax.set_title(key)
         ax.axes.xaxis.set_visible(False)
