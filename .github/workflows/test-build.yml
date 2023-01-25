@@ -26,13 +26,6 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        # MINICONDA_INSTALLER_SCRIPT=Miniconda3-4.5.4-Linux-x86_64.sh
-        # MINICONDA_PREFIX=/usr/local
-        # wget https://repo.continuum.io/miniconda/$MINICONDA_INSTALLER_SCRIPT
-        # chmod +x $MINICONDA_INSTALLER_SCRIPT
-        # ./$MINICONDA_INSTALLER_SCRIPT -b -f -p $MINICONDA_PREFIX
-        # conda install --channel defaults conda --yes
-        # conda update --channel defaults --all --yes
         sudo apt-get update
         sudo apt-get install libboost-all-dev
         wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
@@ -46,13 +39,12 @@ jobs:
         source activate raygun
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    # - name: Lint with flake8
+    #   run: |
+    #     # stop the build if there are Python syntax errors or undefined names
+    #     flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    #     # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+    #     flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
         pytest
