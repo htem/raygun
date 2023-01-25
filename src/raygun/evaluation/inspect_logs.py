@@ -1,6 +1,5 @@
 #%%
 from collections import defaultdict
-import json
 import matplotlib.pyplot as plt
 import numpy as np
 from raygun import read_config
@@ -14,19 +13,27 @@ from raygun.utils import load_json_file, to_json
 def convert_json_log(path: str, tags=None):
     old = load_json_file(path)
     metrics = defaultdict(list)
-    steps = np.array([k for k in old.keys()])
-    metrics["step"] = steps
+    steps = [k for k in old.keys()]
+    steps.sort()
+    metrics["step"] = np.array(steps).astype(int)
     if tags is None:
         tags = [k for k in old[steps[0]].keys()]
 
     for step in steps:
         for tag in tags:
-            metrics[tag].append(old[step][tag])
+            val = old[step][tag]
+            if type(val) is not dict:  # TODO: hacky
+                metrics[tag].append(val)
+            else:
+                tags.remove(tag)
 
     for k, v in metrics.items():
         metrics[k] = np.array(v)
 
-    return metrics
+    return metrics, tags
+
+
+#%%
 
 
 def parse_events_file(path: str, tags: list):
@@ -44,29 +51,35 @@ def parse_events_file(path: str, tags: list):
     return metrics
 
 
-def load_json_logs(path: str, tags=None):
-    files = glob(path)
+def load_json_logs(paths, tags=None):
+    if isinstance(paths, str):
+        paths = [paths]
+
+    files = []
+    for path in paths:
+        files += glob(path)
+
     base_path = os.path.commonpath(files)
-    base_name = (
-        os.path.commonprefix([file.split("/")[-1] for file in files]).replace(
-            ".json", ""
-        ),
+    base_name = os.path.commonprefix([file.split("/")[-1] for file in files]).replace(
+        ".json", ""
     )
     file_basename = os.path.join(base_path, base_name)
     model_logs = {}  # model_name: log_metrics
     for file in files:
         model_name = "_".join(
             file.replace(base_path, "")
-            .rstrip("/" + base_name + ".json")
             .lstrip("/")
+            .rstrip(".json")
+            .rstrip(base_name)
+            .rstrip("/")
             .split("/")
         )
-        model_logs[model_name] = convert_json_log(file, tags)
+        model_logs[model_name], tags = convert_json_log(file, tags)
 
-    return model_logs, file_basename
+    return model_logs, file_basename, tags
 
 
-def load_tensorboards(
+def load_tensorboards(  # TODO: Cleanup
     meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
     start=2000,  # TODO: ALLOW FOR UNBOUNDED
     tags=None,
@@ -98,10 +111,9 @@ def load_tensorboards(
             model_logs[model_name] = parse_events_file(log_paths[p], tags)
             p += 1
 
-    return model_logs, file_basename
+    return model_logs, file_basename, tags
 
 
-# %%
 def pick_checkpoints(
     meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
     increment=2000,
@@ -112,38 +124,45 @@ def pick_checkpoints(
     plot=True,
     save=False,
     tensorboard=True,
+    types: list = ["link", "split", "real_90nm", "real_30nm"],
 ):
     if tensorboard:  # TODO: Make cleaner, this is super hacky
-        model_logs, file_basename = load_tensorboards(meta_log_dir, start, tags)
+        model_logs, file_basename, tags = load_tensorboards(meta_log_dir, start, tags)
     else:
-        model_logs, file_basename = load_json_logs(meta_log_dir, tags)
+        model_logs, file_basename, tags = load_json_logs(meta_log_dir, tags)
 
     for model_name in model_logs.keys():
         model_logs[model_name]["geo_mean"] = get_geo_mean(model_logs[model_name], tags)
         # model_logs[model_name]['smooth_geo_mean'] = smooth(model_logs[model_name]['geo_mean'], smoothing)
-        model_logs[model_name]["smooth_geo_mean"] = get_geo_mean(
+        # model_logs[model_name]["smooth_geo_mean"] = get_geo_mean(
+        #     model_logs[model_name], tags, smoothing=smoothing
+        # )
+        model_logs[model_name]["smooth_sum"] = get_sum(
             model_logs[model_name], tags, smoothing=smoothing
         )
 
         inds = np.array(
             [
-                np.where(model_logs[model_name]["step"] == step)
+                np.argmax(model_logs[model_name]["step"] == step)
                 for step in np.arange(start, final + increment, increment)
+                if step in model_logs[model_name]["step"]
             ]
         ).flatten()
+
         model_logs[model_name]["score_steps"] = np.arange(
             start, final + increment, increment
-        )
-        model_logs[model_name]["scores"] = model_logs[model_name]["smooth_geo_mean"][
-            inds
-        ]
+        )[: len(inds)]
+        # model_logs[model_name]["scores"] = model_logs[model_name]["smooth_geo_mean"][
+        #     inds
+        # ]
+        model_logs[model_name]["scores"] = model_logs[model_name]["smooth_sum"][inds]
         model_logs[model_name]["best_step"] = model_logs[model_name]["score_steps"][
             model_logs[model_name]["scores"].argmin()
         ]
         for tag in tags + ["geo_mean"]:
             model_logs[model_name][tag] = model_logs[model_name][tag][inds]
 
-    bests = show_best_steps(model_logs)
+    bests = show_best_steps(model_logs, types)
     if plot:
         plot_all(model_logs, tags + ["scores"])
 
@@ -157,16 +176,28 @@ def pick_checkpoints(
     return model_logs, bests
 
 
-def get_model_type(model_name: str, types: list = ["link", "split"]) -> str:
+def get_model_type(
+    model_name: str, types: list = ["link", "split", "real_90nm", "real_30nm"]
+) -> str:
     for type in types:
         if type in model_name.lower():
             return type
 
 
-def get_geo_mean(data, tags, smoothing=None):
-    if smoothing is not None:
+def get_sum(data, tags, smoothing=None):
+    if smoothing is not None and smoothing > 0:
         for tag in tags:
-            data[tag] = smooth(data[tag])
+            data[tag] = smooth(data[tag], smoothing)
+    this_sum = np.zeros_like(data[tags[0]])
+    for tag in tags:
+        this_sum += data[tag]
+    return this_sum
+
+
+def get_geo_mean(data, tags, smoothing=None):
+    if smoothing is not None and smoothing > 0:
+        for tag in tags:
+            data[tag] = smooth(data[tag], smoothing)
     temp_prod = np.ones_like(data[tags[0]])
     for tag in tags:
         temp_prod *= data[tag]
@@ -211,7 +242,9 @@ def plot_all(model_logs, tags, size=7):
         plot_scores(model_logs, tag)
 
 
-def show_best_steps(model_logs, types: list = ["link", "split"]):
+def show_best_steps(
+    model_logs, types: list = ["link", "split", "real_90nm", "real_30nm"]
+):
     bests = defaultdict(dict)
     for model_name in model_logs.keys():
         this_best_score = model_logs[model_name]["scores"][
@@ -232,7 +265,7 @@ def show_best_steps(model_logs, types: list = ["link", "split"]):
                 ),
             }
 
-    for type in types:
+    for type in bests.keys():
         print(
             f'Best {type}: \n\t model_name: {bests[type]["model_name"]} \n\t layer_name: {bests[type]["layer_name"]} \n\t score: {bests[type]["score"]}'
         )

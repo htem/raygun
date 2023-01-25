@@ -5,7 +5,7 @@
         "bsub",
         "-n 12",
         "-gpu \"num=1\"",
-        "-q gpu_tesla"
+        "-q gpu_a100"
     ],
     "ndims": 3,
     "train_kwargs": {
@@ -29,78 +29,81 @@
     },
     "batch_size": 1,
     "loss_kwargs": {
-        "validation_config": {
-            "validate_every": 5000,
-            "metric_path": "$working_dir/validation_eval0_metrics.json",
-            "validation_config_path": "$working_dir/validate_eval0_config.json",
-            "prediction_config_path": "$working_dir/predict_eval0_config.json",
-            "checkpoint": null, // fill in per iteration
-            "launch_command": "bsub -n 24 -o validate.log -J validate_eval0 raygun-validate-affinities $working_dir/validate_eval0_config.json &",
-            // CATMAID project ID to pull skeleton from
-            "skeleton_config": {
-                "file": "load",
-                "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
-                "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25c20100000d01afc69b", // eval0
-                "coord_in_pix": true,
-                "coord_in_zyx": true,
-                "voxel_size_xyz": [
-                    30,
-                    30,
-                    30
-                ],
-                "interpolation": true,
-                "interpolation_steps": 10,
-                "dataset_shape": [
-                    1024,
-                    1024,
-                    1024
-                ],
-                "dataset_offset": [
-                    1441,
-                    1384,
-                    785
-                ]
-            },
-            "predict_config": {
-                "config_path": "$working_dir/train_conf.json",
-                "num_workers": 32,
-                "source_path": "$source_dirname/eval_0.n5", //same directory as training source, but eval_0.n5
-                "source_dataset": "$source_dataset", //same ds name as training source
-                "output_ds": [
-                    "pred_affs",
-                    "pred_lsds"
-                ],
-                "out_specs": {
-                    "pred_affs": {
-                        "dtype": "#np.float32#",
-                        "num_channels": 20
-                    },
-                    "pred_lsds": {
-                        "dtype": "#np.float32#",
-                        "num_channels": 10
-                    }
-                },
-                "checkpoint": null, //fill per iteration
-                "launch_command": "bsub -n 48 -gpu \"num=1\" -q gpu_t4 -o predict.log",
-                "scaleShift_input": [
-                    2,
-                    -1
-                ],
-                "input_shape": 132,
-                "output_shape": 40
-            },
-            "segment_config": {
-                "include_config": "$working_dir/train_conf.json",
-                "file": "$working_dir/eval_0.n5",
-                "aff_ds": "pred_affs",
-                "prefix": "",
-                "mutex": true,
-                "max_affinity_value": 1.0,
-                "sep": 3,
-                "mask_thresh": 0.5,
-                "save": false
-            }
-        }
+        // "validate_every": 5000,
+        // "metric_path": "$working_dir/validation_eval0_metrics.json",
+        // "validation_config_path": "$working_dir/validate_eval0_config.json",
+        // "prediction_config_path": "$working_dir/predict_eval0_config.json",
+        // "checkpoint": null, // fill in per iteration
+        // "launch_command": "bsub -n 2 -We 3:59 -o $working_dir/validate.log -J validate_eval0 raygun-validate-affinities $working_dir/validate_eval0_config.json &",
+        // // CATMAID project ID to pull skeleton from
+        // "skeleton_config": {
+        //     "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
+        //     "dataset_name": "volumes/rasterized_skeleton",
+        //     "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
+        //     "url": "http://catmaid2.hms.harvard.edu:9000/annotations/633b25c20100000d01afc69b", // eval0
+        //     "coord_in_pix": true,
+        //     "coord_in_zyx": true,
+        //     "voxel_size_xyz": [
+        //         30,
+        //         30,
+        //         30
+        //     ],
+        //     "interpolation": true,
+        //     "interpolation_steps": 100,
+        //     "dataset_shape": [
+        //         1024,
+        //         1024,
+        //         1024
+        //     ],
+        //     "dataset_offset": [
+        //         1441,
+        //         1384,
+        //         785
+        //     ],
+        //     "save_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
+        //     "save_ds": "volumes/rasterized_skeleton"
+        // },
+        // "predict_config": {
+        //     "config_path": "$working_dir/train_conf.json",
+        //     "num_workers": 12,
+        //     "source_path": "$source_dirname/eval_0.n5", //same directory as training source, but eval_0.n5
+        //     "source_dataset": "$source_dataset", //same ds name as training source
+        //     "output_ds": [
+        //         "pred_affs",
+        //         "pred_lsds"
+        //     ],
+        //     "out_specs": {
+        //         "pred_affs": {
+        //             "dtype": "#np.float32#",
+        //             "num_channels": 20
+        //         },
+        //         "pred_lsds": {
+        //             "dtype": "#np.float32#",
+        //             "num_channels": 10
+        //         }
+        //     },
+        //     "checkpoint": null, //fill per iteration
+        //     "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla",
+        //     "scaleShift_input": [
+        //         2,
+        //         -1
+        //     ],
+        //     "input_shape": 196,
+        //     "output_shape": 104
+        // },
+        // "segment_config": {
+        //     "include_config": "$working_dir/train_conf.json",
+        //     "launch_command": "bsub -n 32 -We 3:59 -o $working_dir/segment.log -J segment_eval0 raygun-validate-segmentation $working_dir/validate_eval0_config.json &",
+        //     // "launch_command": "bsub -n 14 -gpu \"num=1\" -q gpu_tesla -o segment.log -J segment_eval0 raygun-validate-segmentation $working_dir/validate_eval0_config.json &",
+        //     "file": "$working_dir/eval_0.n5",
+        //     "aff_ds": "pred_affs",
+        //     "prefix": "",
+        //     "mutex": true,
+        //     "max_affinity_value": 1.0,
+        //     "sep": 3,
+        //     "mask_thresh": 0.5,
+        //     "dest_dataset": "segment"
+        // }
     },
     "model_kwargs": {
         "unet_kwargs": {

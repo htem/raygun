@@ -1,5 +1,3 @@
-from glob import glob
-from logging import getLogger
 import os
 import sys
 import numpy as np
@@ -199,6 +197,7 @@ def mutex_segment(config_path):
     seg = compute_mws_segmentation(
         affs, neighborhood, sep, strides=[10, 10, 10], mask=mask
     )
+    logger.info("Segmented.")
 
     if "save" in seg_config.keys() and not seg_config["save"]:
         return seg
@@ -212,18 +211,23 @@ def mutex_segment(config_path):
     f[dest_dataset].attrs["offset"] = f[aff_ds].attrs["offset"]
     f[dest_dataset].attrs["resolution"] = f[aff_ds].attrs["resolution"]
 
-    view_script = os.path.join(
-        os.path.dirname(config_path),
-        f"view_{os.path.basename(file).rstrip('.n5').rstrip('.zarr')}.ng",
-    )
+    try:
+        view_script = os.path.join(
+            os.path.dirname(config_path),
+            f"view_{os.path.basename(file).rstrip('.n5').rstrip('.zarr')}.ng",
+        )
 
-    if not os.path.exists(view_script):
-        with open(view_script, "w") as f:
-            f.write(f"neuroglancer -f {file} -d {dest_dataset} ")
+        if not os.path.exists(view_script):
+            with open(view_script, "w") as f:
+                f.write(f"neuroglancer -f {file} -d {dest_dataset} ")
 
-    else:
-        with open(view_script, "a") as f:
-            f.write(f"{dest_dataset} ")
+        else:
+            with open(view_script, "a") as f:
+                f.write(f"{dest_dataset} ")
+    except:
+        logger.warning("Viewing script not written/updated.")
+
+    return seg
 
 
 def segment(config_path=None):  # TODO: Clean up
@@ -241,7 +245,7 @@ def segment(config_path=None):  # TODO: Clean up
     temp = read_config(config_path)
     seg_config.update(temp)
     if seg_config["mutex"]:
-        mutex_segment(config_path)
+        return mutex_segment(config_path)
 
     else:
         file = seg_config["file"]
@@ -263,7 +267,7 @@ def segment(config_path=None):  # TODO: Clean up
                 np.float32
             )  # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0
             logger.info("Getting segmentations...")
-            pred_segs = get_segmentation(
+            segs = get_segmentation(
                 prediction,
                 thresholds=thresholds,
                 labels_mask=labels_mask,
@@ -276,9 +280,9 @@ def segment(config_path=None):  # TODO: Clean up
                 f"view_{os.path.basename(file).rstrip('.n5').rstrip('.zarr')}.ng",
             )
             logger.info("Writing segmentations...")
-            for thresh, pred_seg in zip(thresholds, pred_segs):
+            for thresh, seg in zip(thresholds, segs):
                 dest_dataset = f'pred_seg_{"{:.2f}".format(thresh)}'
-                f[dest_dataset] = pred_seg
+                f[dest_dataset] = seg
                 f[dest_dataset].attrs["offset"] = f[aff_ds].attrs["offset"]
                 f[dest_dataset].attrs["resolution"] = f[aff_ds].attrs["resolution"]
 
@@ -289,6 +293,7 @@ def segment(config_path=None):  # TODO: Clean up
                 else:
                     with open(view_script, "a") as v:
                         v.write(f"{dest_dataset} ")
+        return segs
 
 
 # TODO: MAKE DAISY COMPATIBLE BEFORE 0.3.0

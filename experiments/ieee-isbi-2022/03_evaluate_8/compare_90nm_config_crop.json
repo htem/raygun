@@ -1,0 +1,40 @@
+{ // Should compare fake30nm to real30nm on test volume
+    "target_source": {
+        "path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5",
+        "ds": "volumes/interpolated_90nm_aligned" // "scaleShift": [1,0]
+    },
+    "test_sources": {
+        "link_seed3": {
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_8/link/seed3/training_0.n5",
+            "ds": "volumes/raw_30nm_netG2_44000" // "scaleShift": [1,0]
+        },
+        "link_seed13": {
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_8/link/seed13/training_0.n5",
+            "ds": "volumes/raw_30nm_netG2_44000" // "scaleShift": [1,0]
+        },
+        "link_seed42": {
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_8/link/seed42/training_0.n5",
+            "ds": "volumes/raw_30nm_netG2_62000" // "scaleShift": [1,0]
+        },
+        "split_seed3": {
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_8/split/seed3/training_0.n5",
+            "ds": "volumes/raw_30nm_netG2_66000" // "scaleShift": [1,0]
+        },
+        "split_seed13": {
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_8/split/seed13/training_0.n5",
+            "ds": "volumes/raw_30nm_netG2_88000" // "scaleShift": [1,0]
+        },
+        "split_seed42": {
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_8/split/seed42/training_0.n5",
+            "ds": "volumes/raw_30nm_netG2_44000" // "scaleShift": [1,0]
+        }
+    },
+    "metrics": [
+        "normalized_root_mse",
+        "peak_signal_noise_ratio",
+        "structural_similarity"
+        // 'normalized_mutual_information'
+    ],
+    "metrics_path": "$working_dir/compare_90nm_metrics.json",
+    "crop": 64
+}

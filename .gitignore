@@ -11,6 +11,7 @@
 *.zarr
 *.n5
 *.png
+*.svg
 *.pytest*
 *daisy_logs*
 *snapshots*

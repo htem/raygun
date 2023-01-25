@@ -75,9 +75,12 @@ def worker(render_config_path):
     source = daisy.open_ds(source_path, source_dataset)
 
     # Load output datsets
-    dest_path = os.path.join(
-        os.path.dirname(config_path), os.path.basename(source_path)
-    )
+    if "dest_path" in render_config.keys():
+        dest_path = render_config["dest_path"]
+    else:
+        dest_path = os.path.join(
+            os.path.dirname(config_path), os.path.basename(source_path)
+        )
 
     if output_ds is None:
         if net_name is not None:
@@ -111,7 +114,7 @@ def worker(render_config_path):
                     data += scaleShift_input[1]
 
                 outs = model(data)
-                del data
+                # del data
 
                 if not isinstance(outs, tuple):
                     outs = tuple([outs])
@@ -138,7 +141,7 @@ def worker(render_config_path):
                         logger.info(
                             f"Assuming output data for {dest_dataset} is float between 0 and 1..."
                         )
-                        out = torch.clamp(out, 0, 1)
+                        # out = torch.clamp(out, 0, 1) #TODO
 
                     if torch.cuda.is_available():
                         out = out.cpu().numpy().astype(destination.dtype)
@@ -154,12 +157,9 @@ def worker(render_config_path):
                     ):  # Add Z dimension if necessary
                         out = out[:, None, ...]
 
-                    # if len(out.shape) < 4:  # Add channel dimension if necessary
-                    #     out = out[None, ...]
-
                     destination[block.write_roi] = out
                     logger.info(f"Wrote chunk {block.block_id} to {dest_dataset}...")
-                    del out
+                    # del out
 
 
 if __name__ == "__main__":
