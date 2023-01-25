@@ -8,6 +8,12 @@ conda activate raygun
 pip install git+https://github.com/htem/raygun
 ```
 
+Should you run into gcc / boost errors when conda/pip installing raygun, try installing ```libboost``` first:
+```bash
+sudo apt-get update
+sudo apt-get install libboost-all-dev
+```
+
 # Example train:
 ```bash
 raygun-train path/to/train_config.json
