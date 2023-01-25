@@ -1,3 +1,5 @@
+[![test build](https://github.com/htem/raygun/actions/workflows/test-build.yml/badge.svg)](https://github.com/htem/raygun/actions/workflows/test-build.yml)
+
 # Install:
 Run the following -->
 ```bash
