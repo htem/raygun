@@ -1,0 +1,4 @@
+{
+    "include_config": "../train_conf.json",
+    "loss_type": "link"
+}

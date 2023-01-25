@@ -1,0 +1,10 @@
+{
+    "source_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5",
+    "source_dataset": "volumes/interpolated_90nm_aligned",
+    "net_name": "netG1",
+    "input_shape": 512,
+    "output_shape": 472,
+    "num_workers": 32,
+    "max_retries": 2,
+    "launch_command": "bsub -n 16 -gpu \"num=1\" -q gpu_a100 -o predict.log"
+}

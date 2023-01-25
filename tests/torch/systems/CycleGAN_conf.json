@@ -60,7 +60,7 @@
         "input_nc": 1,
         "output_nc": 1,
         "norm_layer": "#partial(torch.nn.InstanceNorm2d, track_running_stats=True, momentum=0.01)#",
-        // "padding_type": "valid",
+        "padding_type": "same",
         // "activation": torch.nn.SELU,//torch.nn.Tanh, //torch.nn.SiLU,//
         // "add_noise": True,
         "ngf": 64,
@@ -72,7 +72,7 @@
     },
     "pretrain_gnet": false,
 
-    "dnet_type": "classic", //"resnet",
+    "dnet_type": "patchdiscriminator", //"resnet",
     "dnet_kwargs": {
         "input_nc": 1,
         // "downsampling_kw": 2,
@@ -84,8 +84,9 @@
 
     "spawn_subprocess": true,
     "side_length": 64, // requires odd number for valid resnet9 (which gives odd output)        
-    "num_epochs": 240,
-    "freeze_norms_at": 120,
+    "num_epochs": 10,
+    "freeze_norms_at": 5,
     "random_seed": 42,
-    "log_every": 20
+    "log_every": 1,
+    "snapshot_every": 10
 }

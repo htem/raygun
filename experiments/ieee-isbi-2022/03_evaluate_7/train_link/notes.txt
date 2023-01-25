@@ -1,0 +1,1 @@
+For MTLSD networks trained on fake 90nm data produced by "linked" CycleGAN networks.

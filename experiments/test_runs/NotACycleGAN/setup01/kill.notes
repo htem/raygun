@@ -1,0 +1,3 @@
+No even semi-viable images ever emerged past the latent space, though the latent space hit perfect score for tricking the feature-space discriminator. Image space discriminator is scoring perfect against the generators though (as is to be expected). I suspect vanishing gradients is the issue. Will play around with residual blocks after everything is in place for the ISBI paper pipeline.
+
+The dog is dead. It may have a sibling though.

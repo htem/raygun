@@ -1,0 +1,15 @@
+{
+    "include_config": "../train_conf.json",
+    "sources": [
+        {
+            "path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5",
+            "labels": "volumes/GT_labels",
+            "labels_mask": "volumes/trainingMask_center600",
+            "cell_mask": "volumes/unlabeled_mask"
+        },
+        {
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_8/link/seed13/training_0.n5",
+            "raw": "volumes/raw_30nm_netG2_44000"
+        }
+    ]
+}

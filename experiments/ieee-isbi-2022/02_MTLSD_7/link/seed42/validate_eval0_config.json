@@ -1,0 +1,75 @@
+{
+   "metric_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/validation_eval0_metrics.json",
+   "validation_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/validate_eval0_config.json",
+   "prediction_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/predict_eval0_config.json",
+   "checkpoint": "100000",
+   "launch_command": "bsub -n 2 -We 3:59 -o /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/validate.log -J validate_eval0 raygun-validate-affinities /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/validate_eval0_config.json &",
+   "skeleton_config": {
+      "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
+      "dataset_name": "volumes/rasterized_skeleton",
+      "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
+      "voxel_size_xyz": [
+         30,
+         30,
+         30
+      ],
+      "dataset_shape": [
+         1024,
+         1024,
+         1024
+      ],
+      "dataset_offset": [
+         1441,
+         1384,
+         785
+      ],
+      "save_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
+      "save_ds": "volumes/rasterized_skeleton"
+   },
+   "predict_config": {
+      "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/train_conf.json",
+      "num_workers": 12,
+      "source_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed42/eval_0.n5",
+      "source_dataset": "volumes/raw_30nm_netG2_62000",
+      "output_ds": [
+         "pred_affs",
+         "pred_lsds"
+      ],
+      "out_specs": {
+         "pred_affs": {
+            "dtype": "#numpy.float32#",
+            "num_channels": 20
+         },
+         "pred_lsds": {
+            "dtype": "#numpy.float32#",
+            "num_channels": 10
+         }
+      },
+      "checkpoint": "100000",
+      "launch_command": "bsub -n 12 -gpu \"num=1\" -q gpu_tesla -o temp.out",
+      "scaleShift_input": [
+         2,
+         -1
+      ],
+      "input_shape": 196,
+      "output_shape": 104
+   },
+   "segment_config": {
+      "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/train_conf.json",
+      "launch_command": "bsub -n 32 -We 3:59 -o /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/segment.log -J segment_eval0 raygun-validate-segmentation /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/validate_eval0_config.json &",
+      "file": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/eval_0.n5",
+      "aff_ds": "pred_affs",
+      "prefix": "",
+      "mutex": true,
+      "max_affinity_value": 1.0,
+      "sep": 3,
+      "mask_thresh": 0.5,
+      "dest_dataset": "segment"
+   },
+   "crop": [
+      128,
+      128,
+      128
+   ],
+   "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/validate_eval0_config.json"
+}

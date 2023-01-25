@@ -1,0 +1,116 @@
+{
+    "framework": "torch",
+    "system": "CycleGAN",
+    "job_command": ["bsub",
+                    "-n 16",
+                    "-gpu \"num=1\"",
+                    "-q gpu_a100"
+                ],
+
+    "sources": {
+        "A":{ //TODO: Make list to allow for multiple sources
+                "path": "/nrs/funke/rhoadesj/data/XNH/CBv/CBxs_lobV_overview_90nm_rec5iter_db9_l20p15_.n5",
+                "real_name": "volumes/raw",
+                "mask_name": "volumes/training_mask",
+                "min_coefvar":  1e-02
+        },
+        "B":{
+                "path": "/nrs/funke/rhoadesj/data/XNH/CBv/CBxs_lobV_bottomp100um_30nm_rec_db9_.n5",
+                "real_name": "volumes/raw",
+                "mask_name": "volumes/volume_mask",
+                "min_coefvar":  1e-02
+        }
+    },
+    
+    "common_voxel_size": [30, 30, 30], //voxel size to cast all data into
+    "ndims": 3,
+
+    "batch_size": 7,
+    "num_workers": 16,
+    "cache_size": 96,
+    
+    "scheduler": "LambdaLR",
+    "scheduler_kwargs": {
+            "epoch_count": 0,
+            "n_epochs": 150000,
+            "n_epochs_decay": 150000
+        },
+
+    "g_optim_type": "Adam",
+    "g_optim_kwargs": {
+            "betas": [0.5, 0.999],
+            "lr": 0.00004,
+            "weight_decay": 0
+        },
+    "d_optim_type": "Adam",
+    "d_optim_kwargs": {
+            "betas": [0.95, 0.999],
+            "lr": 0.000004,
+            "weight_decay": 0.1
+        },
+
+    // "sampling_bottleneck": True,
+    // "loss_type": "link",
+    "loss_kwargs": {"g_lambda_dict": {
+                            "A": {
+                                    "l1_loss": {"cycled": 3, "identity": 0},
+                                    "gan_loss": {"fake": 1, "cycled": 0}
+                                },
+                            "B": {
+                                "l1_loss": {"cycled": 3, "identity": 0},
+                                "gan_loss": {"fake": 1, "cycled": 0}
+                                }
+                        },
+                    "d_lambda_dict": {
+                        "A": {"real": 1, "fake": 1, "cycled": 0},
+                        "B": {"real": 1, "fake": 1, "cycled": 0}
+                        }
+                    },
+
+    "gnet_type": "residualunet",
+    "gnet_kwargs": {
+        "input_nc": 1,
+        "output_nc": 1,
+        // "norm_layer": "#partial(torch.nn.InstanceNorm3d, track_running_stats=True, momentum=0.01)#",
+        "padding_type": "same",
+        // "activation": "#torch.nn.SELU#",//torch.nn.Tanh, //torch.nn.SiLU,//
+        // "add_noise": True,
+        "ngf": 16,
+        // "constant_upsample": True, // unet specific
+        "fmap_inc_factor": 4, // unet specific
+        "kernel_size_down": [
+                            [[9, 9, 9], [7, 7, 7], [5, 5, 5]],
+                            [[5, 5, 5], [3, 3, 3], [3, 3, 3]],
+                            [[3, 3, 3], [3, 3, 3], [3, 3, 3]]
+                            // [[3, 3, 3], [3, 3, 3], [3, 3, 3]]
+                            ], // unet specific
+        "kernel_size_up": [
+                            [[9, 9, 9], [7, 7, 7], [5, 5, 5]],
+                            [[5, 5, 5], [3, 3, 3], [3, 3, 3]]
+                            // [[3, 3, 3], [3, 3, 3], [3, 3, 3]]
+                            ], // unet specific
+        "num_downs": 3
+        // "residual": True, // unet specific
+        // "n_blocks": 9 // resnet specific
+        // "n_downsampling": 0
+    },
+    "pretrain_gnet": false,
+
+    "dnet_type": "patchdiscriminator", //"resnet",
+    "dnet_kwargs": {
+        "input_nc": 1,
+        // "downsampling_kw": 2,
+        // "kw": 3,
+        "n_layers": 4,
+        // "output_nc": 1,
+        "ngf": 64
+    },
+
+    "spawn_subprocess": true,
+    "side_length": 64, // requires odd number for valid resnet9 (which gives odd output)        
+    "num_epochs": 300000,
+    // "freeze_norms_at": 150000,
+    "log_every": 20,
+    "save_every": 2000,
+    "snapshot_every": 2000
+}

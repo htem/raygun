@@ -1,0 +1,37 @@
+{
+   "link_seed3": {
+      "normalized_root_mse": 0.4070499767583528,
+      "peak_signal_noise_ratio": 13.023355817477524,
+      "structural_similarity": 0.50558386994053
+   },
+   "link_seed13": {
+      "normalized_root_mse": 0.410932263263303,
+      "peak_signal_noise_ratio": 12.940905701371308,
+      "structural_similarity": 0.4924305371123494
+   },
+   "link_seed42": {
+      "normalized_root_mse": 0.406833637845444,
+      "peak_signal_noise_ratio": 13.027973421106553,
+      "structural_similarity": 0.5094365871233267
+   },
+   "real_30nm": {
+      "normalized_root_mse": 0.20138064420287916,
+      "peak_signal_noise_ratio": 19.135955987081637,
+      "structural_similarity": 0.35334042226547124
+   },
+   "split_seed3": {
+      "normalized_root_mse": 0.4275923430948426,
+      "peak_signal_noise_ratio": 12.595712109389641,
+      "structural_similarity": 0.4021388720124944
+   },
+   "split_seed13": {
+      "normalized_root_mse": 0.4141233917488965,
+      "peak_signal_noise_ratio": 12.873715256954716,
+      "structural_similarity": 0.4326791927048835
+   },
+   "split_seed42": {
+      "normalized_root_mse": 0.4177192250451344,
+      "peak_signal_noise_ratio": 12.79862123056121,
+      "structural_similarity": 0.4730341664046441
+   }
+}

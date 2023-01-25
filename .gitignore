@@ -5,7 +5,15 @@
 
 # Parts of experiments
 *.out
+*.err
 *tensorboard*
 *checkpoint*
 *.zarr
 *.n5
+*.png
+*.svg
+*.pytest*
+*daisy_logs*
+*snapshots*
+*.log
+*.ng
