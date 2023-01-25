@@ -58,11 +58,29 @@ def get_images(dataset_dict, roi):
 
 
 def show_images(
-    dataset_dict, roi, axs=None, save=False, folder_name="qualitative_figures"
+    dataset_dict,
+    roi,
+    axs=None,
+    save=False,
+    folder_name="qualitative_figures",
+    overlay_seg=None,
 ):
     # if save:
     #     filepath = os.path.join(os.getcwd(), folder_name)
     #     os.makedirs(filepath, exist_ok=True)
+    if overlay_seg is not None:
+        seg = get_image(overlay_seg["file"], overlay_seg["ds"], roi)
+        seg = seg.squeeze()
+        if len(seg.shape) >= 3 and seg.shape[0] < seg.shape[-1]:
+            seg = seg.transpose((1, 2, 0))
+            if seg.shape[-1] > 3:
+                seg = seg[..., :3]
+        seg = label2rgb(seg, bg_label=0)
+        alpha = (seg.max(-1) > 0).astype(float)
+        alpha *= 0.5
+        seg = np.concatenate((seg, alpha[..., None]), axis=2)
+    else:
+        seg = None
     images = get_images(dataset_dict, roi)
     num = len(images)
     if axs is None:
@@ -78,7 +96,9 @@ def show_images(
             image = image.transpose((1, 2, 0))
             if image.shape[-1] > 3:
                 image = image[..., :3]
-
+        images[key] = image
+        # if seg is not None:
+        #     image = label2rgb(seg, image=image, alpha=0.7, bg_label=0)
         if "segment" in key or len(image.shape) >= 3:
             # if save:
             #     plt.imsave(os.path.join(filepath, name, ".svg"), image, vmin=0, vmax=255)
@@ -97,6 +117,11 @@ def show_images(
             ax.set_title(key)
         ax.axes.xaxis.set_visible(False)
         ax.axes.yaxis.set_visible(False)
+        if seg is not None:
+            ax.imshow(seg)
+
+    return images, seg
+
     # return fig, axs
 
 
@@ -104,21 +129,34 @@ def show_images(
 num = 4
 fig, axes = plt.subplots(2, num, figsize=(5 * num, 10))
 
-roi = daisy.Roi(offset=(896, 1920, 312), shape=(512, 512, 1)) * 30
 dataset_dict = {
     "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5": {
         "Real 30nm": "volumes/raw_30nm",
         "Real 90nm": "volumes/interpolated_90nm_aligned",
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed3/training_0.n5": {
-        "Link: Fake 90nm (best)": "volumes/raw_30nm_netG2_56000"  # picked based on final test performance
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed42/training_0.n5": {
+        "Link: Fake 90nm (best)": "volumes/raw_30nm_netG2_62000"  # picked based on final test performance
     },
     "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/split/seed42/training_0.n5": {
         "Split: Fake 90nm (best)": "volumes/raw_30nm_netG2_36000"  # picked based on final test performance
     },
 }
+# file = list(dataset_dict.keys())[0]
+# ds = daisy.open_ds(file, list(dataset_dict[file].values())[0])
+# roi = daisy.Roi(offset=(896, 1920, 312), shape=(512, 512, 1)) * 30
+roi = daisy.Roi(offset=(884, 1908, 312), shape=(512, 512, 1)) * 30
+# roi = daisy.Roi(offset=(884, 1908, 340), shape=(512, 512, 1)) * 30
 
-show_images(dataset_dict, roi, axs=axes[0])
+images, seg = show_images(
+    dataset_dict,
+    roi,
+    axs=axes[0],
+    overlay_seg={
+        "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5",
+        "ds": "volumes/GT_labels",
+    },
+)
+fig
 
 #%%
 # Eval1
@@ -137,7 +175,7 @@ dataset_dict = {
     },
 }
 
-show_images(dataset_dict, roi, axs=axes[1])
+images, seg = show_images(dataset_dict, roi, axs=axes[1])
 fig.set_tight_layout(True)
 fig
 # %%
@@ -200,7 +238,7 @@ dataset_dict_list = [
         "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
             "Real 90nm\n(Trained on:\nLink-Fake 90nm)": "volumes/interpolated_90nm_aligned"
         },
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/train_link/seed3/predict_real90nm/eval_1.n5": {
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/train_link/seed42/predict_real90nm/eval_1.n5": {
             "Predicted\nLocal Shape\nDescriptors": "pred_lsds",
             "Predicted\nAffinities": "pred_affs",
             "Predicted\nSegmentation": "segment",
@@ -222,7 +260,7 @@ rows = 7
 fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 5 * rows))
 for r in range(rows):
     dataset_dict = dataset_dict_list[r]
-    show_images(dataset_dict, roi, axs=axes[r])
+    images, seg = show_images(dataset_dict, roi, axs=axes[r])
 fig.set_tight_layout(True)
 fig
 # %%
@@ -232,7 +270,7 @@ rows = 4
 fig, axes = plt.subplots(rows, cols, figsize=(5 * cols, 5 * rows))
 for c in range(cols):
     dataset_dict = dataset_dict_list[c]
-    show_images(dataset_dict, roi, axs=axes[:, c])
+    images, seg = show_images(dataset_dict, roi, axs=axes[:, c])
 fig.set_tight_layout(True)
 fig
 # %%

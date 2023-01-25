@@ -343,7 +343,7 @@ results, basename, tags = load_json_tests(paths)
 
 print(
     *[
-        f"{k}: \n\tnvi_merge={v['nvi_merge']} \t nvi_split={v['nvi_split']}\n\tVOI sum={v['voi_merge']+v['voi_split']}\n\n"
+        f"{k}: \n\tvoi_merge={v['voi_merge']} \t voi_split={v['voi_split']}\n\tVOI sum={v['voi_merge']+v['voi_split']}\n\n"
         for k, v in results.items()
     ]
 )
@@ -394,7 +394,8 @@ for c, (metric, results) in enumerate(sums.items()):
     # if c == 0:
     axes[c].set_ylabel("Sum of split and merge scores")
     # x_labels = ["train\npredict\nmean=\nmin=\nmax="]
-    x_labels = ["Train on:\nPredict on:\nBest score = "]
+    x_labels = ["Train on:\nPredict on:\nBest score = \nMean = \nWorst score = "]
+    # x_labels = ["Train on:\nPredict on:\nBest score = "]
     x = 0
     for train in trains:
         for predict in predicts:
@@ -409,10 +410,10 @@ for c, (metric, results) in enumerate(sums.items()):
                 result,
                 label=f"train-{train} | predict-{predict}",
             )
-            # x_labels.append(
-            #     f"{train}\n{predict}\n{means[metric][train, predict]:3.4f}\n{mins[metric][train, predict]:3.4f}\n{maxs[metric][train, predict]:3.4f}"
-            # )
-            x_labels.append(f"{train}\n{predict}\n{mins[metric][train, predict]:3.4f}")
+            x_labels.append(
+                f"{train}\n{predict}\n{mins[metric][train, predict]:3.4f}\n{means[metric][train, predict]:3.4f}\n{maxs[metric][train, predict]:3.4f}"
+            )
+            # x_labels.append(f"{train}\n{predict}\n{mins[metric][train, predict]:3.4f}")
             x += 1
     axes[c].set_xticks(range(x + 1))
     axes[c].set_xticklabels(x_labels)
