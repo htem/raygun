@@ -37,7 +37,7 @@ jobs:
         conda info -a
         conda create -q -n raygun python=${{ matrix.python-version }} tensorflow pytorch torchvision torchaudio cudatoolkit=11.3 affogato -c pytorch -c nvidia -c conda-forge --yes
         source activate raygun
-        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install --upgrade pip setuptools wheel Cython
         pip install git+https://github.com/htem/raygun
     - name: Lint with flake8
       run: |
