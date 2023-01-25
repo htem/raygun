@@ -71,7 +71,6 @@ def launch(launch_command):
         logger.warning(f"Execution failed: {e}")
 
 
-# @reloading
 def run_validation(config=None, iter=None):
     if config is None:  # assume used as CLI
         config = sys.argv[1]
@@ -137,11 +136,11 @@ def validate_segmentation(config=None):
 
 def pad_eval(segment_array, image, crop=None):
     if crop is not None:
-        segment_array = segment_array[crop[0] : -crop[0], crop[1] : -crop[1], crop[2] : -crop[2]]
+        segment_array = segment_array[
+            crop[0] : -crop[0], crop[1] : -crop[1], crop[2] : -crop[2]
+        ]
 
-    pad = (
-            daisy.Coordinate(np.array(image.shape) - np.array(segment_array.shape)) // 2
-        )
+    pad = daisy.Coordinate(np.array(image.shape) - np.array(segment_array.shape)) // 2
     if sum(pad) < 3:
         image = image
     else:
