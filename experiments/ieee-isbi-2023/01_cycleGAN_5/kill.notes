@@ -1,4 +1,0 @@
-No inversions, but most networks completely lost the discriminator gradients. Going to retry with residual blocks on non-residual unet (i.e. the classic).
-
-The dog won't listen.
-

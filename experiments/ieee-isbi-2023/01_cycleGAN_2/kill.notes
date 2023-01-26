@@ -1,4 +1,0 @@
-All but link42 went all gray for fake_B; link_13 went gray for fake_A; and split_13 went houndstooth. Early training (~10,000) seemed to be going well. Not sure what happened. Going to try SeLU and decaying learning rate.
-
-The dog is lost.
-

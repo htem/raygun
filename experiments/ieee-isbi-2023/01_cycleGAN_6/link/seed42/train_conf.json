@@ -1,4 +1,0 @@
-{
-    "include_config": "../train_conf.json",
-    "random_seed": 42
-}
