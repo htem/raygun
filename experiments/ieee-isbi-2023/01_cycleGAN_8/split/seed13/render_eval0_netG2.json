@@ -1,5 +1,0 @@
-{
-    "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_8/render_eval0_netG2.json",
-    "config_path": "$working_dir/train_conf.json",
-    "checkpoint": 88000
-}
