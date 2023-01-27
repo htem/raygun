@@ -1,9 +1,9 @@
 {
-   "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/split/seed13/train_conf.json",
+   "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/split/seed13/train_conf.json",
    "num_workers": 12,
    "source_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5",
    "source_dataset": "volumes/interpolated_90nm_aligned",
-   "dest_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/train_split/seed13/predict_real90nm/eval_1.n5",
+   "dest_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/train_split/seed13/predict_real90nm/eval_1.n5",
    "output_ds": [
       "pred_affs",
       "pred_lsds"

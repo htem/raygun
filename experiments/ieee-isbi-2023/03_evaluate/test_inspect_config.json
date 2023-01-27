@@ -1,11 +1,11 @@
 {
     "meta_log_dir": [
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/test_eval1_metrics.json",
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/test_eval1_metrics.json",
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/*/test_eval1_metrics.json",
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/*/*/test_eval1_metrics.json",
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/*/*/*/test_eval1_metrics.json",
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/*/*/*/*/test_eval1_metrics.json"
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/test_eval1_metrics.json",
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/test_eval1_metrics.json",
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/test_eval1_metrics.json",
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/*/test_eval1_metrics.json",
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/*/*/test_eval1_metrics.json",
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/*/*/*/test_eval1_metrics.json"
     ],
     // "tags": [
     //     "voi_merge",
