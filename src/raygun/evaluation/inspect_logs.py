@@ -80,7 +80,7 @@ def load_json_logs(paths, tags=None):
 
 
 def load_tensorboards(  # TODO: Cleanup
-    meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
+    meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/tensorboards",
     start=2000,  # TODO: ALLOW FOR UNBOUNDED
     tags=None,
 ):
@@ -115,7 +115,7 @@ def load_tensorboards(  # TODO: Cleanup
 
 
 def pick_checkpoints(
-    meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
+    meta_log_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/tensorboards",
     increment=2000,
     start=2000,  # TODO: ALLOW FOR UNBOUNDED
     final=200000,
