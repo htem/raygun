@@ -81,10 +81,10 @@ dataset_dict = {
         "Real 30nm": "volumes/raw_30nm",
         "Real 90nm": "volumes/interpolated_90nm_aligned",
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed3/training_0.n5": {
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/link/seed3/training_0.n5": {
         "Link: Fake 90nm (best)": "volumes/raw_30nm_netG2_56000"  # picked based on final test performance
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/split/seed42/training_0.n5": {
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/split/seed42/training_0.n5": {
         "Split: Fake 90nm (best)": "volumes/raw_30nm_netG2_36000"  # picked based on final test performance
     },
 }
@@ -100,10 +100,10 @@ dataset_dict = {
         "Real 30nm": "volumes/raw_30nm",
         "Real 90nm": "volumes/interpolated_90nm_aligned",
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed13/eval_1.n5": {
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/link/seed13/eval_1.n5": {
         "Link: Fake 30nm (best)": "volumes/interpolated_90nm_aligned_netG1_46000"  # picked based on final test performance
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/split/seed42/eval_1.n5": {
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/split/seed42/eval_1.n5": {
         "Split: Fake 30nm (best)": "volumes/interpolated_90nm_aligned_netG1_36000"  # picked based on final test performance
     },
 }
@@ -123,7 +123,7 @@ dataset_dict = {
     "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
         "Raw": "volumes/raw_30nm"
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/train_real/30nm/predict_real/30nm/eval_1.n5": {
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/train_real/30nm/predict_real/30nm/eval_1.n5": {
         "Predicted\nLocal Shape\nDescriptors": "pred_lsds",
         "Predicted\nAffinities": "pred_affs",
         "Predicted\nSegmentation": "segment",
@@ -138,10 +138,10 @@ dataset_dict = {
         "Real 30nm": "volumes/raw_30nm",
         "Real 90nm": "volumes/interpolated_90nm_aligned",
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed13/eval_1.n5": {
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/link/seed13/eval_1.n5": {
         "Link: Fake 30nm (best)": "volumes/interpolated_90nm_aligned_netG1_46000"  # picked based on final test performance
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/split/seed42/eval_1.n5": {
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/split/seed42/eval_1.n5": {
         "Split: Fake 30nm (best)": "volumes/interpolated_90nm_aligned_netG1_36000"  # picked based on final test performance
     },
 }

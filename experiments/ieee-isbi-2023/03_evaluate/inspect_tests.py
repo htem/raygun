@@ -76,7 +76,7 @@ def load_json_tests(paths, tags=None):
 
 
 def show_data(
-    meta_test_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/tensorboards",
+    meta_test_dir="/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/tensorboards",
     tags=None,
     smoothing=None,
     plot=True,
@@ -332,12 +332,12 @@ def plot_metric_pairs_scatters(data):
 
 #%%
 paths = [
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/test_eval1_metrics.json",
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/test_eval1_metrics.json",
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/*/test_eval1_metrics.json",
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/*/*/test_eval1_metrics.json",
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/*/*/*/test_eval1_metrics.json",
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate_7/*/*/*/*/*/test_eval1_metrics.json",
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/test_eval1_metrics.json",
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/test_eval1_metrics.json",
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/test_eval1_metrics.json",
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/*/test_eval1_metrics.json",
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/*/*/test_eval1_metrics.json",
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/*/*/*/test_eval1_metrics.json",
 ]
 results, basename, tags = load_json_tests(paths)
 

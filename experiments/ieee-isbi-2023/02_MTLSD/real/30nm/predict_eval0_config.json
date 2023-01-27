@@ -1,5 +1,5 @@
 {
-   "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/train_conf.json",
+   "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/real/30nm/train_conf.json",
    "num_workers": 12,
    "source_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
    "source_dataset": "volumes/raw_30nm",

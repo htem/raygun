@@ -1,5 +1,5 @@
 {
-    "meta_eval_dir": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/*/*/validation_eval0_metrics.json",
+    "meta_eval_dir": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/*/*/validation_eval0_metrics.json",
     "tags": [
         "voi_merge",
         "voi_split"

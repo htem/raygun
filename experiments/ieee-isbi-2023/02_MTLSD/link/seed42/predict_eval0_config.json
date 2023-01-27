@@ -1,7 +1,7 @@
 {
-   "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/link/seed42/train_conf.json",
+   "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/link/seed42/train_conf.json",
    "num_workers": 12,
-   "source_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed42/eval_0.n5",
+   "source_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/link/seed42/eval_0.n5",
    "source_dataset": "volumes/raw_30nm_netG2_62000",
    "output_ds": [
       "pred_affs",

@@ -5,15 +5,15 @@
     },
     "test_sources": {
         "link_seed3": {
-            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed3/training_0.n5",
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/link/seed3/training_0.n5",
             "ds": "volumes/raw_30nm_netG2_56000" // "scaleShift": [1,0]
         },
         "link_seed13": {
-            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed13/training_0.n5",
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/link/seed13/training_0.n5",
             "ds": "volumes/raw_30nm_netG2_46000" // "scaleShift": [1,0]
         },
         "link_seed42": {
-            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/link/seed42/training_0.n5",
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/link/seed42/training_0.n5",
             "ds": "volumes/raw_30nm_netG2_62000" // "scaleShift": [1,0]
         },
         "real_30nm": {
@@ -21,15 +21,15 @@
             "ds": "volumes/raw_30nm" // "scaleShift": [1,0]
         },
         "split_seed3": {
-            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/split/seed3/training_0.n5",
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/split/seed3/training_0.n5",
             "ds": "volumes/raw_30nm_netG2_40000" // "scaleShift": [1,0]
         },
         "split_seed13": {
-            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/split/seed13/training_0.n5",
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/split/seed13/training_0.n5",
             "ds": "volumes/raw_30nm_netG2_40000" // "scaleShift": [1,0]
         },
         "split_seed42": {
-            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN_7/split/seed42/training_0.n5",
+            "path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/split/seed42/training_0.n5",
             "ds": "volumes/raw_30nm_netG2_36000" // "scaleShift": [1,0]
         }
     },

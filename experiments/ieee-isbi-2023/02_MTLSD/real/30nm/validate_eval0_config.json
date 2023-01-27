@@ -1,9 +1,9 @@
 {
-   "metric_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/validation_eval0_metrics.json",
-   "validation_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/validate_eval0_config.json",
-   "prediction_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/predict_eval0_config.json",
+   "metric_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/real/30nm/validation_eval0_metrics.json",
+   "validation_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/real/30nm/validate_eval0_config.json",
+   "prediction_config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/real/30nm/predict_eval0_config.json",
    "checkpoint": "100000",
-   "launch_command": "bsub -n 2 -We 3:59 -o /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/validate.log -J validate_eval0 raygun-validate-affinities /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/validate_eval0_config.json &",
+   "launch_command": "bsub -n 2 -We 3:59 -o /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/real/30nm/validate.log -J validate_eval0 raygun-validate-affinities /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/real/30nm/validate_eval0_config.json &",
    "skeleton_config": {
       "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
       "dataset_name": "volumes/rasterized_skeleton",
@@ -27,7 +27,7 @@
       "save_ds": "volumes/rasterized_skeleton"
    },
    "predict_config": {
-      "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/train_conf.json",
+      "config_path": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/real/30nm/train_conf.json",
       "num_workers": 12,
       "source_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
       "source_dataset": "volumes/raw_30nm",
@@ -55,9 +55,9 @@
       "output_shape": 104
    },
    "segment_config": {
-      "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/train_conf.json",
-      "launch_command": "bsub -n 32 -We 3:59 -o /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/segment.log -J segment_eval0 raygun-validate-segmentation /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/validate_eval0_config.json &",
-      "file": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/real/30nm/eval_0.n5",
+      "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/real/30nm/train_conf.json",
+      "launch_command": "bsub -n 32 -We 3:59 -o /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/real/30nm/segment.log -J segment_eval0 raygun-validate-segmentation /nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/real/30nm/validate_eval0_config.json &",
+      "file": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/real/30nm/eval_0.n5",
       "aff_ds": "pred_affs",
       "prefix": "",
       "mutex": true,
@@ -71,5 +71,5 @@
       128,
       128
    ],
-   "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD_7/validate_eval0_config.json"
+   "include_config": "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/02_MTLSD/validate_eval0_config.json"
 }
