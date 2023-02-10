@@ -50,7 +50,8 @@ def test_stats(raw_dict, stat=kstest):
             (len(stats[metric]["keys"]), len(stats[metric]["keys"]))
         )
         for i in range(len(stats[metric]["keys"])):
-            for j in range(i + 1, len(stats[metric]["keys"])):
+            # for j in range(i + 1, len(stats[metric]["keys"])):
+            for j in range(i, len(stats[metric]["keys"])):
                 result = np.array(results[stats[metric]["keys"][i]])
                 result2 = np.array(results[stats[metric]["keys"][j]])
                 stats[metric]["p_merge"][i, j] = stat(result[:, 1], result2[:, 1])[1]
