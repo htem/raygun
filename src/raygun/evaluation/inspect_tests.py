@@ -1,33 +1,102 @@
 #%%
 from collections import defaultdict
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from raygun import read_config
 from glob import glob
 import os
 import sys
+from scipy.stats import (
+    variation,
+    kstest,
+    ks_2samp,
+    anderson,
+    wilcoxon,
+    mannwhitneyu,
+    epps_singleton_2samp,
+)
 
 from raygun.utils import load_json_file, to_json
-import matplotlib
 
-# switch to svg backend
-matplotlib.use("svg")
-# update latex preamble
-plt.rcParams.update(
-    {
-        "svg.fonttype": "path",
-        "font.family": "sans-serif",
-        "font.sans-serif": "AvenirNextLTPro",  # ["Avenir", "AvenirNextLTPro", "Avenir Next LT Pro", "AvenirNextLTPro-Regular", 'UniversLTStd-Light', 'Verdana', 'Helvetica']
-        "path.simplify": True,
-        # "text.usetex": True,
-        # "pgf.rcfonts": False,
-        # "pgf.texsystem": 'pdflatex', # default is xetex
-        # "pgf.preamble": [
-        #      r"\usepackage[T1]{fontenc}",
-        #      r"\usepackage{mathpazo}"
-        #      ]
-    }
-)
+# # switch to svg backend
+# matplotlib.use("svg")
+# # update latex preamble
+# plt.rcParams.update(
+#     {
+#         "svg.fonttype": "path",
+#         "font.family": "sans-serif",
+#         # "font.sans-serif": "AvenirNextLTPro",  # ["Avenir", "AvenirNextLTPro", "Avenir Next LT Pro", "AvenirNextLTPro-Regular", 'UniversLTStd-Light', 'Verdana', 'Helvetica']
+#         "path.simplify": True,
+#         # "text.usetex": True,
+#         # "pgf.rcfonts": False,
+#         # "pgf.texsystem": 'pdflatex', # default is xetex
+#         # "pgf.preamble": [
+#         #      r"\usepackage[T1]{fontenc}",
+#         #      r"\usepackage{mathpazo}"
+#         #      ]
+#     }
+# )
+
+
+def test_stats(raw_dict, stat=kstest):
+    stats = {}
+    for metric, results in raw_dict.items():
+        stats[metric] = {"keys": list(results.keys())}
+        stats[metric]["p_merge"] = np.ones(
+            (len(stats[metric]["keys"]), len(stats[metric]["keys"]))
+        )
+        stats[metric]["p_split"] = np.ones(
+            (len(stats[metric]["keys"]), len(stats[metric]["keys"]))
+        )
+        for i in range(len(stats[metric]["keys"])):
+            for j in range(i + 1, len(stats[metric]["keys"])):
+                result = np.array(results[stats[metric]["keys"][i]])
+                result2 = np.array(results[stats[metric]["keys"][j]])
+                stats[metric]["p_merge"][i, j] = stat(result[:, 1], result2[:, 1])[1]
+                stats[metric]["p_split"][i, j] = stat(result[:, 0], result2[:, 0])[1]
+                stats[metric]["p_merge"][j, i] = stats[metric]["p_merge"][i, j]
+                stats[metric]["p_split"][j, i] = stats[metric]["p_split"][i, j]
+    return stats
+
+
+def plot_stats(stats, size=5):
+    fig, axes = plt.subplots(
+        len(stats.keys()), 2, figsize=(2 * size, len(stats.keys()) * size)
+    )
+    for ax, (metric, data) in zip(axes, stats.items()):
+        p_merge = data["p_merge"]
+        p_split = data["p_split"]
+        keys = data["keys"]
+        ax[0].imshow(p_merge, cmap="hot", interpolation="nearest")
+        ax[0].set_xticks(np.arange(len(keys)))
+        ax[0].set_yticks(np.arange(len(keys)))
+        ax[0].set_xticklabels(["\n".join(k) for k in keys], rotation=90)
+        ax[0].set_yticklabels(["\n".join(k) for k in keys])
+        ax[0].set_title(f"{metric} merge")
+        ax[0].set_xlabel("Train on:\nPredict on:")
+        ax[0].set_ylabel("Train on:\nPredict on:")
+        for i in range(len(keys)):
+            for j in range(len(keys)):
+                ax[0].text(
+                    j, i, f"{p_merge[i, j]:.2f}", ha="center", va="center", color="w"
+                )
+        ax[1].imshow(p_split, cmap="hot", interpolation="nearest")
+        ax[1].set_xticks(np.arange(len(keys)))
+        ax[1].set_yticks(np.arange(len(keys)))
+        ax[1].set_xticklabels(["\n".join(k) for k in keys], rotation=90)
+        ax[1].set_yticklabels(["\n".join(k) for k in keys])
+        ax[1].set_title(f"{metric} split")
+        ax[1].set_xlabel("Train on:\nPredict on:")
+        ax[1].set_ylabel("Train on:\nPredict on:")
+        for i in range(len(keys)):
+            for j in range(len(keys)):
+                ax[1].text(
+                    j, i, f"{p_split[i, j]:.2f}", ha="center", va="center", color="w"
+                )
+    fig.tight_layout()
+    fig.show()
+    return fig
 
 
 def convert_json_test(path: str, tags=None):
@@ -330,93 +399,6 @@ def plot_metric_pairs_scatters(data):
     return fig
 
 
-#%%
-paths = [
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/test_eval1_metrics.json",
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/test_eval1_metrics.json",
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/test_eval1_metrics.json",
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/*/test_eval1_metrics.json",
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/*/*/test_eval1_metrics.json",
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/*/*/*/*/*/test_eval1_metrics.json",
-]
-results, basename, tags = load_json_tests(paths)
-
-print(
-    *[
-        f"{k}: \n\tnvi_merge={v['nvi_merge']} \t nvi_split={v['nvi_split']}\n\tVOI sum={v['voi_merge']+v['voi_split']}\n\n"
-        for k, v in results.items()
-    ]
-)
-
-raw_dict, sums, means, mins, maxs = make_data_dict(results)
-
-#%%
-fig, axes = plt.subplots(len(sums), 1, figsize=(7, 15))
-for c, (metric, results) in enumerate(sums.items()):
-    axes[c].set_title(metric)
-    # if c == 0:
-    axes[c].set_ylabel("Sum of split and merge scores")
-    # x_labels = ["train\npredict\nmean=\nmin=\nmax="]
-    x_labels = ["Train on:\nPredict on:\nBest score = "]
-    for x, ((train, predict), result) in enumerate(results.items()):
-        means[metric][train, predict] = np.mean(result)
-        maxs[metric][train, predict] = np.max(result)
-        mins[metric][train, predict] = np.min(result)
-        axes[c].scatter(
-            np.ones_like(result) * x + 1,
-            result,
-            label=f"train-{train} | predict-{predict}",
-        )
-        # x_labels.append(
-        #     f"{train}\n{predict}\n{means[metric][train, predict]:3.4f}\n{mins[metric][train, predict]:3.4f}\n{maxs[metric][train, predict]:3.4f}"
-        # )
-        x_labels.append(f"{train}\n{predict}\n{mins[metric][train, predict]:3.4f}")
-    axes[c].set_xticks(range(x + 2))
-    axes[c].set_xticklabels(x_labels)
-fig.tight_layout()
-
-#%%
-trains = [
-    "real30nm",
-    "real90nm",
-    "link",
-    "split",
-]  # set([keys[0] for keys in list(sums.values())[0].keys()])
-predicts = [
-    "real30nm",
-    "link",
-    "split",
-    "real90nm",
-]  # set([keys[1] for keys in list(sums.values())[0].keys()])
-fig, axes = plt.subplots(len(sums), 1, figsize=(7, 15))
-for c, (metric, results) in enumerate(sums.items()):
-    axes[c].set_title(metric)
-    # if c == 0:
-    axes[c].set_ylabel("Sum of split and merge scores")
-    # x_labels = ["train\npredict\nmean=\nmin=\nmax="]
-    x_labels = ["Train on:\nPredict on:\nBest score = "]
-    x = 0
-    for train in trains:
-        for predict in predicts:
-            if (train, predict) not in results.keys():
-                continue
-            result = results[train, predict]
-            means[metric][train, predict] = np.mean(result)
-            maxs[metric][train, predict] = np.max(result)
-            mins[metric][train, predict] = np.min(result)
-            axes[c].scatter(
-                np.ones_like(result) * x + 1,
-                result,
-                label=f"train-{train} | predict-{predict}",
-            )
-            # x_labels.append(
-            #     f"{train}\n{predict}\n{means[metric][train, predict]:3.4f}\n{mins[metric][train, predict]:3.4f}\n{maxs[metric][train, predict]:3.4f}"
-            # )
-            x_labels.append(f"{train}\n{predict}\n{mins[metric][train, predict]:3.4f}")
-            x += 1
-    axes[c].set_xticks(range(x + 1))
-    axes[c].set_xticklabels(x_labels)
-fig.tight_layout()
 # %%
 if __name__ == "__main__":
     config_path = sys.argv[1]
