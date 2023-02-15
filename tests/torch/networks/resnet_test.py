@@ -1,4 +1,5 @@
 import torch
+import unittest
 from unittest import TestCase
 from raygun.torch.networks.ResNet import *
 
