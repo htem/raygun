@@ -37,6 +37,35 @@ class TestNLayerDiscriminator2D(unittest.TestCase):
         self.assertLessEqual(fov, expected_fov + 40)
 
 
+class TestNLayerDiscriminator3D(unittest.TestCase):
+
+    def test_output_shape(self):
+        # Test the output shape of the discriminator
+        batch_size = 2
+        input_nc = 1
+        input_size = (32, 32, 32)
+        x = torch.randn(batch_size, input_nc, *input_size)
+        net = NLayerDiscriminator3D(input_nc=input_nc)
+        output = net(x)
+        self.assertEqual(output.shape, (batch_size, 1, 2, 2, 2))
+
+    def test_forward(self):
+        # Test the forward pass of the discriminator
+        batch_size = 2
+        input_nc = 1
+        input_size = (32, 32, 32)
+        x = torch.randn(batch_size, input_nc, *input_size)
+        net = NLayerDiscriminator3D(input_nc=input_nc)
+        output = net(x)
+        self.assertIsInstance(output, torch.Tensor)
+
+    def test_parameter_count(self):
+        # Test the number of parameters in the discriminator
+        net = NLayerDiscriminator3D()
+        num_params = sum(p.numel() for p in net.parameters())
+        self.assertEqual(num_params, 11048769)
+
+
 class TestNLayerDiscriminator(unittest.TestCase):
     def test_init_2d(self):
         discriminator = NLayerDiscriminator(ndims=2, input_nc=3, ngf=64, n_layers=3)
