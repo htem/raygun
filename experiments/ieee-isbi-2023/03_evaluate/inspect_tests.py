@@ -116,3 +116,164 @@ for c, (metric, results) in enumerate(sums.items()):
     axes[c].set_xticklabels(x_labels)
 fig.tight_layout()
 fig
+
+#%%
+# BOXPLOTS WITH DATAFRAMES/SEABORN
+import pandas as pd
+import seaborn as sns
+
+# trains = [
+#     "link",
+#     "split",
+#     "real30nm",
+#     # "real90nm",
+# ]  # set([keys[0] for keys in list(sums.values())[0].keys()])
+# predicts = [
+#     # "real30nm",
+#     "link",
+#     "split",
+#     "real90nm",
+# ]  # set([keys[1] for keys in list(sums.values())[0].keys()])
+
+
+def get_df(sums, pairs, metric="voi"):
+    df = pd.DataFrame()
+    results = sums[metric]
+    # for train in trains:
+    #     for predict in predicts:
+    for train, predict in pairs:
+        if (train, predict) not in results.keys():
+            # print("nah")
+            continue
+        for result in results[train, predict]:
+            df = pd.concat(
+                [
+                    df,
+                    pd.DataFrame(
+                        result, columns=[metric], index=[f"{train}-->{predict}"]
+                    ),
+                ],
+                axis=0,
+            )
+    return df
+
+
+def box_plots(
+    pairs,
+    baselines,
+    sums=sums,
+    metric_names={
+        "voi": "Variation of information",
+        "rand": "Rand index",
+        "nvi": "Normalized variation of information",
+    },
+):
+    fig, axes = plt.subplots(len(sums), 1, figsize=(7, 15))
+    for c, (metric, results) in enumerate(sums.items()):
+        if metric not in metric_names.keys():
+            continue
+
+        df = get_df(sums, pairs.values(), metric)
+        sns.boxplot(
+            ax=axes[c],
+            data=df,
+            x=df.index,
+            y=metric,
+        )
+
+        axes[c].set_title(metric_names[metric])
+        axes[c].set_ylabel("Segmentation Errors")
+        x_labels = []
+        x = 0
+        for name, (train, predict) in pairs.items():
+            if (train, predict) not in results.keys():
+                continue
+            x_labels.append(name)
+            x += 1
+        axes[c].set_xticks(range(x))
+        axes[c].set_xticklabels(x_labels)
+        for name, (baseline, style) in baselines.items():
+            axes[c].plot(
+                range(-1, x + 1), [means[metric][baseline]] * (x + 2), style, label=name
+            )
+        axes[c].set_xlim(-0.5, x - 0.5)
+        axes[c].legend()
+    fig.tight_layout()
+
+    return fig
+
+
+# %%
+pairs = {
+    "Link:\nEnhanced": ("real30nm", "link"),
+    "Link:\nNative": ("link", "real90nm"),
+    "Split:\nEnhanced": ("real30nm", "split"),
+    "Split:\nNative": ("split", "real90nm"),
+}
+
+baselines = {
+    "Naive": (("real30nm", "real90nm"), "r--"),
+    "Paired": (("real90nm", "real90nm"), "g--"),
+}
+
+fig = box_plots(pairs, baselines)
+fig.savefig("boxplots_compare_all.png", dpi=300)
+
+# %%
+
+pairs = {
+    # "Link:\nEnhanced": ("real30nm", "link"),
+    # "Link:\nNative": ("link", "real90nm"),
+    "Enhanced": ("real30nm", "split"),
+    "Native": ("split", "real90nm"),
+}
+
+baselines = {
+    "Naive": (("real30nm", "real90nm"), "r--"),
+    "Paired": (("real90nm", "real90nm"), "g--"),
+}
+
+fig = box_plots(pairs, baselines)
+fig.savefig("boxplots_compare_split_poster.png", dpi=300)
+# %%
+
+pairs = {
+    "Enhanced": ("real30nm", "split"),
+    "Native": ("split", "real90nm"),
+}
+
+baselines = {
+    "Naive": (("real30nm", "real90nm"), "r--"),
+}
+
+fig = box_plots(pairs, baselines)
+fig.savefig("boxplots_compare_split.png", dpi=300)
+# %%
+
+pairs = {
+    "Enhanced": ("real30nm", "link"),
+    "Native": ("link", "real90nm"),
+}
+
+baselines = {
+    "Naive": (("real30nm", "real90nm"), "r--"),
+    "Paired": (("real90nm", "real90nm"), "g--"),
+}
+
+fig = box_plots(pairs, baselines)
+fig.savefig("boxplots_compare_link_poster.png", dpi=300)
+# %%
+
+pairs = {
+    "Enhanced": ("real30nm", "link"),
+    "Native": ("link", "real90nm"),
+}
+
+baselines = {
+    "Naive": (("real30nm", "real90nm"), "r--"),
+}
+
+fig = box_plots(pairs, baselines)
+fig.savefig("boxplots_compare_link.png", dpi=300)
+
+# %%

@@ -1,6 +1,13 @@
 [![test build](https://github.com/htem/raygun/actions/workflows/test-build.yml/badge.svg)](https://github.com/htem/raygun/actions/workflows/test-build.yml)
 
-# Install:
+
+# Raygun
+The goal of this repository is to provide an extendable toolbox for large-scale experimentation with deep learning techniques for image enhancement and segmentation of N-dimensional biological imaging data. It is designed to support high-performance computing clusters and utilize GPU-acceleration.
+
+
+
+
+## Install:
 Run the following -->
 ```bash
 conda create -n raygun python=3.9 tensorflow pytorch torchvision torchaudio cudatoolkit=11.3 affogato -c pytorch -c nvidia -c conda-forge 
@@ -14,7 +21,7 @@ sudo apt-get update
 sudo apt-get install libboost-all-dev
 ```
 
-# Example train:
+## Example train:
 ```bash
 raygun-train path/to/train_config.json
 ```
