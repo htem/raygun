@@ -30,6 +30,7 @@ plt.rcParams.update(
         #      r"\usepackage[T1]{fontenc}",
         #      r"\usepackage{mathpazo}"
         #      ]
+        # "font.size": 20,
     }
 )
 
@@ -134,10 +135,10 @@ dataset_dict = {
         "Real 30nm": "volumes/raw_30nm",
         "Real 90nm": "volumes/interpolated_90nm_aligned",
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/link/seed42/training_0.n5": {
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/01_cycleGAN/link/seed42/training_0.n5": {
         "Link: Fake 90nm (best)": "volumes/raw_30nm_netG2_62000"  # picked based on final test performance
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/split/seed42/training_0.n5": {
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/01_cycleGAN/split/seed42/training_0.n5": {
         "Split: Fake 90nm (best)": "volumes/raw_30nm_netG2_36000"  # picked based on final test performance
     },
 }
@@ -167,10 +168,10 @@ dataset_dict = {
         "Real 30nm": "volumes/raw_30nm",
         "Real 90nm": "volumes/interpolated_90nm_aligned",
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/link/seed13/eval_1.n5": {
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/01_cycleGAN/link/seed13/eval_1.n5": {
         "Link: Fake 30nm (best)": "volumes/interpolated_90nm_aligned_netG1_46000"  # picked based on final test performance
     },
-    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/split/seed42/eval_1.n5": {
+    "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/01_cycleGAN/split/seed42/eval_1.n5": {
         "Split: Fake 30nm (best)": "volumes/interpolated_90nm_aligned_netG1_36000"  # picked based on final test performance
     },
 }
@@ -188,27 +189,27 @@ dataset_dict_list = [
         "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
             "Real 30nm": "volumes/raw_30nm"
         },
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/train_real/30nm/predict_real/30nm/eval_1.n5": {
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_real/30nm/predict_real/30nm/eval_1.n5": {
             "Predicted\nLocal Shape\nDescriptors": "pred_lsds",
             "Predicted\nAffinities": "pred_affs",
             "Predicted\nSegmentation": "segment",
         },
     },
     {  # Train on Real 30nm, Predict on Link-Fake 30nm
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/link/seed13/eval_1.n5": {
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/01_cycleGAN/link/seed13/eval_1.n5": {
             "Link: Fake 30nm (best)": "volumes/interpolated_90nm_aligned_netG1_46000"
         },
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/train_real/30nm/predict_link/seed13/eval_1.n5": {
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_real/30nm/predict_link/seed13/eval_1.n5": {
             "Predicted\nLocal Shape\nDescriptors": "pred_lsds",
             "Predicted\nAffinities": "pred_affs",
             "Predicted\nSegmentation": "segment",
         },
     },
     {  # Train on Real 30nm, Predict on Split-Fake 30nm
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/01_cycleGAN/split/seed42/eval_1.n5": {
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/01_cycleGAN/split/seed42/eval_1.n5": {
             "Split: Fake 30nm (best)": "volumes/interpolated_90nm_aligned_netG1_36000"
         },
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/train_real/30nm/predict_split/seed42/eval_1.n5": {
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_real/30nm/predict_split/seed42/eval_1.n5": {
             "Predicted\nLocal Shape\nDescriptors": "pred_lsds",
             "Predicted\nAffinities": "pred_affs",
             "Predicted\nSegmentation": "segment",
@@ -218,7 +219,7 @@ dataset_dict_list = [
         "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
             "Real 90nm\n(Trained on:\nreal 30nm)": "volumes/interpolated_90nm_aligned"
         },
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/train_real/30nm/predict_real/90nm/eval_1.n5": {
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_real/30nm/predict_real/90nm/eval_1.n5": {
             "Predicted\nLocal Shape\nDescriptors": "pred_lsds",
             "Predicted\nAffinities": "pred_affs",
             "Predicted\nSegmentation": "segment",
@@ -228,7 +229,7 @@ dataset_dict_list = [
         "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
             "Real 90nm\n(Trained on:\nreal 90nm)": "volumes/interpolated_90nm_aligned"
         },
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/train_real/90nm/predict_real90nm/eval_1.n5": {
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_real/90nm/predict_real90nm/eval_1.n5": {
             "Predicted\nLocal Shape\nDescriptors": "pred_lsds",
             "Predicted\nAffinities": "pred_affs",
             "Predicted\nSegmentation": "segment",
@@ -238,7 +239,7 @@ dataset_dict_list = [
         "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
             "Real 90nm\n(Trained on:\nLink-Fake 90nm)": "volumes/interpolated_90nm_aligned"
         },
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/train_link/seed42/predict_real90nm/eval_1.n5": {
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_link/seed42/predict_real90nm/eval_1.n5": {
             "Predicted\nLocal Shape\nDescriptors": "pred_lsds",
             "Predicted\nAffinities": "pred_affs",
             "Predicted\nSegmentation": "segment",
@@ -248,7 +249,7 @@ dataset_dict_list = [
         "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
             "Real 90nm\n(Trained on:\nSplit-Fake 90nm)": "volumes/interpolated_90nm_aligned"
         },
-        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2022/03_evaluate/train_split/seed42/predict_real90nm/eval_1.n5": {
+        "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_split/seed42/predict_real90nm/eval_1.n5": {
             "Predicted\nLocal Shape\nDescriptors": "pred_lsds",
             "Predicted\nAffinities": "pred_affs",
             "Predicted\nSegmentation": "segment",

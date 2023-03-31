@@ -1,25 +1,34 @@
 # %%
 from raygun.evaluation.inspect_tests import *
 
-# switch to svg backend
-# matplotlib.use("svg")
-# update latex preamble
-# plt.rcParams.update(
-#     {
-#         "svg.fonttype": "path",
-#         # "font.family": "sans-serif",
-#         # "font.sans-serif": "AvenirNextLTPro",  # ["Avenir", "AvenirNextLTPro", "Avenir Next LT Pro", "AvenirNextLTPro-Regular", 'UniversLTStd-Light', 'Verdana', 'Helvetica']
-#         "path.simplify": True,
-#         # "text.usetex": True,
-#         # "pgf.rcfonts": False,
-#         # "pgf.texsystem": 'pdflatex', # default is xetex
-#         # "pgf.preamble": [
-#         #      r"\usepackage[T1]{fontenc}",
-#         #      r"\usepackage{mathpazo}"
-#         #      ]
-#     }
-# )
 
+# switch to svg backend
+matplotlib.use("svg")
+# update latex preamble
+plt.rcParams.update(
+    {
+        "svg.fonttype": "path",
+        # "font.family": "sans-serif",
+        # "font.sans-serif": [
+        #     "Avenir",
+        #     "AvenirNextLTPro",
+        #     "Avenir Next LT Pro",
+        #     "AvenirNextLTPro-Regular",
+        #     "UniversLTStd-Light",
+        #     "Verdana",
+        #     "Helvetica",
+        # ],
+        "path.simplify": True,
+        # "text.usetex": True,
+        # "pgf.rcfonts": False,
+        # "pgf.texsystem": 'pdflatex', # default is xetex
+        # "pgf.preamble": [
+        #      r"\usepackage[T1]{fontenc}",
+        #      r"\usepackage{mathpazo}"
+        #      ]
+        "font.size": 14,
+    }
+)
 # %%
 paths = [
     "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/test_eval1_metrics.json",
@@ -122,19 +131,6 @@ fig
 import pandas as pd
 import seaborn as sns
 
-# trains = [
-#     "link",
-#     "split",
-#     "real30nm",
-#     # "real90nm",
-# ]  # set([keys[0] for keys in list(sums.values())[0].keys()])
-# predicts = [
-#     # "real30nm",
-#     "link",
-#     "split",
-#     "real90nm",
-# ]  # set([keys[1] for keys in list(sums.values())[0].keys()])
-
 
 def get_df(sums, pairs, metric="voi"):
     df = pd.DataFrame()
@@ -175,6 +171,7 @@ def box_plots(
 
         df = get_df(sums, pairs.values(), metric)
         sns.boxplot(
+            # sns.violinplot(
             ax=axes[c],
             data=df,
             x=df.index,
@@ -196,8 +193,9 @@ def box_plots(
             axes[c].plot(
                 range(-1, x + 1), [means[metric][baseline]] * (x + 2), style, label=name
             )
+            axes[c].text(x - 0.45, means[metric][baseline], name, color=style[0])
         axes[c].set_xlim(-0.5, x - 0.5)
-        axes[c].legend()
+        # axes[c].legend()
     fig.tight_layout()
 
     return fig
@@ -212,13 +210,14 @@ pairs = {
 }
 
 baselines = {
-    "Naive": (("real30nm", "real90nm"), "r--"),
+    "Naïve": (("real30nm", "real90nm"), "r--"),
     "Paired": (("real90nm", "real90nm"), "g--"),
 }
 
 fig = box_plots(pairs, baselines)
-fig.savefig("boxplots_compare_all.png", dpi=300)
-
+# fig.savefig("boxplots_compare_all.png", dpi=300)
+# fig.savefig("boxplots_compare_all.svg", dpi=300)
+fig
 # %%
 
 pairs = {
@@ -229,7 +228,7 @@ pairs = {
 }
 
 baselines = {
-    "Naive": (("real30nm", "real90nm"), "r--"),
+    "Naïve": (("real30nm", "real90nm"), "r--"),
     "Paired": (("real90nm", "real90nm"), "g--"),
 }
 
@@ -243,11 +242,14 @@ pairs = {
 }
 
 baselines = {
-    "Naive": (("real30nm", "real90nm"), "r--"),
+    "Naïve": (("real30nm", "real90nm"), "r--"),
 }
 
 fig = box_plots(pairs, baselines)
-fig.savefig("boxplots_compare_split.png", dpi=300)
+# fig.savefig("boxplots_compare_split.png", dpi=300)
+fig.savefig("boxplots_compare_split.svg", dpi=300)
+fig
+
 # %%
 
 pairs = {
@@ -256,7 +258,7 @@ pairs = {
 }
 
 baselines = {
-    "Naive": (("real30nm", "real90nm"), "r--"),
+    "Naïve": (("real30nm", "real90nm"), "r--"),
     "Paired": (("real90nm", "real90nm"), "g--"),
 }
 
@@ -270,10 +272,11 @@ pairs = {
 }
 
 baselines = {
-    "Naive": (("real30nm", "real90nm"), "r--"),
+    "Naïve": (("real30nm", "real90nm"), "r--"),
 }
 
 fig = box_plots(pairs, baselines)
-fig.savefig("boxplots_compare_link.png", dpi=300)
-
+# fig.savefig("boxplots_compare_link.png", dpi=300)
+fig.savefig("boxplots_compare_link.svg", dpi=300)
+fig
 # %%
