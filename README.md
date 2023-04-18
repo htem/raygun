@@ -3,8 +3,8 @@
 
 # Raygun
 The goal of this repository is to provide an extendable toolbox for large-scale experimentation with deep learning techniques for image enhancement and segmentation of N-dimensional biological imaging data. It is designed to support high-performance computing clusters and utilize GPU-acceleration.
-Training datasets, as well as model checkpoints used in the paper will be made accessible soon!
 
+Training datasets, as well as model checkpoints used in the paper will be made accessible soon!
 
 
 ## Install:
