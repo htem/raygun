@@ -4,21 +4,80 @@ from raygun.utils import passing_locals
 
 import logging
 
-logger = logging.Logger(__name__, "INFO")
+logger: logging.Logger = logging.Logger(__name__, "INFO")
 
 
 class LinkCycleLoss(BaseCompetentLoss):
-    """CycleGAN loss function"""
+    """Linked CycleGAN loss function, implemented in PyTorch.
 
+    Args:
+        netD1 (``nn.Module``): 
+            A discriminator module that differentiates between fake and real ``B``s.
+
+        netG1 (``nn.Module``): 
+            A generator module that turns ``A``s into ``B``s.
+
+        netD2 (``nn.Module``): 
+            A discriminator module that differentiates between fake and real ``A``s.
+
+        netG2 (``nn.Module``): 
+            A generator module that turns ``B``s into ``A``s.
+
+        optimizer_G (``optim.Optimizer``): 
+            An instance of PyTorch optimizer to optimize the generator modules.
+
+        optimizer_D (``optim.Optimizer``): 
+            An instance of PyTorch optimizer to optimize the discriminator modules.
+
+        dims (``int``): 
+            Number of dimensions of image tensor, typically ``2`` for grayscale and ``3`` for RGB.
+
+        l1_loss (``callable``, optional):
+            A callable loss function. Default is ``torch.nn.SmoothL1Loss()``.
+
+        g_lambda_dict (``dict``, optional):
+            A dictionary with keys ``A`` and ``B``, each with a dictionary of keys ``l1_loss`` and ``gan_loss``. 
+            The value of ``l1_loss`` is itself a dictionary with keys ``cycled`` and ``identity``, and the value 
+            of ``gan_loss`` is a dictionary with keys ``fake`` and ``cycled``. The values of these keys correspond 
+            to the weights for the corresponding losses. Default is as follows:
+            ```
+            {
+                "A": {
+                    "l1_loss": {"cycled": 10, "identity": 0},
+                    "gan_loss": {"fake": 1, "cycled": 0},
+                },
+                "B": {
+                    "l1_loss": {"cycled": 10, "identity": 0},
+                    "gan_loss": {"fake": 1, "cycled": 0},
+                },
+            }
+            ```
+
+        d_lambda_dict (``dict``, optional):
+            A dictionary with keys ``A`` and ``B``, each with a dictionary of keys ``real``, ``fake``, and ``cycled``. 
+            The values of these keys correspond to the weights for the corresponding losses. Default is as follows:
+            ```
+            {
+                "A": {"real": 1, "fake": 1, "cycled": 0},
+                "B": {"real": 1, "fake": 1, "cycled": 0},
+            }
+            ```
+
+        gan_mode (``str``, optional):
+            The type of GAN loss to use. Options are ``lsgan`` and ``wgangp``. Default is ``lsgan``.
+
+        **kwargs:
+            Optional keyword arguments.
+    """
     def __init__(
         self,
-        netD1,  # differentiates between fake and real Bs
-        netG1,  # turns As into Bs
-        netD2,  # differentiates between fake and real As
-        netG2,  # turns Bs into As
-        optimizer_G,
-        optimizer_D,
-        dims,
+        netD1:torch.nn.Module,  # differentiates between fake and real Bs
+        netG1:torch.nn.Module,  # turns As into Bs
+        netD2:torch.nn.Module,  # differentiates between fake and real As
+        netG2:torch.nn.Module,  # turns Bs into As
+        optimizer_G:torch.optim.Optimizer,
+        optimizer_D:torch.optim.Optimizer,
+        dims:int,
         l1_loss=torch.nn.SmoothL1Loss(),
         g_lambda_dict={
             "A": {
@@ -36,13 +95,13 @@ class LinkCycleLoss(BaseCompetentLoss):
         },
         gan_mode="lsgan",
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**passing_locals(locals()))
-        self.data_dict = {}
+        self.data_dict:dict = {}
 
-    def backward_D(self, side, dnet, data_dict):
+    def backward_D(self, side, dnet, data_dict) -> float:
         """Calculate losses for a discriminator"""
-        loss = 0
+        loss:float = 0.
         for key, lambda_ in self.d_lambda_dict[side].items():
             if lambda_ != 0:
                 # if key == 'identity': # TODO: ADD IDENTITY SUPPORT
@@ -58,7 +117,7 @@ class LinkCycleLoss(BaseCompetentLoss):
         loss.backward()
         return loss
 
-    def backward_Ds(self, data_dict, n_loop=5):
+    def backward_Ds(self, data_dict, n_loop=5) -> tuple:
         self.set_requires_grad(
             [self.netG1, self.netG2], False
         )  # G does not require gradients when optimizing D
