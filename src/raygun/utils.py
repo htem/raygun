@@ -7,8 +7,8 @@ import numpy as np
 import gunpowder as gp
 
 
-def passing_locals(local_dict):
-    kwargs = {}
+def passing_locals(local_dict) -> dict:
+    kwargs:dict = {}
     for k, v in local_dict.items():
         if k[0] != "_" and k != "self":
             if k == "kwargs":

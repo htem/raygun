@@ -19,7 +19,10 @@ from raygun.torch.systems import BaseSystem
 logger: logging.Logger = logging.Logger(__name__, "INFO")
 
 class CycleGAN(BaseSystem):
-    """CycleGAN implementation of :class:`raygun.torch.systems.BaseSystem`.
+    """Implementation of a CycleGAN system for image-to-image translation using PyTorch.
+
+    This class extends the `BaseSystem` class and implements the training and inference
+    pipelines for a CycleGAN model.
 
     Args:
         config (``string``, optional):
