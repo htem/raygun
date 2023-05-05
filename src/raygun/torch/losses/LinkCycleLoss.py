@@ -69,6 +69,7 @@ class LinkCycleLoss(BaseCompetentLoss):
         **kwargs:
             Optional keyword arguments.
     """
+
     def __init__(
         self,
         netD1:torch.nn.Module,  # differentiates between fake and real Bs
@@ -125,7 +126,7 @@ class LinkCycleLoss(BaseCompetentLoss):
                 # else:
                 #     pred = data_dict[key]
 
-                this_loss = self.gan_loss(dnet(data_dict[key].detach()), key == "real")
+                this_loss: float = self.gan_loss(dnet(data_dict[key].detach()), key == "real")
 
                 self.loss_dict.update({f"Discriminator_{side}/{key}": this_loss})
                 loss += lambda_ * this_loss
@@ -206,13 +207,13 @@ class LinkCycleLoss(BaseCompetentLoss):
 
                     if fcn_name == "l1_loss":
                         if real.size()[-self.dims :] != pred.size()[-self.dims :]:
-                            this_loss = loss_fcn(
+                            this_loss: float = loss_fcn(
                                 self.crop(real, pred.size()[-self.dims :]), pred
                             )
                         else:
-                            this_loss = loss_fcn(real, pred)
+                            this_loss: float = loss_fcn(real, pred)
                     elif fcn_name == "gan_loss":
-                        this_loss = loss_fcn(dnet(pred), True)
+                        this_loss: float = loss_fcn(dnet(pred), True)
 
                     self.loss_dict.update({f"{fcn_name}/{key}_{side}": this_loss})
                     loss += lambda_ * this_loss
