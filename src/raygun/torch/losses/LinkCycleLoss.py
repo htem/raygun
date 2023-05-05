@@ -99,8 +99,24 @@ class LinkCycleLoss(BaseCompetentLoss):
         super().__init__(**passing_locals(locals()))
         self.data_dict:dict = {}
 
-    def backward_D(self, side, dnet, data_dict) -> float:
-        """Calculate losses for a discriminator"""
+    def backward_D(self, side:str, dnet: torch.nn.Module, data_dict:dict) -> float:
+        """Calculate losses for a discriminator.
+        Args:
+            side (``nn.Module``): 
+                The side of interest of the CycleGAN (A or B type data).
+
+            dnet (``nn.Module``): 
+                The discriminator to backpropagate upon & calculate losses.
+
+            data_dict (``dict``): 
+                The training data dictionary with labels for A/B data.
+
+        Returns:
+            ``float``:
+                The calcualted discriminator loss.
+
+        """
+
         loss:float = 0.
         for key, lambda_ in self.d_lambda_dict[side].items():
             if lambda_ != 0:
@@ -117,7 +133,21 @@ class LinkCycleLoss(BaseCompetentLoss):
         loss.backward()
         return loss
 
-    def backward_Ds(self, data_dict, n_loop=5) -> tuple:
+    def backward_Ds(self, data_dict, n_loop=5) -> tuple(float, float):
+        """Calculate losses for all discriminators in the system.
+
+        Args:
+            data_dict (``dict``): 
+                The training data dictionary with labels for A/B data.
+
+            n_loop (``integer``):
+                Number of loop iterations.
+
+        Returns:
+            ``tuple(float, float)``:
+                The calcualted losses for each discriminator.
+        """
+
         self.set_requires_grad(
             [self.netG1, self.netG2], False
         )  # G does not require gradients when optimizing D
@@ -126,14 +156,14 @@ class LinkCycleLoss(BaseCompetentLoss):
 
         if self.gan_mode.lower() == "wgangp":  # Wasserstein Loss
             for _ in range(n_loop):
-                loss_D1 = self.backward_D("B", self.netD1, data_dict["B"])
-                loss_D2 = self.backward_D("A", self.netD2, data_dict["A"])
+                loss_D1: float = self.backward_D("B", self.netD1, data_dict["B"])
+                loss_D2: float = self.backward_D("A", self.netD2, data_dict["A"])
                 self.optimizer_D.step()  # update D's weights
                 self.clamp_weights(self.netD1)
                 self.clamp_weights(self.netD2)
         else:
-            loss_D1 = self.backward_D("B", self.netD1, data_dict["B"])
-            loss_D2 = self.backward_D("A", self.netD2, data_dict["A"])
+            loss_D1: float = self.backward_D("B", self.netD1, data_dict["B"])
+            loss_D2: float = self.backward_D("A", self.netD2, data_dict["A"])
             self.optimizer_D.step()  # update D's weights
 
         self.set_requires_grad(
@@ -143,9 +173,28 @@ class LinkCycleLoss(BaseCompetentLoss):
         # return losses
         return loss_D1, loss_D2
 
-    def backward_G(self, side, gnet, dnet, data_dict):
-        """Calculate losses for a generator"""
-        loss = 0
+    def backward_G(self, side:str, gnet:torch.nn.Module, dnet:torch.nn.Module, data_dict:dict) -> float:
+        """Calculate losses for a generator.
+        Args:
+            side (``nn.Module``): 
+                The side of interest of the CycleGAN (A or B type data).
+
+            gnet (``nn.Module``): 
+                The generator to backpropagate upon & calculate losses.
+
+            dnet (``nn.Module``): 
+                The discriminator to refrence for loss calculations.
+
+            data_dict (``dict``): 
+                The training data dictionary with labels for A/B data.
+
+        Returns:
+            ``float``:
+                The calcualted generator loss.
+
+        """
+
+        loss: float = 0.
         real = data_dict["real"]
         for fcn_name, lambdas in self.g_lambda_dict[side].items():
             loss_fcn = getattr(self, fcn_name)
@@ -172,16 +221,27 @@ class LinkCycleLoss(BaseCompetentLoss):
         loss.backward(retain_graph=True)
         return loss
 
-    def backward_Gs(self, data_dict):
+    def backward_Gs(self, data_dict) -> tuple(float, float):
+        """Calculate losses for all generators in the system.
+
+        Args:
+            data_dict (``dict``): 
+                The training data dictionary with labels for A/B data.
+
+        Returns:
+            ``tuple(float, float)``:
+                The calcualted losses for each generator.
+        """
+
         self.set_requires_grad(
             [self.netD1, self.netD2], False
         )  # D requires no gradients when optimizing G
 
         self.optimizer_G.zero_grad(set_to_none=True)  # set G1's gradients to zero
-        loss_G1 = self.backward_G(
+        loss_G1: float = self.backward_G(
             "B", self.netG1, self.netD1, data_dict["B"]
         )  # calculate gradient for G
-        loss_G2 = self.backward_G(
+        loss_G2: float = self.backward_G(
             "A", self.netG2, self.netD2, data_dict["A"]
         )  # calculate gradient for G
         self.optimizer_G.step()  # udpate G1's weights
@@ -193,7 +253,33 @@ class LinkCycleLoss(BaseCompetentLoss):
         # return losses
         return loss_G1, loss_G2
 
-    def forward(self, real_A, fake_A, cycled_A, real_B, fake_B, cycled_B):
+    def forward(self, real_A:torch.Tensor, fake_A:torch.Tensor, cycled_A:torch.Tensor, real_B:torch.Tensor, fake_B:torch.Tensor, cycled_B:torch.Tensor) -> float:
+        """Forward pass for the Linked CycleGAN system.
+
+        Args:
+            real_A (``torch.Tensor``): 
+                A-style training data.
+
+            fake_A (``torch.Tensor``): 
+                A-style generated data.
+
+            cycled_A (``torch.Tensor``): 
+                A-style recycled generated data.
+
+            real_B (``torch.Tensor``): 
+                B-style training data
+
+            fake_B (``torch.Tensor``): 
+                B-style generated data.
+
+            cycled_B (``torch.Tensor``): 
+                B-style recycled generated data.
+    
+        Returns:
+            ``float``:
+                The total loss for the system.
+        """
+
         self.data_dict.update({
             "real_A": real_A,
             "fake_A": fake_A,
@@ -205,10 +291,10 @@ class LinkCycleLoss(BaseCompetentLoss):
 
         # crop if necessary
         if real_A.size()[-self.dims :] != fake_B.size()[-self.dims :]:
-            real_A = self.crop(real_A, fake_A.size()[-self.dims :])
-            real_B = self.crop(real_B, fake_B.size()[-self.dims :])
+            real_A: torch.Tensor = self.crop(real_A, fake_A.size()[-self.dims :])
+            real_B: torch.Tensor = self.crop(real_B, fake_B.size()[-self.dims :])
 
-        data_dict = {
+        data_dict: dict = {
             "A": {"real": real_A, "fake": fake_A, "cycled": cycled_A},
             "B": {"real": real_B, "fake": fake_B, "cycled": cycled_B},
         }
@@ -227,7 +313,7 @@ class LinkCycleLoss(BaseCompetentLoss):
             }
         )
 
-        total_loss = loss_G1 + loss_G2 + loss_D1 + loss_D2
+        total_loss: float = loss_G1 + loss_G2 + loss_D1 + loss_D2
         # define dummy backward pass to disable Gunpowder's Train node loss.backward() call
         total_loss.backward = lambda: None
 
