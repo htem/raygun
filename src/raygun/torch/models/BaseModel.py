@@ -11,8 +11,8 @@ class BaseModel(torch.nn.Module):
             self, "output_arrays"
         ), "Model object must have list attribute `output_arrays` indicating what arrays are output by the model's forward pass, in order."
 
-    def add_log(self, writer, iter):
+    def add_log(self, writer, iter) -> None:
         pass
 
-    def forward(self):
+    def forward(self) -> None:
         return
