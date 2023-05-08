@@ -1,5 +1,6 @@
 from raygun.evaluation.validate_affinities import run_validation
 import torch
+from torch.utils.tensorboard import SummaryWriter
 
 from raygun.utils import passing_locals
 from raygun.torch.losses import GANLoss
@@ -88,12 +89,11 @@ class BaseCompetentLoss(torch.nn.Module):
         """Add an additional log to the writer, containing loss values and image examples.
 
         Args:
-            writer (``TODO``):
+            writer (``SummaryWriter``):
                 The display writer to append the losses & images to.
             
             step (``int``):
-                TODO.
-        
+                The current training step.
         """
 
         # add loss values
