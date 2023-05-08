@@ -8,12 +8,54 @@ import numpy as np
 
 import logging
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 from raygun.utils import passing_locals, to_json
 
-
 class BaseTrain(object):
+    """Base training class for models.
+
+    Args:
+        datapipes (``dict``): 
+            Dictionary of Gunpowder datapipes.
+
+        batch_request (``gunpowder.BatchRequest``): 
+            Request to use when running Gunpowder.
+
+        model (``torch.nn.Module``): 
+            PyTorch model to use for training.
+
+        loss (``torch.nn.Module``): 
+            PyTorch loss function to use for training.
+
+        optimizer (``torch.nn.Module``): 
+            PyTorch optimizer to use for training.
+
+        tensorboard_path (``string``, optional): 
+            Path to use for Tensorboard logs. Defaults to "./tensorboard/".
+
+        log_every (``integer``, optional): 
+            How often to log loss during training. Defaults to 20.
+
+        checkpoint_basename (``string``, optional): 
+            Basename to use for model checkpoints. Defaults to "./models/model".
+
+        save_every (``intger``, optional): 
+            How often to save a model checkpoint. Defaults to 2000.
+
+        spawn_subprocess (``bool``, optional): 
+            Whether to spawn a subprocess to run Gunpowder. Defaults to False.
+
+        num_workers (``integer``, optional): 
+            Number of workers to use with the Gunpowder PreCache node. Defaults to 11.
+
+        cache_size (``integer``, optional): 
+            Cache size to use with the Gunpowder PreCache node. Defaults to 50.
+
+        snapshot_every (``integer``, optional): 
+            How often to save a snapshot of the training volumes. Defaults to None.
+    """
+
     def __init__(
         self,
         datapipes: dict,
@@ -30,27 +72,27 @@ class BaseTrain(object):
         cache_size: int = 50,
         snapshot_every=None,
         **kwargs,
-    ):
-        kwargs = passing_locals(locals())
+    ) -> None:
+        kwargs: dict = passing_locals(locals())
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        self.arrays = {}
+        self.arrays: dict = {}
         for datapipe in datapipes.values():
             self.arrays.update(datapipe.arrays)
 
-        self.input_dict = {}
+        self.input_dict: dict = {}
         for array_name in inspect.signature(model.forward).parameters.keys():
             if array_name != "self":
                 self.input_dict[array_name] = self.arrays[array_name]
 
-        self.output_dict = {}
+        self.output_dict: dict = {}
         for i, array_name in enumerate(model.output_arrays):
             if array_name not in self.arrays.keys():
                 self.arrays[array_name] = gp.ArrayKey(array_name.upper())
             self.output_dict[i] = self.arrays[array_name]
 
-        self.loss_input_dict = {}
+        self.loss_input_dict: dict = {}
         for i, array_name in enumerate(
             inspect.signature(loss.forward).parameters.keys()
         ):

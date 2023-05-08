@@ -23,12 +23,6 @@ class CycleTrain(BaseTrain):
     ):
         super().__init__(**passing_locals(locals()))
 
-    # def prenet_pipe(self, mode: str = "train"): #TODO: Remove before 0.3.0
-    #     return (
-    #         tuple([dp.prenet_pipe(mode) for dp in self.datapipes.values()])
-    #         + gp.MergeProvider()
-    #     )  # merge upstream pipelines for multiple sources
-
     def postnet_pipe(self, mode: str = "train"):
         if mode == "test":
             stack = lambda dp: 1
