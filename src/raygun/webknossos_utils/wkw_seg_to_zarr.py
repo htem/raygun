@@ -104,7 +104,7 @@ def get_wk_mask(
 
             # Open the WKW dataset (as the `1` folder)
             print(f"Opening {zf_data_tmpdir + '/1'}...")
-            dataset = wkw.Dataset.open(zf_data_tmpdir + "/1")
+            dataset = wkw.Dataset.open(zf_data_tmpdir + "/Volume/1")
             zarr_path = zarr_path.rstrip(os.sep)
             print(f"Opening {zarr_path}/{raw_name}...")
             ds = daisy.open_ds(zarr_path, raw_name)
@@ -199,11 +199,12 @@ def wkw_seg_to_zarr(
     wk_token="Q9OpWh1PPwHYfH9BsnoM2Q",
     gt_name=None,
     gt_name_prefix="volumes/",
+    overwrite=None,
 ):
-    print(f"Downloading {wk_url}/annotations/Explorational/{annotation_ID}...")
+    print(f"Downloading {annotation_ID} from {wk_url}...")
     with wk.webknossos_context(token=wk_token, url=wk_url):
         annotation = wk.Annotation.download(
-            annotation_ID, annotation_type="Explorational"
+            annotation_ID#, annotation_type="Explorational"
         )
 
     time_str = strftime("%Y%m%d", gmtime())
@@ -217,7 +218,8 @@ def wkw_seg_to_zarr(
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     if os.path.exists(zip_path):
-        overwrite = input(f"{zip_path} already exists. Overwrite it? (y/n)")
+        if overwrite is None:
+            overwrite = input(f"{zip_path} already exists. Overwrite it? (y/n)")
         if overwrite.lower() == "y":
             os.remove(zip_path)
         else:
@@ -249,7 +251,7 @@ def wkw_seg_to_zarr(
             data = dataset.read(
                 ds.roi.get_offset() / ds.voxel_size, ds.roi.get_shape() / ds.voxel_size
             ).squeeze()
-
+            print(f"Sum of all data: {data.sum()}")
             # Save annotations to zarr
             if gt_name is None:
                 gt_name = f'{gt_name_prefix}gt_{annotation.dataset_name}_{annotation.username.replace(" ","")}_{time_str}'
@@ -282,20 +284,21 @@ def wkw_seg_to_zarr(
                 gt_array.voxel_size,
                 data.dtype,
                 write_size=write_size,
-                write_roi=chunk_roi,
+                # write_roi=chunk_roi,
                 # num_channels=num_channels,
-                compressor=compressor,
+                # compressor=compressor,
             )
 
             # Prepare saving function/variables
             def save_chunk(block: daisy.Roi):
-                # try:
-                destination.__setitem__(
-                    block.write_roi, gt_array.__getitem__(block.read_roi)
-                )
-                #     return 0 # success
-                # except:
-                #     return 1 # error
+                try:
+                    destination.__setitem__(
+                        block.write_roi, gt_array.__getitem__(block.read_roi)
+                    )
+                    # destination[block.write_roi] = gt_array[block.read_roi]
+                    return 0 # success
+                except:
+                    return 1 # error
 
             # Write data to new dataset
             task = daisy.Task(
@@ -336,21 +339,16 @@ if __name__ == "__main__":
         "zarr_path", type=str, help="Input path to Zarr volume used for annotation."
     )
     ap.add_argument(
-        "raw_name",
+        "--raw_name",
         type=str,
         help="Input name of dataset in the Zarr volume that was used for annotation.",
+        default="volumes/raw"
     )
     ap.add_argument(
         "--wk_url",
         type=str,
         help="URL of Webknossos instance.",
         default="http://catmaid2.hms.harvard.edu:9000",
-    )
-    ap.add_argument(
-        "--annotation_url_prefix",
-        type=str,
-        help="URL prefix for the Webknossos annotation.",
-        default="http://catmaid2.hms.harvard.edu:9000/annotations/Explorational/",
     )
     ap.add_argument(
         "--wk_token",
