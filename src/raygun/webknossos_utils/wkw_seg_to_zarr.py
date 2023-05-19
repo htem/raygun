@@ -83,7 +83,7 @@ def get_wk_mask(
         if overwrite.lower() == "y":
             os.remove(zip_path)
         else:
-            zip_suffix = (
+            zip_suffix = input(
                 f"Save with new suffix? (Enter suffix, or leave blank to abort.)"
             )
             if zip_suffix != "":
@@ -221,7 +221,7 @@ def wkw_seg_to_zarr(
         if overwrite.lower() == "y":
             os.remove(zip_path)
         else:
-            zip_suffix = (
+            zip_suffix = input(
                 f"Save with new suffix? (Enter suffix, or leave blank to abort.)"
             )
             if zip_suffix != "":
