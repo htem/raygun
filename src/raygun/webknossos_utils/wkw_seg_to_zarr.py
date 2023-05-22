@@ -248,8 +248,10 @@ def wkw_seg_to_zarr(
             zarr_path = zarr_path.rstrip(os.sep)
             print(f"Opening {zarr_path}/{raw_name}...")
             ds = daisy.open_ds(zarr_path, raw_name)
+            print(f"Reading from offset {ds.roi.get_offset() / ds.voxel_size} and shape {ds.roi.get_shape() / ds.voxel_size}")
             data = dataset.read(
-                ds.roi.get_offset() / ds.voxel_size, ds.roi.get_shape() / ds.voxel_size
+                ds.roi.get_offset() / ds.voxel_size, 
+                ds.roi.get_shape() / ds.voxel_size
             ).squeeze()
             print(f"Sum of all data: {data.sum()}")
             # Save annotations to zarr

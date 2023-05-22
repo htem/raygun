@@ -18,6 +18,7 @@ def make_cutout(
     src_dataset="volumes/raw_mipmap/s1",
 ):
     src = daisy.open_ds(src_file, src_dataset)
+    roi = roi.snap_to_grid(src.voxel_size, mode="closest")
     out = daisy.prepare_ds(
         out_file,
         out_dataset,
