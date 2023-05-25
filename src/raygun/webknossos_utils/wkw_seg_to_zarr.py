@@ -194,7 +194,7 @@ def wkw_seg_to_zarr(
     annotation_ID,
     save_path,  # TODO: Add mkdtemp() as default
     zarr_path,
-    raw_name,
+    raw_name="volumes/raw",
     wk_url="http://catmaid2.hms.harvard.edu:9000",
     wk_token="Q9OpWh1PPwHYfH9BsnoM2Q",
     gt_name=None,
@@ -232,6 +232,13 @@ def wkw_seg_to_zarr(
                 print("Aborting...")
     annotation.save(zip_path)
 
+    zarr_path = zarr_path.rstrip(os.sep)
+    print(f"Opening {zarr_path}/{raw_name}...")
+    ds = daisy.open_ds(zarr_path, raw_name)
+    offset = ds.roi.get_offset() #/ ds.voxel_size
+    shape = ds.roi.get_shape() / ds.voxel_size
+    print(f"Reading from offset {offset} and shape {shape}")
+
     # Extract zip file
     zf = zipfile.ZipFile(zip_path)
     with tempfile.TemporaryDirectory() as tempdir:
@@ -244,85 +251,82 @@ def wkw_seg_to_zarr(
 
             # Open the WKW dataset (as the `1` folder)
             print(f"Opening {zf_data_tmpdir + '/1'}...")
-            dataset = wkw.Dataset.open(zf_data_tmpdir + "/1")
-            zarr_path = zarr_path.rstrip(os.sep)
-            print(f"Opening {zarr_path}/{raw_name}...")
-            ds = daisy.open_ds(zarr_path, raw_name)
-            print(f"Reading from offset {ds.roi.get_offset() / ds.voxel_size} and shape {ds.roi.get_shape() / ds.voxel_size}")
+            dataset = wkw.wkw.Dataset.open(zf_data_tmpdir + "/1")
             data = dataset.read(
-                ds.roi.get_offset() / ds.voxel_size, 
-                ds.roi.get_shape() / ds.voxel_size
+                offset,
+                shape
             ).squeeze()
-            print(f"Sum of all data: {data.sum()}")
-            # Save annotations to zarr
-            if gt_name is None:
-                gt_name = f'{gt_name_prefix}gt_{annotation.dataset_name}_{annotation.username.replace(" ","")}_{time_str}'
 
-            target_roi = ds.roi
-            gt_array = daisy.Array(data, ds.roi, ds.voxel_size)
+    print(f"Sum of all data: {data.sum()}")
+    # Save annotations to zarr
+    if gt_name is None:
+        gt_name = f'{gt_name_prefix}gt_{annotation.dataset_name}_{annotation.username.replace(" ","")}_{time_str}'
 
-            chunk_size = ds.chunk_shape[0]
-            num_channels = 1
-            compressor = {
-                "id": "blosc",
-                "clevel": 3,
-                "cname": "blosclz",
-                "blocksize": chunk_size,
-            }
-            num_workers = 30
-            write_size = gt_array.voxel_size * chunk_size
-            chunk_roi = daisy.Roi(
-                [
-                    0,
-                ]
-                * len(target_roi.get_offset()),
-                write_size,
+    target_roi = ds.roi
+    gt_array = daisy.Array(data, ds.roi, ds.voxel_size)
+
+    chunk_size = ds.chunk_shape[0]
+    num_channels = 1
+    compressor = {
+        "id": "blosc",
+        "clevel": 3,
+        "cname": "blosclz",
+        "blocksize": chunk_size,
+    }
+    num_workers = 30
+    write_size = gt_array.voxel_size * chunk_size
+    chunk_roi = daisy.Roi(
+        [
+            0,
+        ]
+        * len(target_roi.get_offset()),
+        write_size,
+    )
+
+    destination = daisy.prepare_ds(
+        zarr_path,
+        gt_name,
+        target_roi,
+        gt_array.voxel_size,
+        data.dtype,
+        write_size=write_size,
+        # write_roi=chunk_roi,
+        # num_channels=num_channels,
+        # compressor=compressor,
+    )
+
+    # Prepare saving function/variables
+    def save_chunk(block: daisy.Roi):
+        try:
+            destination.__setitem__(
+                block.write_roi, gt_array.__getitem__(block.read_roi)
             )
+            # destination[block.write_roi] = gt_array[block.read_roi]
+            return 0 # success
+        except:
+            return 1 # error
 
-            destination = daisy.prepare_ds(
-                zarr_path,
-                gt_name,
-                target_roi,
-                gt_array.voxel_size,
-                data.dtype,
-                write_size=write_size,
-                # write_roi=chunk_roi,
-                # num_channels=num_channels,
-                # compressor=compressor,
-            )
+    # Write data to new dataset
+    task = daisy.Task(
+        f"save>{gt_name}",
+        target_roi,
+        chunk_roi,
+        chunk_roi,
+        process_function=save_chunk,
+        read_write_conflict=False,
+        fit="shrink",
+        num_workers=num_workers,
+        max_retries=2,
+    )
+    success = daisy.run_blockwise([task])
 
-            # Prepare saving function/variables
-            def save_chunk(block: daisy.Roi):
-                try:
-                    destination.__setitem__(
-                        block.write_roi, gt_array.__getitem__(block.read_roi)
-                    )
-                    # destination[block.write_roi] = gt_array[block.read_roi]
-                    return 0 # success
-                except:
-                    return 1 # error
-
-            # Write data to new dataset
-            task = daisy.Task(
-                f"save>{gt_name}",
-                target_roi,
-                chunk_roi,
-                chunk_roi,
-                process_function=save_chunk,
-                read_write_conflict=False,
-                fit="shrink",
-                num_workers=num_workers,
-                max_retries=2,
-            )
-            success = daisy.run_blockwise([task])
-
-            if success:
-                print(
-                    f"{target_roi} from {annotation_name} written to {zarr_path}/{gt_name}"
-                )
-                return gt_name
-            else:
-                print("Failed to save annotation layer.")
+    if success:
+        print(
+            f"{target_roi} from {annotation_name} written to {zarr_path}/{gt_name}"
+        )
+        return gt_name
+    else:
+        print("Failed to save annotation layer.")
 
 
 #%%
