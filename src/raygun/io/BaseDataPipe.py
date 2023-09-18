@@ -28,9 +28,10 @@ class BaseDataPipe(object):
 
     def prenet_pipe(self, mode: str = "train"):
         # Make pre-net datapipe
-        prenet_pipe = self.source + gp.RandomLocation()
+        prenet_pipe = self.source
         if mode == "train":
             sections = [
+                gp.RandomLocation(),
                 "reject",
                 "resample",
                 "preprocess",
@@ -41,7 +42,7 @@ class BaseDataPipe(object):
         elif mode == "predict":
             sections = ["reject", "resample", "preprocess", "unsqueeze", "stack"]
         elif mode == "test":
-            sections = ["reject", "resample", "preprocess", "unsqueeze", gp.Stack(1)]
+            sections = [gp.RandomLocation(), "reject", "resample", "preprocess", "unsqueeze", gp.Stack(1)]
         else:
             raise ValueError(f"mode={mode} not implemented.")
 
