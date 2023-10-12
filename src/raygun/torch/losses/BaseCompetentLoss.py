@@ -35,9 +35,6 @@ class BaseCompetentLoss(torch.nn.Module):
             requires_grad (``bool``):
                 Whether the networks require gradients or not.
         """
-
-        if not isinstance(nets, list): # TODO: remove, this should be redudant with type checking enforced
-            nets: list = [nets]
         for net in nets:
             if net is not None:
                 for param in net.parameters():
