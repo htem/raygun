@@ -68,7 +68,6 @@ class WeightedMSELoss_MTLSD(BaseCompetentLoss):
         gt_affs=None,
         affs_weights=None,
         pred_affs_ac=None,
-        # affs_weights_ac=None, TODO
     ):
         self.data_dict.update(
             {
