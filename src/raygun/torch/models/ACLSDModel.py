@@ -19,6 +19,7 @@ class ACLSDModel(torch.nn.Module):
             "num_heads": 2,
             "downsample_factors": [(2, 2, 2), (2, 2, 2), (2, 2, 2)],
             "constant_upsample": True,
+            "padding_type": "same",
         },
         ac_unet_kwargs={
             "input_nc": 1,
@@ -26,6 +27,7 @@ class ACLSDModel(torch.nn.Module):
             "fmap_inc_factor": 6,
             "downsample_factors": [(2, 2, 2), (2, 2, 2), (2, 2, 2)],
             "constant_upsample": True,
+            "padding_type": "same",
         },
         num_affs=3,
     ):
