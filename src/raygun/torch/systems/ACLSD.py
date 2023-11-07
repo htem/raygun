@@ -69,7 +69,6 @@ class ACLSD(BaseSystem):
             "output_size",
             "voxel_size",
             "neighborhood",
-            "lsd_kwargs",
             "batch_size",
             "pad",
             "random_location_kwargs",
