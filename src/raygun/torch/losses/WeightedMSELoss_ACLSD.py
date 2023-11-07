@@ -81,10 +81,16 @@ class WeightedMSELoss_MTLSD(BaseCompetentLoss):
                 "pred_affs_ac": pred_affs_ac.detach(),
             }
         )
+        try:
+            lsd_loss = self._calc_loss(pred_lsds, gt_lsds, lsds_weights)
+            aff_loss = self._calc_loss(pred_affs, gt_affs, affs_weights)
+        except:
+            lsd_loss = aff_loss = 0.
 
-        lsd_loss = self._calc_loss(pred_lsds, gt_lsds, lsds_weights)
-        aff_loss = self._calc_loss(pred_affs, gt_affs, affs_weights)
-        ac_aff_loss = self._calc_loss(pred_affs_ac, gt_affs)
+        try:
+            ac_aff_loss = self._calc_loss(pred_affs_ac, gt_affs)
+        except:
+            ac_aff_loss = 0.
 
         self.loss_dict = {"LSDs": lsd_loss.detach(), "Affinities1": aff_loss.detach(), "Affinities2": ac_aff_loss}
 
