@@ -1,5 +1,5 @@
 {
-    "source_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5",
+    "source_path": "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvBottomGT/training_0.n5",
     "source_dataset": "volumes/raw_30nm",
     "net_name": "netG2",
     "input_shape": 512,

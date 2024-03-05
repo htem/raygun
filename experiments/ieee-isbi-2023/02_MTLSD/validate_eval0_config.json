@@ -6,9 +6,9 @@
     "launch_command": "bsub -n 2 -We 3:59 -o $working_dir/validate.log -J validate_eval0 raygun-validate-affinities $working_dir/validate_eval0_config.json &",
     // CATMAID project ID to pull skeleton from
     "skeleton_config": {
-        "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
+        "file": "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvTopGT/eval_0.n5",
         "dataset_name": "volumes/rasterized_skeleton",
-        "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
+        "search_path": "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvTopGT/eval0_extras/eval0/skeletons",
         "voxel_size_xyz": [
             30,
             30,
@@ -24,7 +24,7 @@
             1384,
             785
         ],
-        "save_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_0.n5",
+        "save_path": "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvTopGT/eval_0.n5",
         "save_ds": "volumes/rasterized_skeleton"
     },
     "predict_config": {

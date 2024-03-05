@@ -131,7 +131,7 @@ num = 4
 fig, axes = plt.subplots(2, num, figsize=(5 * num, 10))
 
 dataset_dict = {
-    "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5": {
+    "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvBottomGT/training_0.n5": {
         "Real 30nm": "volumes/raw_30nm",
         "Real 90nm": "volumes/interpolated_90nm_aligned",
     },
@@ -153,7 +153,7 @@ images, seg = show_images(
     roi,
     axs=axes[0],
     overlay_seg={
-        "file": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5",
+        "file": "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvBottomGT/training_0.n5",
         "ds": "volumes/GT_labels",
     },
 )
@@ -164,7 +164,7 @@ fig
 # roi = daisy.Roi(offset=(1737, 600, 1118), shape=(512, 512, 1)) * 30
 roi = daisy.Roi(offset=(1737, 600, 1589), shape=(512, 512, 1)) * 30
 dataset_dict = {
-    "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
+    "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvTopGT/eval_1.n5": {
         "Real 30nm": "volumes/raw_30nm",
         "Real 90nm": "volumes/interpolated_90nm_aligned",
     },
@@ -186,7 +186,7 @@ roi = daisy.Roi(offset=(1737, 600, 1589), shape=(512, 512, 1)) * 30
 # Trained on Real 30nm
 dataset_dict_list = [
     {  # Train on Real 30nm, Predict on Real 30nm
-        "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
+        "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvTopGT/eval_1.n5": {
             "Real 30nm": "volumes/raw_30nm"
         },
         "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_real/30nm/predict_real/30nm/eval_1.n5": {
@@ -216,7 +216,7 @@ dataset_dict_list = [
         },
     },
     {  # Train on Real 30nm, Predict on Real 90nm
-        "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
+        "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvTopGT/eval_1.n5": {
             "Real 90nm\n(Trained on:\nreal 30nm)": "volumes/interpolated_90nm_aligned"
         },
         "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_real/30nm/predict_real/90nm/eval_1.n5": {
@@ -226,7 +226,7 @@ dataset_dict_list = [
         },
     },
     {  # Train on Real 90nm, Predict on Real 90nm
-        "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
+        "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvTopGT/eval_1.n5": {
             "Real 90nm\n(Trained on:\nreal 90nm)": "volumes/interpolated_90nm_aligned"
         },
         "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_real/90nm/predict_real90nm/eval_1.n5": {
@@ -236,7 +236,7 @@ dataset_dict_list = [
         },
     },
     {  # Train on Link-Fake 90nm, Predict on Real 90nm
-        "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
+        "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvTopGT/eval_1.n5": {
             "Real 90nm\n(Trained on:\nLink-Fake 90nm)": "volumes/interpolated_90nm_aligned"
         },
         "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_link/seed42/predict_real90nm/eval_1.n5": {
@@ -246,7 +246,7 @@ dataset_dict_list = [
         },
     },
     {  # Train on Split-Fake 90nm, Predict on Real 90nm
-        "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval_1.n5": {
+        "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvTopGT/eval_1.n5": {
             "Real 90nm\n(Trained on:\nSplit-Fake 90nm)": "volumes/interpolated_90nm_aligned"
         },
         "/nrs/funke/rhoadesj/raygun/experiments/ieee-isbi-2023/03_evaluate/train_split/seed42/predict_real90nm/eval_1.n5": {

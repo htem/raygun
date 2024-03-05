@@ -3,7 +3,7 @@
     // "skeleton_project_id": 18,
     "skeleton_config": {
         "file": "load",
-        "search_path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvTopGT/eval0_extras/eval0/skeletons",
+        "search_path": "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvTopGT/eval0_extras/eval0/skeletons",
         "url": "http://catmaid2.hms.harvard.edu:9000/annotations/62e941050100008800fe64bf", // eval1
         "coord_in_pix": true,
         "coord_in_zyx": true,

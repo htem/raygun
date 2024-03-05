@@ -10,7 +10,7 @@
     ],
     "sources": [
         {
-            "path": "/nrs/funke/rhoadesj/data/XNH/CBv/GT/CBvBottomGT/training_0.n5",
+            "path": "/nrs/funke/rhoadesj/data/XNH/CBvGT/CBvBottomGT/training_0.n5",
             "raw": "volumes/interpolated_90nm_aligned",
             "labels": "volumes/GT_labels",
             "labels_mask": "volumes/trainingMask_center400",
